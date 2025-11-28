@@ -4,6 +4,7 @@
 
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
+import jwt from 'jsonwebtoken';
 import type { ServerToClientEvents, ClientToServerEvents, AuthUser } from '@tracearr/shared';
 import { WS_EVENTS } from '@tracearr/shared';
 
@@ -15,6 +16,19 @@ interface SocketData {
 }
 
 let io: TypedServer | null = null;
+
+/**
+ * Verify JWT token for WebSocket connections
+ */
+function verifyToken(token: string): AuthUser {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET not configured');
+  }
+
+  const decoded = jwt.verify(token, secret) as AuthUser;
+  return decoded;
+}
 
 export function initializeWebSocket(httpServer: HttpServer): TypedServer {
   io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
@@ -36,38 +50,52 @@ export function initializeWebSocket(httpServer: HttpServer): TypedServer {
       }
 
       // Verify JWT and attach user to socket
-      // const user = await verifyJWT(token);
-      // socket.data.user = user;
+      const user = verifyToken(token);
+      (socket.data as SocketData).user = user;
 
       next();
     } catch (error) {
+      console.error('[WebSocket] Auth error:', error);
       next(new Error('Authentication failed'));
     }
   });
 
   io.on('connection', (socket: TypedSocket) => {
-    console.log(`Client connected: ${socket.id}`);
+    const user = (socket.data as SocketData).user;
+    console.log(`[WebSocket] Client connected: ${socket.id} (user: ${user?.username ?? 'unknown'})`);
 
     // Join user-specific room for targeted messages
-    // const user = socket.data.user;
-    // socket.join(`user:${user.userId}`);
+    if (user?.userId) {
+      socket.join(`user:${user.userId}`);
+    }
+
+    // Join server rooms for server-specific messages
+    if (user?.serverIds) {
+      for (const serverId of user.serverIds) {
+        socket.join(`server:${serverId}`);
+      }
+    }
+
+    // Auto-subscribe to sessions on connect
+    socket.join('sessions');
 
     // Handle session subscriptions
     socket.on(WS_EVENTS.SUBSCRIBE_SESSIONS as 'subscribe:sessions', () => {
       socket.join('sessions');
-      console.log(`${socket.id} subscribed to sessions`);
+      console.log(`[WebSocket] ${socket.id} subscribed to sessions`);
     });
 
     socket.on(WS_EVENTS.UNSUBSCRIBE_SESSIONS as 'unsubscribe:sessions', () => {
       socket.leave('sessions');
-      console.log(`${socket.id} unsubscribed from sessions`);
+      console.log(`[WebSocket] ${socket.id} unsubscribed from sessions`);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
+      console.log(`[WebSocket] Client disconnected: ${socket.id}, reason: ${reason}`);
     });
   });
 
+  console.log('[WebSocket] Server initialized');
   return io;
 }
 

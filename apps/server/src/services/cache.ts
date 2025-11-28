@@ -145,6 +145,17 @@ export interface PubSubService {
   unsubscribe(channel: string): Promise<void>;
 }
 
+// Module-level storage for pubsub service instance
+let pubSubServiceInstance: PubSubService | null = null;
+
+/**
+ * Get the global PubSub service instance
+ * Must be called after createPubSubService has been called
+ */
+export function getPubSubService(): PubSubService | null {
+  return pubSubServiceInstance;
+}
+
 export function createPubSubService(
   publisher: Redis,
   subscriber: Redis
@@ -158,7 +169,7 @@ export function createPubSubService(
     }
   });
 
-  return {
+  const service: PubSubService = {
     async publish(event: string, data: unknown): Promise<void> {
       await publisher.publish(
         REDIS_KEYS.PUBSUB_EVENTS,
@@ -179,4 +190,9 @@ export function createPubSubService(
       await subscriber.unsubscribe(channel);
     },
   };
+
+  // Store instance for global access
+  pubSubServiceInstance = service;
+
+  return service;
 }
