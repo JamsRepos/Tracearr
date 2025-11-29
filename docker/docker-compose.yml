@@ -1,8 +1,6 @@
 services:
   tracearr:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/connorgallopo/tracearr:v0.1.0-alpha.1
     ports:
       - "${PORT:-3000}:3000"
     environment:
