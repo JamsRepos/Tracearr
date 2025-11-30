@@ -4,6 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Monitor,
   Smartphone,
   Tablet,
@@ -12,6 +18,7 @@ import {
   ChevronUp,
   Laptop,
   HardDrive,
+  MapPin,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { UserDevice } from '@tracearr/shared';
@@ -110,6 +117,16 @@ function getDeviceDisplayName(device: UserDevice): string {
   return device.platform ?? 'Unknown Device';
 }
 
+function formatLocationShort(loc: { city: string | null; region: string | null; country: string | null }): string {
+  if (loc.city && loc.region) {
+    return `${loc.city}, ${loc.region}`;
+  }
+  if (loc.city && loc.country) {
+    return `${loc.city}, ${loc.country}`;
+  }
+  return loc.city ?? loc.country ?? 'Unknown';
+}
+
 export function UserDevicesCard({
   devices,
   isLoading,
@@ -168,85 +185,129 @@ export function UserDevicesCard({
   const hasMore = devices.length > INITIAL_DISPLAY_COUNT;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Monitor className="h-5 w-5" />
-            Devices
-          </div>
-          <Badge variant="secondary" className="font-normal">
-            {devices.length} unique
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {displayedDevices.map((device, index) => {
-            const deviceKey = `${device.deviceId ?? index}-${device.playerName ?? ''}-${device.product ?? ''}`;
-            const percentage = totalSessions > 0
-              ? Math.round((device.sessionCount / totalSessions) * 100)
-              : 0;
-            const DeviceIcon = getDeviceIcon(device);
-            const displayName = getDeviceDisplayName(device);
+    <TooltipProvider>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Monitor className="h-5 w-5" />
+              Devices
+            </div>
+            <Badge variant="secondary" className="font-normal">
+              {devices.length} unique
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {displayedDevices.map((device, index) => {
+              const deviceKey = `${device.deviceId ?? index}-${device.playerName ?? ''}-${device.product ?? ''}`;
+              const percentage = totalSessions > 0
+                ? Math.round((device.sessionCount / totalSessions) * 100)
+                : 0;
+              const DeviceIcon = getDeviceIcon(device);
+              const displayName = getDeviceDisplayName(device);
+              const locations = device.locations ?? [];
+              const hasMultipleLocations = locations.length > 1;
+              const primaryLocation = locations[0];
 
-            return (
-              <div
-                key={deviceKey}
-                className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+              return (
+                <div
+                  key={deviceKey}
+                  className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                >
+                  {/* Device Icon */}
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
                     <DeviceIcon className="h-4 w-4 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium">{displayName}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+
+                  {/* Device Info */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-medium">{displayName}</p>
                       {device.platform && (
-                        <>
-                          <span>{device.platform}</span>
-                          <span>·</span>
-                        </>
+                        <span className="text-xs text-muted-foreground">
+                          {device.platform}
+                        </span>
                       )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>
                         {device.sessionCount} session{device.sessionCount !== 1 ? 's' : ''}
                       </span>
                       <span>·</span>
                       <span>
-                        Last seen {formatDistanceToNow(new Date(device.lastSeenAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(device.lastSeenAt), { addSuffix: true })}
                       </span>
+                      {primaryLocation && (
+                        <>
+                          <span>·</span>
+                          {hasMultipleLocations ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex cursor-help items-center gap-1 text-yellow-500">
+                                  <MapPin className="h-3 w-3" />
+                                  {locations.length} locations
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <div className="space-y-1">
+                                  {locations.map((loc, locIndex) => (
+                                    <div
+                                      key={locIndex}
+                                      className="flex items-center justify-between gap-4 text-xs"
+                                    >
+                                      <span>{formatLocationShort(loc)}</span>
+                                      <span className="tabular-nums text-muted-foreground">
+                                        {loc.sessionCount}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {formatLocationShort(primaryLocation)}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-                <Badge variant="outline" className="font-mono">
-                  {percentage}%
-                </Badge>
-              </div>
-            );
-          })}
-        </div>
 
-        {hasMore && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-3 w-full"
-            onClick={() => { setIsExpanded(!isExpanded); }}
-          >
-            {isExpanded ? (
-              <>
-                <ChevronUp className="mr-2 h-4 w-4" />
-                Show Less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="mr-2 h-4 w-4" />
-                View All ({devices.length - INITIAL_DISPLAY_COUNT} more)
-              </>
-            )}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+                  {/* Usage Percentage */}
+                  <Badge variant="outline" className="flex-shrink-0 font-mono">
+                    {percentage}%
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+
+          {hasMore && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3 w-full"
+              onClick={() => { setIsExpanded(!isExpanded); }}
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="mr-2 h-4 w-4" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                  View All ({devices.length - INITIAL_DISPLAY_COUNT} more)
+                </>
+              )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 }

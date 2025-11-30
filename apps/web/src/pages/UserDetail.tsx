@@ -30,6 +30,21 @@ import {
   useUserDevices,
 } from '@/hooks/queries';
 
+/**
+ * Format duration in human readable format
+ */
+function formatDuration(ms: number | null): string {
+  if (!ms) return '—';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 const sessionColumns: ColumnDef<Session>[] = [
   {
     accessorKey: 'mediaTitle',
@@ -45,6 +60,13 @@ const sessionColumns: ColumnDef<Session>[] = [
     accessorKey: 'state',
     header: 'Status',
     cell: ({ row }) => <ActiveSessionBadge state={row.original.state} />,
+  },
+  {
+    accessorKey: 'durationMs',
+    header: 'Duration',
+    cell: ({ row }) => (
+      <span className="text-sm">{formatDuration(row.original.durationMs)}</span>
+    ),
   },
   {
     accessorKey: 'platform',

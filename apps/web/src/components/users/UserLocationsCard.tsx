@@ -105,17 +105,19 @@ export function UserLocationsCard({
                   <div>
                     <p className="font-medium">
                       {location.city ?? 'Unknown City'}
-                      {location.country && (
-                        <span className="text-muted-foreground">, {location.country}</span>
+                      {location.region && (
+                        <span className="text-muted-foreground">, {location.region}</span>
                       )}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{location.country ?? 'Unknown'}</span>
+                      <span>·</span>
                       <span>
                         {location.sessionCount} session{location.sessionCount !== 1 ? 's' : ''}
                       </span>
                       <span>·</span>
                       <span>
-                        Last seen {formatDistanceToNow(new Date(location.lastSeenAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(location.lastSeenAt), { addSuffix: true })}
                       </span>
                     </div>
                   </div>
