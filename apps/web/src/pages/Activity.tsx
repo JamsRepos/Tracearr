@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { ActiveSessionBadge } from '@/components/sessions/ActiveSessionBadge';
-import { User, Tv, Globe, Clock, Film, MonitorPlay } from 'lucide-react';
+import { User, Tv, Globe, Clock, Film, MonitorPlay, Layers } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { SessionWithDetails, ActiveSession } from '@tracearr/shared';
@@ -148,9 +148,24 @@ const sessionColumns: ColumnDef<SessionWithDetails>[] = [
   {
     accessorKey: 'durationMs',
     header: 'Duration',
-    cell: ({ row }) => (
-      <span className="text-sm">{formatDuration(row.original.durationMs)}</span>
-    ),
+    cell: ({ row }) => {
+      const session = row.original;
+      const segmentCount = session.segmentCount ?? 1;
+      return (
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{formatDuration(session.durationMs)}</span>
+          {segmentCount > 1 && (
+            <span
+              className="flex items-center gap-0.5 text-xs text-muted-foreground"
+              title={`${segmentCount} viewing sessions`}
+            >
+              <Layers className="h-3 w-3" />
+              {segmentCount}
+            </span>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: 'platform',
