@@ -291,6 +291,8 @@ export class TautulliService {
               .set({
                 stoppedAt: new Date(record.stopped * 1000),
                 durationMs: record.duration * 1000,
+                pausedDurationMs: record.paused_counter * 1000,
+                watched: record.watched_status === 1,
                 progressMs: Math.round(
                   (record.percent_complete / 100) * (existing.totalDurationMs ?? 0)
                 ),
@@ -326,6 +328,8 @@ export class TautulliService {
                 externalSessionId: record.reference_id,
                 stoppedAt: new Date(record.stopped * 1000),
                 durationMs: record.duration * 1000,
+                pausedDurationMs: record.paused_counter * 1000,
+                watched: record.watched_status === 1,
               })
               .where(eq(sessions.id, existingSession.id));
 
@@ -360,8 +364,13 @@ export class TautulliService {
             durationMs: record.duration * 1000,
             totalDurationMs: null, // Tautulli doesn't provide total duration directly
             progressMs: null, // Will calculate from percent_complete if needed
+            // Pause tracking from Tautulli
+            pausedDurationMs: record.paused_counter * 1000,
+            watched: record.watched_status === 1,
+            // Network/device info
             ipAddress: record.ip_address || '0.0.0.0',
             geoCity: geo.city,
+            geoRegion: geo.region,
             geoCountry: geo.country,
             geoLat: geo.lat,
             geoLon: geo.lon,
