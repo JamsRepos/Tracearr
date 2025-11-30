@@ -3,22 +3,34 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
+import { isNotNull, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { servers } from '../db/schema.js';
+import { servers, users } from '../db/schema.js';
 
 export const setupRoutes: FastifyPluginAsync = async (app) => {
   /**
-   * GET /setup/status - Check if any servers have been configured
+   * GET /setup/status - Check Tracearr configuration status
    *
    * This endpoint is public (no auth required) so the frontend
    * can determine whether to show the setup wizard or login page.
+   *
+   * Returns:
+   * - needsSetup: true if no owner accounts exist
+   * - hasServers: true if at least one server is configured
+   * - hasPasswordAuth: true if at least one user has password login enabled
    */
   app.get('/status', async () => {
-    const serverList = await db.select({ id: servers.id }).from(servers).limit(1);
+    // Check for servers and users in parallel
+    const [serverList, ownerList, passwordUserList] = await Promise.all([
+      db.select({ id: servers.id }).from(servers).limit(1),
+      db.select({ id: users.id }).from(users).where(eq(users.isOwner, true)).limit(1),
+      db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1),
+    ]);
 
     return {
+      needsSetup: ownerList.length === 0,
       hasServers: serverList.length > 0,
-      needsSetup: serverList.length === 0,
+      hasPasswordAuth: passwordUserList.length > 0,
     };
   });
 };

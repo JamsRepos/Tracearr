@@ -302,6 +302,7 @@ async function getActiveRules(): Promise<Rule[]> {
 
 /**
  * Create a violation from rule evaluation result
+ * Uses a transaction to ensure violation insert and trust score update are atomic
  */
 async function createViolation(
   ruleId: string,
@@ -310,28 +311,35 @@ async function createViolation(
   result: RuleEvaluationResult,
   rule: Rule
 ): Promise<void> {
-  const [created] = await db
-    .insert(violations)
-    .values({
-      ruleId,
-      userId,
-      sessionId,
-      severity: result.severity,
-      data: result.data,
-    })
-    .returning();
-
-  // Decrease user trust score based on severity
+  // Calculate trust penalty based on severity
   const trustPenalty = result.severity === 'high' ? 20 : result.severity === 'warning' ? 10 : 5;
-  await db
-    .update(users)
-    .set({
-      trustScore: sql`GREATEST(0, ${users.trustScore} - ${trustPenalty})`,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, userId));
 
-  // Get user details for the violation broadcast
+  // Use transaction to ensure violation creation and trust score update are atomic
+  const created = await db.transaction(async (tx) => {
+    const [violation] = await tx
+      .insert(violations)
+      .values({
+        ruleId,
+        userId,
+        sessionId,
+        severity: result.severity,
+        data: result.data,
+      })
+      .returning();
+
+    // Decrease user trust score based on severity (atomic within transaction)
+    await tx
+      .update(users)
+      .set({
+        trustScore: sql`GREATEST(0, ${users.trustScore} - ${trustPenalty})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return violation;
+  });
+
+  // Get user details for the violation broadcast (outside transaction - read only)
   const [user] = await db
     .select({
       id: users.id,

@@ -116,7 +116,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Verify access
-      if (!authUser.serverIds.includes(user.serverId)) {
+      if (user.serverId && !authUser.serverIds.includes(user.serverId)) {
         return reply.forbidden('You do not have access to this user');
       }
 
@@ -179,7 +179,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Verify access
-      if (!authUser.serverIds.includes(user.serverId)) {
+      if (user.serverId && !authUser.serverIds.includes(user.serverId)) {
         return reply.forbidden('You do not have access to this user');
       }
 
@@ -256,7 +256,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
         return reply.notFound('User not found');
       }
 
-      if (!authUser.serverIds.includes(user.serverId)) {
+      if (user.serverId && !authUser.serverIds.includes(user.serverId)) {
         return reply.forbidden('You do not have access to this user');
       }
 
@@ -339,7 +339,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
         return reply.notFound('User not found');
       }
 
-      if (!authUser.serverIds.includes(user.serverId)) {
+      if (user.serverId && !authUser.serverIds.includes(user.serverId)) {
         return reply.forbidden('You do not have access to this user');
       }
 
@@ -408,7 +408,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
         return reply.notFound('User not found');
       }
 
-      if (!authUser.serverIds.includes(user.serverId)) {
+      if (user.serverId && !authUser.serverIds.includes(user.serverId)) {
         return reply.forbidden('You do not have access to this user');
       }
 

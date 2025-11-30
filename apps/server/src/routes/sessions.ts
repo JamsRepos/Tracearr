@@ -51,7 +51,9 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       const authUser = request.user;
       const offset = (page - 1) * pageSize;
 
-      // Build WHERE clause conditions dynamically
+      // Build WHERE clause conditions dynamically for raw SQL CTE query
+      // Note: Using sql.join() pattern because this query requires a CTE for reference_id grouping,
+      // which isn't expressible in Drizzle's query builder.
       const conditions: ReturnType<typeof sql>[] = [];
 
       // Filter by user's accessible servers
@@ -316,7 +318,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         }
       }
 
-      // Query from database
+      // Query from database using manual JOINs
+      // Note: We use manual JOINs here instead of relational queries because:
+      // 1. The API expects a flat response shape (serverName, username vs nested objects)
+      // 2. Manual JOINs produce the exact shape without transformation
+      // 3. Type-safe via explicit select fields
+      // See drizzle-orm-research-findings.md for when to use relational vs manual JOINs
       const sessionData = await db
         .select({
           id: sessions.id,

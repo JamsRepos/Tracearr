@@ -40,6 +40,7 @@ import { violationRoutes } from './routes/violations.js';
 import { statsRoutes } from './routes/stats.js';
 import { settingsRoutes } from './routes/settings.js';
 import { importRoutes } from './routes/import.js';
+import { imageRoutes } from './routes/images.js';
 import { getPollerSettings } from './routes/settings.js';
 import { initializeEncryption, isEncryptionInitialized } from './utils/crypto.js';
 import { geoipService } from './services/geoip.js';
@@ -212,6 +213,7 @@ async function buildApp() {
   await app.register(statsRoutes, { prefix: `${API_BASE_PATH}/stats` });
   await app.register(settingsRoutes, { prefix: `${API_BASE_PATH}/settings` });
   await app.register(importRoutes, { prefix: `${API_BASE_PATH}/import` });
+  await app.register(imageRoutes, { prefix: `${API_BASE_PATH}/images` });
 
   // Serve static frontend in production
   const webDistPath = resolve(PROJECT_ROOT, 'apps/web/dist');

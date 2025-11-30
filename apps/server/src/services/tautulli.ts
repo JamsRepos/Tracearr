@@ -231,9 +231,11 @@ export class TautulliService {
 
     // Map by externalId (Plex user ID)
     for (const user of tracearrUsers) {
-      const plexUserId = parseInt(user.externalId, 10);
-      if (!isNaN(plexUserId)) {
-        userMap.set(plexUserId, user.id);
+      if (user.externalId) {
+        const plexUserId = parseInt(user.externalId, 10);
+        if (!isNaN(plexUserId)) {
+          userMap.set(plexUserId, user.id);
+        }
       }
     }
 

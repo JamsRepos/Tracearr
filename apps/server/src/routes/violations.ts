@@ -131,6 +131,11 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
 
       const { id } = params.data;
 
+      // Query using manual JOINs for flat API response shape
+      // Manual JOINs are preferred here because:
+      // 1. API expects flat object (ruleName, username vs nested rule.name, user.name)
+      // 2. Includes fields from 3 related tables with custom selection
+      // See drizzle-orm-research-findings.md for relational vs manual JOIN guidance
       const violationRows = await db
         .select({
           id: violations.id,
