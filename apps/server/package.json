@@ -13,6 +13,7 @@
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist .turbo",
     "db:generate": "drizzle-kit generate",

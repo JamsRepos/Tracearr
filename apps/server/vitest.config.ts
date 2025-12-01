@@ -3,12 +3,30 @@ import { resolve } from 'node:path';
 
 const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
+// Test Organization:
+//
+// Unit Tests (default - run with `pnpm test`):
+//   Located in: src/__tests__/*.test.ts (co-located with source)
+//   Fast, isolated, no network calls
+//   Test pure functions by importing actual exports
+//
+// Integration Tests (run with `pnpm test:integration`):
+//   Located in: test/integration/*.integration.test.ts
+//   May mock fetch, test service classes
+//   Slower, test component interactions
+//
+// Security Tests:
+//   Located in: src/*.security.test.ts
+//   Test auth, authorization, input validation
+
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Unit tests: co-located __tests__ folders + security tests
+    // Exclude integration tests (they use a separate config)
     include: ['src/**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/*.integration.test.ts'],
     setupFiles: ['./src/test/setup.ts'],
     testTimeout: 10000,
     hookTimeout: 10000,
@@ -21,7 +39,7 @@ export default defineConfig({
       // Include json-summary for CI coverage reporting
       reporter: ['text', 'json', 'json-summary', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      include: ['src/services/**/*.ts', 'src/routes/**/*.ts', 'src/jobs/**/*.ts'],
+      include: ['src/services/**/*.ts', 'src/routes/**/*.ts', 'src/jobs/**/*.ts', 'src/utils/**/*.ts'],
       exclude: ['**/*.test.ts', '**/test/**'],
       // Coverage thresholds - applied per-file for tested modules
       thresholds: {
