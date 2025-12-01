@@ -12,7 +12,7 @@ import type {
   ConcurrentStreamsParams,
   GeoRestrictionParams,
 } from '@tracearr/shared';
-import { GEOIP_CONFIG } from '@tracearr/shared';
+import { GEOIP_CONFIG, TIME_MS } from '@tracearr/shared';
 
 export interface RuleEvaluationResult {
   violated: boolean;
@@ -179,7 +179,7 @@ export class RuleEngine {
     recentSessions: Session[],
     params: DeviceVelocityParams
   ): RuleEvaluationResult {
-    const windowStart = new Date(session.startedAt.getTime() - params.windowHours * 60 * 60 * 1000);
+    const windowStart = new Date(session.startedAt.getTime() - params.windowHours * TIME_MS.HOUR);
 
     const userSessions = recentSessions.filter(
       (s) => s.userId === session.userId && s.startedAt >= windowStart

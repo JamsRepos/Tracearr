@@ -10,13 +10,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, unlinkSyn
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
+import { TIME_MS } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { servers } from '../db/schema.js';
 import { decrypt } from '../utils/crypto.js';
 
 // Cache directory (in project root/data/image-cache)
 const CACHE_DIR = join(process.cwd(), 'data', 'image-cache');
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = TIME_MS.DAY;
 const MAX_CACHE_SIZE_MB = 500; // Maximum cache size in MB
 
 // Ensure cache directory exists
@@ -147,7 +148,7 @@ async function cleanupCache(): Promise<void> {
 }
 
 // Run cleanup periodically (every hour)
-setInterval(() => { void cleanupCache(); }, 60 * 60 * 1000);
+setInterval(() => { void cleanupCache(); }, TIME_MS.HOUR);
 // Also run on startup
 void cleanupCache();
 

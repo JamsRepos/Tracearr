@@ -1,13 +1,20 @@
 /**
  * Server sync service - imports users and libraries from Plex/Jellyfin
+ *
+ * Uses generic syncServerUsers function for both Plex and Jellyfin,
+ * delegating user operations to userService.
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { servers, users } from '../db/schema.js';
-import { PlexService } from './plex.js';
-import { JellyfinService } from './jellyfin.js';
+import { servers } from '../db/schema.js';
+import {
+  createMediaServerClient,
+  PlexClient,
+  type MediaUser,
+} from './mediaServer/index.js';
 import { decrypt } from '../utils/crypto.js';
+import { upsertUserFromMediaServer } from './userService.js';
 
 export interface SyncResult {
   usersAdded: number;
@@ -22,6 +29,65 @@ export interface SyncOptions {
 }
 
 /**
+ * Generic user sync - works for both Plex and Jellyfin
+ *
+ * Uses userService.upsertUserFromMediaServer to handle create/update logic,
+ * eliminating duplicate code between syncPlexUsers and syncJellyfinUsers.
+ */
+async function syncServerUsers(
+  serverId: string,
+  mediaUsers: MediaUser[]
+): Promise<{ added: number; updated: number; errors: string[] }> {
+  const errors: string[] = [];
+  let added = 0;
+  let updated = 0;
+
+  for (const mediaUser of mediaUsers) {
+    try {
+      const result = await upsertUserFromMediaServer(serverId, mediaUser);
+      if (result.created) {
+        added++;
+      } else {
+        updated++;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      errors.push(`Failed to sync user ${mediaUser.username}: ${message}`);
+    }
+  }
+
+  return { added, updated, errors };
+}
+
+/**
+ * Fetch Plex users from server (Plex has special API via Plex.tv)
+ */
+async function fetchPlexUsers(token: string, serverUrl: string): Promise<MediaUser[]> {
+  // Get server machine identifier for shared_servers API
+  const response = await fetch(serverUrl, {
+    headers: {
+      'X-Plex-Token': token,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to connect to Plex server: ${response.status}`);
+  }
+
+  const serverInfo = (await response.json()) as {
+    MediaContainer?: { machineIdentifier?: string };
+  };
+  const machineIdentifier = serverInfo.MediaContainer?.machineIdentifier;
+
+  if (!machineIdentifier) {
+    throw new Error('Could not get server machine identifier');
+  }
+
+  return PlexClient.getAllUsersWithLibraries(token, machineIdentifier);
+}
+
+/**
  * Sync users from Plex server to local database
  */
 async function syncPlexUsers(
@@ -29,80 +95,13 @@ async function syncPlexUsers(
   token: string,
   serverUrl: string
 ): Promise<{ added: number; updated: number; errors: string[] }> {
-  const errors: string[] = [];
-  let added = 0;
-  let updated = 0;
-
   try {
-    // Get server machine identifier for shared_servers API
-    const response = await fetch(serverUrl, {
-      headers: {
-        'X-Plex-Token': token,
-        Accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to connect to Plex server: ${response.status}`);
-    }
-
-    const serverInfo = (await response.json()) as {
-      MediaContainer?: { machineIdentifier?: string };
-    };
-    const machineIdentifier = serverInfo.MediaContainer?.machineIdentifier;
-
-    if (!machineIdentifier) {
-      throw new Error('Could not get server machine identifier');
-    }
-
-    // Get all users with their library access from Plex.tv
-    const plexUsers = await PlexService.getAllUsersWithLibraries(token, machineIdentifier);
-
-    for (const plexUser of plexUsers) {
-      try {
-        // Check if user exists
-        const existing = await db
-          .select()
-          .from(users)
-          .where(and(eq(users.serverId, serverId), eq(users.externalId, plexUser.id)))
-          .limit(1);
-
-        if (existing.length > 0) {
-          // Update existing user
-          await db
-            .update(users)
-            .set({
-              username: plexUser.username || plexUser.title,
-              email: plexUser.email || null,
-              thumbUrl: plexUser.thumb || null,
-              isOwner: plexUser.isAdmin,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, existing[0]!.id));
-          updated++;
-        } else {
-          // Insert new user
-          await db.insert(users).values({
-            serverId,
-            externalId: plexUser.id,
-            username: plexUser.username || plexUser.title,
-            email: plexUser.email || null,
-            thumbUrl: plexUser.thumb || null,
-            isOwner: plexUser.isAdmin,
-          });
-          added++;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        errors.push(`Failed to sync user ${plexUser.username}: ${message}`);
-      }
-    }
+    const plexUsers = await fetchPlexUsers(token, serverUrl);
+    return syncServerUsers(serverId, plexUsers);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    errors.push(`Plex user sync failed: ${message}`);
+    return { added: 0, updated: 0, errors: [`Plex user sync failed: ${message}`] };
   }
-
-  return { added, updated, errors };
 }
 
 /**
@@ -113,63 +112,18 @@ async function syncJellyfinUsers(
   serverUrl: string,
   encryptedToken: string
 ): Promise<{ added: number; updated: number; errors: string[] }> {
-  const errors: string[] = [];
-  let added = 0;
-  let updated = 0;
-
   try {
-    const jellyfinService = new JellyfinService({
-      id: serverId,
-      name: '',
+    const client = createMediaServerClient({
       type: 'jellyfin',
       url: serverUrl,
       token: encryptedToken,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as any);
-    const jellyfinUsers = await jellyfinService.getUsers();
-
-    for (const jfUser of jellyfinUsers) {
-      try {
-        // Check if user exists
-        const existing = await db
-          .select()
-          .from(users)
-          .where(and(eq(users.serverId, serverId), eq(users.externalId, jfUser.id)))
-          .limit(1);
-
-        if (existing.length > 0) {
-          // Update existing user
-          await db
-            .update(users)
-            .set({
-              username: jfUser.name,
-              isOwner: jfUser.isAdministrator,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, existing[0]!.id));
-          updated++;
-        } else {
-          // Insert new user
-          await db.insert(users).values({
-            serverId,
-            externalId: jfUser.id,
-            username: jfUser.name,
-            isOwner: jfUser.isAdministrator,
-          });
-          added++;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        errors.push(`Failed to sync user ${jfUser.name}: ${message}`);
-      }
-    }
+    });
+    const jellyfinUsers = await client.getUsers();
+    return syncServerUsers(serverId, jellyfinUsers);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    errors.push(`Jellyfin user sync failed: ${message}`);
+    return { added: 0, updated: 0, errors: [`Jellyfin user sync failed: ${message}`] };
   }
-
-  return { added, updated, errors };
 }
 
 /**
@@ -217,15 +171,13 @@ export async function syncServer(
   // Sync libraries (just count for now - libraries stored on server)
   if (options.syncLibraries) {
     try {
-      if (server.type === 'plex') {
-        const plexService = new PlexService(server as any);
-        const libraries = await plexService.getLibraries();
-        result.librariesSynced = libraries.length;
-      } else if (server.type === 'jellyfin') {
-        const jellyfinService = new JellyfinService(server as any);
-        const libraries = await jellyfinService.getLibraries();
-        result.librariesSynced = libraries.length;
-      }
+      const client = createMediaServerClient({
+        type: server.type,
+        url: serverUrl,
+        token: server.token,
+      });
+      const libraries = await client.getLibraries();
+      result.librariesSynced = libraries.length;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       result.errors.push(`Library sync failed: ${message}`);

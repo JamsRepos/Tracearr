@@ -8,8 +8,7 @@ import { createServerSchema, serverIdParamSchema } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { servers } from '../db/schema.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
-import { PlexService } from '../services/plex.js';
-import { JellyfinService } from '../services/jellyfin.js';
+import { PlexClient, JellyfinClient } from '../services/mediaServer/index.js';
 import { syncServer } from '../services/sync.js';
 
 export const serverRoutes: FastifyPluginAsync = async (app) => {
@@ -79,12 +78,12 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       // Verify the server connection
       try {
         if (type === 'plex') {
-          const isAdmin = await PlexService.verifyServerAdmin(token, url);
+          const isAdmin = await PlexClient.verifyServerAdmin(token, url);
           if (!isAdmin) {
             return reply.forbidden('Token does not have admin access to this Plex server');
           }
         } else if (type === 'jellyfin') {
-          const isAdmin = await JellyfinService.verifyServerAdmin(token, url);
+          const isAdmin = await JellyfinClient.verifyServerAdmin(token, url);
           if (!isAdmin) {
             return reply.forbidden('Token does not have admin access to this Jellyfin server');
           }

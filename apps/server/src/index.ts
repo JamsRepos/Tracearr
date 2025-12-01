@@ -30,14 +30,14 @@ import type { ActiveSession, ViolationWithDetails, DashboardStats, TautulliImpor
 
 import authPlugin from './plugins/auth.js';
 import redisPlugin from './plugins/redis.js';
-import { authRoutes } from './routes/auth.js';
+import { authRoutes } from './routes/auth/index.js';
 import { setupRoutes } from './routes/setup.js';
 import { serverRoutes } from './routes/servers.js';
-import { userRoutes } from './routes/users.js';
+import { userRoutes } from './routes/users/index.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { ruleRoutes } from './routes/rules.js';
 import { violationRoutes } from './routes/violations.js';
-import { statsRoutes } from './routes/stats.js';
+import { statsRoutes } from './routes/stats/index.js';
 import { settingsRoutes } from './routes/settings.js';
 import { importRoutes } from './routes/import.js';
 import { imageRoutes } from './routes/images.js';
@@ -46,7 +46,7 @@ import { getPollerSettings } from './routes/settings.js';
 import { initializeEncryption, isEncryptionInitialized } from './utils/crypto.js';
 import { geoipService } from './services/geoip.js';
 import { createCacheService, createPubSubService } from './services/cache.js';
-import { initializePoller, startPoller, stopPoller } from './jobs/poller.js';
+import { initializePoller, startPoller, stopPoller } from './jobs/poller/index.js';
 import { initializeWebSocket, broadcastToSessions } from './websocket/index.js';
 import { db, runMigrations } from './db/client.js';
 import { initTimescaleDB, getTimescaleStatus } from './db/timescale.js';
