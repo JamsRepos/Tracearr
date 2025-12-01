@@ -546,8 +546,15 @@ function MobileSettings() {
 
   const getQRData = (): string => {
     if (!config?.token) return '';
+    // In dev, Vite runs on :5173 but mobile app needs the backend on :3000
+    // In production, both are served from the same origin
+    let serverUrl = window.location.origin;
+    if (import.meta.env.DEV) {
+      // Replace Vite's port with backend port for dev
+      serverUrl = serverUrl.replace(':5173', ':3000');
+    }
     const payload: MobileQRPayload = {
-      url: window.location.origin,
+      url: serverUrl,
       token: config.token,
       name: config.serverName,
     };
