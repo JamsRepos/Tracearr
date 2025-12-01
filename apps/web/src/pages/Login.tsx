@@ -38,6 +38,7 @@ export function Login() {
   const [plexServers, setPlexServers] = useState<PlexServerInfo[]>([]);
   const [plexTempToken, setPlexTempToken] = useState<string | null>(null);
   const [connectingToServer, setConnectingToServer] = useState<string | null>(null);
+  const [plexPopup, setPlexPopup] = useState<Window | null>(null);
 
   // Local auth state
   const [localLoading, setLocalLoading] = useState(false);
@@ -70,6 +71,14 @@ export function Login() {
     }
   }, [isAuthenticated, authLoading, navigate, searchParams]);
 
+  // Close Plex popup helper
+  const closePlexPopup = () => {
+    if (plexPopup && !plexPopup.closed) {
+      plexPopup.close();
+    }
+    setPlexPopup(null);
+  };
+
   // Poll for Plex PIN claim
   const pollPlexPin = async (pinId: string) => {
     try {
@@ -81,7 +90,10 @@ export function Login() {
         return;
       }
 
-      // PIN claimed! Check what we got back
+      // PIN claimed - close the popup
+      closePlexPopup();
+
+      // Check what we got back
       if (result.needsServerSelection && result.servers && result.tempToken) {
         // New user - needs to select a server
         setPlexServers(result.servers);
@@ -111,8 +123,9 @@ export function Login() {
       const result = await api.auth.loginPlex();
       setPlexAuthUrl(result.authUrl);
 
-      // Open Plex auth in popup
-      window.open(result.authUrl, 'plex_auth', 'width=600,height=700,popup=yes');
+      // Open Plex auth in popup and store reference
+      const popup = window.open(result.authUrl, 'plex_auth', 'width=600,height=700,popup=yes');
+      setPlexPopup(popup);
 
       // Start polling
       void pollPlexPin(result.pinId);
@@ -157,6 +170,11 @@ export function Login() {
 
   // Reset Plex auth state
   const resetPlexAuth = () => {
+    // Close popup if still open
+    if (plexPopup && !plexPopup.closed) {
+      plexPopup.close();
+    }
+    setPlexPopup(null);
     setAuthStep('initial');
     setPlexAuthUrl(null);
     setPlexServers([]);
