@@ -133,7 +133,6 @@ jobs:
           eas build \
             --platform ios \
             --profile preview \
-            --auto-submit \
             --auto-submit-with-profile preview \
             --non-interactive \
             --no-wait
@@ -195,7 +194,6 @@ jobs:
           eas build \
             --platform android \
             --profile preview \
-            --auto-submit \
             --auto-submit-with-profile preview \
             --non-interactive \
             --no-wait
