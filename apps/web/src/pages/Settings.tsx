@@ -131,9 +131,9 @@ function GeneralSettings() {
       <CardContent className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-base">Session Polling</Label>
+            <Label className="text-base">Session Sync</Label>
             <p className="text-sm text-muted-foreground">
-              Enable automatic polling for active sessions from your media servers
+              Enable session tracking for your media servers
             </p>
           </div>
           <Switch
@@ -144,9 +144,9 @@ function GeneralSettings() {
 
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-base">Polling Interval</Label>
+            <Label className="text-base">Sync Interval</Label>
             <p className="text-sm text-muted-foreground">
-              How often to check for active sessions (5-300 seconds)
+              Polling frequency for Jellyfin/Emby (5-300 seconds)
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -163,10 +163,14 @@ function GeneralSettings() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-muted/50 p-4">
+        <div className="rounded-lg bg-muted/50 p-4 space-y-2">
           <p className="text-sm text-muted-foreground">
-            Changes take effect on the next poll cycle. Lower intervals provide more real-time
-            updates but increase load on your media servers.
+            <strong>Plex:</strong> Uses real-time updates via SSE. Polling is only used as a
+            fallback if the connection fails.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <strong>Jellyfin/Emby:</strong> Uses the sync interval above for session detection.
+            Lower values provide faster updates but increase server load.
           </p>
         </div>
       </CardContent>
