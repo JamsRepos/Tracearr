@@ -272,13 +272,14 @@ export const violations = pgTable(
   ]
 );
 
-// Mobile access tokens (for QR code pairing)
+// Mobile pairing tokens (one-time use, expire after 15 minutes)
 export const mobileTokens = pgTable('mobile_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(), // SHA-256 of trr_mob_xxx token
-  isEnabled: boolean('is_enabled').notNull().default(true),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  rotatedAt: timestamp('rotated_at', { withTimezone: true }),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'cascade' }),
+  usedAt: timestamp('used_at', { withTimezone: true }), // Set when token is used, null = unused
 });
 
 // Mobile sessions (paired devices)
