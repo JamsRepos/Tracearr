@@ -66,6 +66,7 @@ export type {
   MobileConfig,
   MobilePairRequest,
   MobilePairResponse,
+  MobilePairTokenResponse,
   MobileQRPayload,
   NotificationEventType,
   NotificationPreferences,

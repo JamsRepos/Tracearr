@@ -2,29 +2,38 @@
  * Mobile routes - Mobile app pairing, authentication, and session management
  *
  * Settings endpoints (owner only):
- * - GET /mobile - Get mobile config (token, sessions)
- * - POST /mobile/enable - Enable mobile access, generate token
+ * - GET /mobile - Get mobile config (enabled status, sessions)
+ * - POST /mobile/enable - Enable mobile access
  * - POST /mobile/disable - Disable mobile access
- * - POST /mobile/rotate - Rotate token (invalidates old)
+ * - POST /mobile/pair-token - Generate one-time pairing token
  * - DELETE /mobile/sessions - Revoke all mobile sessions
+ * - DELETE /mobile/sessions/:id - Revoke single mobile session
  *
  * Auth endpoints (mobile app):
- * - POST /mobile/pair - Exchange mobile token for JWT
+ * - POST /mobile/pair - Exchange pairing token for JWT
  * - POST /mobile/refresh - Refresh mobile JWT
+ * - POST /mobile/push-token - Register push token
  */
 
 import type { FastifyPluginAsync } from 'fastify';
 import { createHash, randomBytes } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, and, gt, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import type { MobileConfig, MobileSession, MobilePairResponse } from '@tracearr/shared';
+import type { MobileConfig, MobileSession, MobilePairResponse, MobilePairTokenResponse } from '@tracearr/shared';
 import { REDIS_KEYS, CACHE_TTL } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { mobileTokens, mobileSessions, servers, users } from '../db/schema.js';
+import { mobileTokens, mobileSessions, servers, users, settings } from '../db/schema.js';
 
 // Rate limits for mobile auth endpoints
 const MOBILE_PAIR_MAX_ATTEMPTS = 5; // 5 attempts per 15 minutes
 const MOBILE_REFRESH_MAX_ATTEMPTS = 30; // 30 attempts per 15 minutes
+
+// Limits
+const MAX_PAIRED_DEVICES = 5;
+const MAX_PENDING_TOKENS = 3;
+const TOKEN_EXPIRY_MINUTES = 15;
+const TOKEN_GEN_RATE_LIMIT = 3; // Max tokens per 5 minutes
+const TOKEN_GEN_RATE_WINDOW = 5 * 60; // 5 minutes in seconds
 
 // Token format: trr_mob_<32 random bytes as base64url>
 const MOBILE_TOKEN_PREFIX = 'trr_mob_';
@@ -91,11 +100,24 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only server owners can access mobile settings');
     }
 
-    // Get mobile token
-    const tokenRow = await db.select().from(mobileTokens).limit(1);
+    // Get mobile enabled status from settings
+    const settingsRow = await db.select({ mobileEnabled: settings.mobileEnabled }).from(settings).limit(1);
+    const isEnabled = settingsRow[0]?.mobileEnabled ?? false;
 
     // Get mobile sessions
     const sessionsRows = await db.select().from(mobileSessions);
+
+    // Count pending tokens (unexpired and unused)
+    const pendingTokensResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(mobileTokens)
+      .where(
+        and(
+          gt(mobileTokens.expiresAt, new Date()),
+          isNull(mobileTokens.usedAt)
+        )
+      );
+    const pendingTokens = pendingTokensResult[0]?.count ?? 0;
 
     // Get server name
     const serverRow = await db.select({ name: servers.name }).from(servers).limit(1);
@@ -112,17 +134,18 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
     }));
 
     const config: MobileConfig = {
-      isEnabled: tokenRow.length > 0 && tokenRow[0]!.isEnabled,
-      token: null, // Never return the actual token in GET, must enable to see
-      serverName,
+      isEnabled,
       sessions,
+      serverName,
+      pendingTokens,
+      maxDevices: MAX_PAIRED_DEVICES,
     };
 
     return config;
   });
 
   /**
-   * POST /mobile/enable - Enable mobile access and generate/return token
+   * POST /mobile/enable - Enable mobile access (no token generated)
    */
   app.post('/enable', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authUser = request.user;
@@ -131,44 +154,17 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only server owners can enable mobile access');
     }
 
-    // Check if token already exists
-    const existingToken = await db.select().from(mobileTokens).limit(1);
+    // Update settings to enable mobile
+    await db
+      .update(settings)
+      .set({ mobileEnabled: true, updatedAt: new Date() })
+      .where(eq(settings.id, 1));
 
-    let plainToken: string;
-
-    if (existingToken.length > 0 && existingToken[0]!.isEnabled) {
-      // Token exists and is enabled - can't retrieve the plain token, must rotate
-      return reply.badRequest('Mobile access is already enabled. Use rotate to get a new token.');
-    } else if (existingToken.length > 0) {
-      // Token exists but disabled - generate new token and enable
-      plainToken = generateMobileToken();
-      const tokenHash = hashToken(plainToken);
-
-      await db
-        .update(mobileTokens)
-        .set({
-          tokenHash,
-          isEnabled: true,
-          rotatedAt: new Date(),
-        })
-        .where(eq(mobileTokens.id, existingToken[0]!.id));
-    } else {
-      // No token exists - create new
-      plainToken = generateMobileToken();
-      const tokenHash = hashToken(plainToken);
-
-      await db.insert(mobileTokens).values({
-        tokenHash,
-        isEnabled: true,
-      });
-    }
-
-    // Get server name
+    // Get current state for response
+    const sessionsRows = await db.select().from(mobileSessions);
     const serverRow = await db.select({ name: servers.name }).from(servers).limit(1);
     const serverName = serverRow[0]?.name || 'Tracearr';
 
-    // Get current sessions
-    const sessionsRows = await db.select().from(mobileSessions);
     const sessions: MobileSession[] = sessionsRows.map((s) => ({
       id: s.id,
       deviceName: s.deviceName,
@@ -181,14 +177,132 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
 
     const config: MobileConfig = {
       isEnabled: true,
-      token: plainToken, // Return the plain token only on enable/rotate
-      serverName,
       sessions,
+      serverName,
+      pendingTokens: 0,
+      maxDevices: MAX_PAIRED_DEVICES,
     };
 
     app.log.info({ userId: authUser.userId }, 'Mobile access enabled');
 
     return config;
+  });
+
+  /**
+   * POST /mobile/pair-token - Generate a one-time pairing token
+   *
+   * Rate limited: 3 tokens per 5 minutes per user
+   * Max pending tokens: 3
+   * Max paired devices: 5
+   */
+  app.post('/pair-token', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can generate pairing tokens');
+    }
+
+    // Check if mobile is enabled
+    const settingsRow = await db.select({ mobileEnabled: settings.mobileEnabled }).from(settings).limit(1);
+    if (!settingsRow[0]?.mobileEnabled) {
+      return reply.badRequest('Mobile access is not enabled');
+    }
+
+    // Rate limiting: max 3 tokens per 5 minutes
+    // Use Lua script for atomic INCR + EXPIRE operation
+    const rateLimitKey = `mobile_token_gen:${authUser.userId}`;
+    const luaScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+      end
+      return current
+    `;
+    const currentCount = await app.redis.eval(luaScript, 1, rateLimitKey, TOKEN_GEN_RATE_WINDOW) as number;
+
+    if (currentCount > TOKEN_GEN_RATE_LIMIT) {
+      const ttl = await app.redis.ttl(rateLimitKey);
+      reply.header('Retry-After', String(ttl > 0 ? ttl : TOKEN_GEN_RATE_WINDOW));
+      return reply.tooManyRequests('Too many token generation attempts. Please try again later.');
+    }
+
+    // Use transaction to prevent race conditions on device and token limit checks
+    let plainToken: string;
+    let expiresAt: Date;
+
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Set serializable isolation level to prevent phantom reads
+        await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`);
+
+        // Check max pending tokens (within transaction for consistency)
+        const pendingTokensResult = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(mobileTokens)
+          .where(
+            and(
+              gt(mobileTokens.expiresAt, new Date()),
+              isNull(mobileTokens.usedAt)
+            )
+          );
+        const pendingCount = pendingTokensResult[0]?.count ?? 0;
+
+        if (pendingCount >= MAX_PENDING_TOKENS) {
+          throw new Error('MAX_PENDING_TOKENS');
+        }
+
+        // Check max paired devices (within transaction to prevent race condition)
+        const sessionsCount = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(mobileSessions);
+        const deviceCount = sessionsCount[0]?.count ?? 0;
+
+        if (deviceCount >= MAX_PAIRED_DEVICES) {
+          throw new Error('MAX_PAIRED_DEVICES');
+        }
+
+        // Generate token
+        const token = generateMobileToken();
+        const tokenHash = hashToken(token);
+        const expires = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+        await tx.insert(mobileTokens).values({
+          tokenHash,
+          expiresAt: expires,
+          createdBy: authUser.userId,
+        });
+
+        return { token, expires };
+      });
+
+      plainToken = result.token;
+      expiresAt = result.expires;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+
+      if (message === 'MAX_PENDING_TOKENS') {
+        return reply.badRequest(
+          `Maximum of ${MAX_PENDING_TOKENS} pending tokens allowed. Wait for expiry or use an existing token.`
+        );
+      }
+      if (message === 'MAX_PAIRED_DEVICES') {
+        return reply.badRequest(
+          `Maximum of ${MAX_PAIRED_DEVICES} devices allowed. Remove a device first.`
+        );
+      }
+
+      app.log.error({ err }, 'Token generation transaction failed');
+      return reply.internalServerError('Failed to generate token. Please try again.');
+    }
+
+    app.log.info({ userId: authUser.userId }, 'Mobile pairing token generated');
+
+    const response: MobilePairTokenResponse = {
+      token: plainToken,
+      expiresAt,
+    };
+
+    return response;
   });
 
   /**
@@ -201,8 +315,11 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only server owners can disable mobile access');
     }
 
-    // Disable token (don't delete, in case they want to re-enable)
-    await db.update(mobileTokens).set({ isEnabled: false });
+    // Disable in settings
+    await db
+      .update(settings)
+      .set({ mobileEnabled: false, updatedAt: new Date() })
+      .where(eq(settings.id, 1));
 
     // Revoke all mobile sessions (delete from DB and Redis)
     const sessionsRows = await db.select().from(mobileSessions);
@@ -211,60 +328,12 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
     }
     await db.delete(mobileSessions);
 
+    // Delete all pending tokens
+    await db.delete(mobileTokens);
+
     app.log.info({ userId: authUser.userId }, 'Mobile access disabled');
 
     return { success: true };
-  });
-
-  /**
-   * POST /mobile/rotate - Rotate token (invalidates old sessions)
-   */
-  app.post('/rotate', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const authUser = request.user;
-
-    if (authUser.role !== 'owner') {
-      return reply.forbidden('Only server owners can rotate mobile token');
-    }
-
-    // Check if mobile is enabled
-    const existingToken = await db.select().from(mobileTokens).limit(1);
-    if (existingToken.length === 0 || !existingToken[0]!.isEnabled) {
-      return reply.badRequest('Mobile access is not enabled');
-    }
-
-    // Generate new token
-    const plainToken = generateMobileToken();
-    const tokenHash = hashToken(plainToken);
-
-    await db
-      .update(mobileTokens)
-      .set({
-        tokenHash,
-        rotatedAt: new Date(),
-      })
-      .where(eq(mobileTokens.id, existingToken[0]!.id));
-
-    // Revoke all existing sessions
-    const sessionsRows = await db.select().from(mobileSessions);
-    for (const session of sessionsRows) {
-      await app.redis.del(`${MOBILE_REFRESH_PREFIX}${session.refreshTokenHash}`);
-    }
-    await db.delete(mobileSessions);
-
-    // Get server name
-    const serverRow = await db.select({ name: servers.name }).from(servers).limit(1);
-    const serverName = serverRow[0]?.name || 'Tracearr';
-
-    const config: MobileConfig = {
-      isEnabled: true,
-      token: plainToken, // Return new token
-      serverName,
-      sessions: [], // All sessions revoked
-    };
-
-    app.log.info({ userId: authUser.userId }, 'Mobile token rotated');
-
-    return config;
   });
 
   /**
@@ -289,25 +358,72 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
     return { success: true, revokedCount: sessionsRows.length };
   });
 
+  /**
+   * DELETE /mobile/sessions/:id - Revoke a single mobile session
+   */
+  app.delete('/sessions/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can revoke mobile sessions');
+    }
+
+    const { id } = request.params as { id: string };
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return reply.badRequest('Invalid session ID format');
+    }
+
+    // Find the session
+    const sessionRow = await db
+      .select()
+      .from(mobileSessions)
+      .where(eq(mobileSessions.id, id))
+      .limit(1);
+
+    if (sessionRow.length === 0) {
+      return reply.notFound('Mobile session not found');
+    }
+
+    const session = sessionRow[0]!;
+
+    // Delete refresh token from Redis
+    await app.redis.del(`${MOBILE_REFRESH_PREFIX}${session.refreshTokenHash}`);
+
+    // Delete session from DB (notification_preferences cascade-deleted via FK)
+    await db.delete(mobileSessions).where(eq(mobileSessions.id, id));
+
+    app.log.info(
+      { userId: authUser.userId, sessionId: id, deviceName: session.deviceName },
+      'Mobile session revoked'
+    );
+
+    return { success: true };
+  });
+
   // ============================================
   // Auth endpoints (mobile app)
   // ============================================
 
   /**
-   * POST /mobile/pair - Exchange mobile token for JWT
+   * POST /mobile/pair - Exchange pairing token for JWT
    *
    * Rate limited: 5 attempts per IP per 15 minutes to prevent brute force
    */
   app.post('/pair', async (request, reply) => {
-    // Rate limiting check
+    // Rate limiting check - use Lua script for atomic INCR + EXPIRE
     const clientIp = request.ip;
     const rateLimitKey = REDIS_KEYS.RATE_LIMIT_MOBILE_PAIR(clientIp);
-    const currentCount = await app.redis.incr(rateLimitKey);
-
-    // Set TTL on first request
-    if (currentCount === 1) {
-      await app.redis.expire(rateLimitKey, CACHE_TTL.RATE_LIMIT);
-    }
+    const luaScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+      end
+      return current
+    `;
+    const currentCount = await app.redis.eval(luaScript, 1, rateLimitKey, CACHE_TTL.RATE_LIMIT) as number;
 
     if (currentCount > MOBILE_PAIR_MAX_ATTEMPTS) {
       const ttl = await app.redis.ttl(rateLimitKey);
@@ -328,108 +444,191 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
       return reply.unauthorized('Invalid mobile token');
     }
 
-    // Hash the token and look it up
     const tokenHash = hashToken(token);
-    const tokenRow = await db
-      .select()
-      .from(mobileTokens)
-      .where(eq(mobileTokens.tokenHash, tokenHash))
-      .limit(1);
 
-    if (tokenRow.length === 0 || !tokenRow[0]!.isEnabled) {
-      return reply.unauthorized('Invalid or disabled mobile token');
-    }
+    // Check max devices before attempting pair
+    const sessionsCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(mobileSessions);
+    const deviceCount = sessionsCount[0]?.count ?? 0;
 
-    // Get the owner user
-    const ownerRow = await db
-      .select()
-      .from(users)
-      .where(eq(users.role, 'owner'))
-      .limit(1);
-
-    if (ownerRow.length === 0) {
-      return reply.internalServerError('No owner account found');
-    }
-
-    const owner = ownerRow[0]!;
-
-    // Get all server IDs for the JWT
-    const allServers = await db.select({ id: servers.id }).from(servers);
-    const serverIds = allServers.map((s) => s.id);
-
-    // Get server name and URL for response
-    const serverRow = await db.select({ name: servers.name }).from(servers).limit(1);
-    const serverName = serverRow[0]?.name || 'Tracearr';
-
-    // Generate access token with mobile-specific expiry
-    const accessToken = app.jwt.sign(
-      {
-        userId: owner.id,
-        username: owner.username,
-        role: 'owner',
-        serverIds,
-        mobile: true, // Flag to identify mobile tokens
-        deviceId, // Device identifier for session targeting
-      },
-      { expiresIn: MOBILE_ACCESS_EXPIRY }
-    );
-
-    // Generate refresh token
-    const refreshToken = generateRefreshToken();
-    const refreshTokenHash = hashToken(refreshToken);
-
-    // Check if device already has a session (by deviceId)
+    // Check if this device is already paired (would be an update, not new)
     const existingSession = await db
       .select()
       .from(mobileSessions)
       .where(eq(mobileSessions.deviceId, deviceId))
       .limit(1);
 
-    if (existingSession.length > 0) {
-      // Update existing session
-      const oldHash = existingSession[0]!.refreshTokenHash;
-      await app.redis.del(`${MOBILE_REFRESH_PREFIX}${oldHash}`);
-
-      await db
-        .update(mobileSessions)
-        .set({
-          refreshTokenHash,
-          deviceName,
-          platform,
-          deviceSecret: deviceSecret ?? null,
-          lastSeenAt: new Date(),
-        })
-        .where(eq(mobileSessions.id, existingSession[0]!.id));
-    } else {
-      // Create new session
-      await db.insert(mobileSessions).values({
-        refreshTokenHash,
-        deviceName,
-        deviceId,
-        platform,
-        deviceSecret: deviceSecret ?? null,
-      });
+    if (existingSession.length === 0 && deviceCount >= MAX_PAIRED_DEVICES) {
+      return reply.badRequest(
+        `Maximum of ${MAX_PAIRED_DEVICES} devices allowed. Remove a device first.`
+      );
     }
 
-    // Store refresh token in Redis
+    // Use transaction with row-level locking to prevent race conditions
+    let result: {
+      accessToken: string;
+      refreshToken: string;
+      owner: { id: string; username: string };
+      serverName: string;
+      serverIds: string[];
+      oldRefreshTokenHash?: string; // Track old hash for cleanup outside transaction
+    };
+
+    try {
+      result = await db.transaction(async (tx) => {
+        // Set serializable isolation level to prevent phantom reads
+        await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`);
+
+        // Lock and validate token
+        const tokenRows = await tx
+          .select()
+          .from(mobileTokens)
+          .where(eq(mobileTokens.tokenHash, tokenHash))
+          .for('update')
+          .limit(1);
+
+        if (tokenRows.length === 0) {
+          throw new Error('INVALID_TOKEN');
+        }
+
+        const tokenRow = tokenRows[0]!;
+
+        if (tokenRow.usedAt) {
+          throw new Error('TOKEN_ALREADY_USED');
+        }
+
+        if (tokenRow.expiresAt < new Date()) {
+          throw new Error('TOKEN_EXPIRED');
+        }
+
+        // Get the owner user
+        const ownerRow = await tx
+          .select()
+          .from(users)
+          .where(eq(users.role, 'owner'))
+          .limit(1);
+
+        if (ownerRow.length === 0) {
+          throw new Error('NO_OWNER');
+        }
+
+        const owner = ownerRow[0]!;
+
+        // Get all server IDs for the JWT
+        const allServers = await tx.select({ id: servers.id }).from(servers);
+        const serverIds = allServers.map((s) => s.id);
+
+        // Get server name
+        const serverRow = await tx.select({ name: servers.name }).from(servers).limit(1);
+        const serverName = serverRow[0]?.name || 'Tracearr';
+
+        // Generate refresh token
+        const newRefreshToken = generateRefreshToken();
+        const refreshTokenHash = hashToken(newRefreshToken);
+
+        // Track old refresh token hash for cleanup (if updating existing session)
+        let oldHash: string | undefined;
+
+        // Create or update session
+        if (existingSession.length > 0) {
+          // Update existing session - save old hash for cleanup outside transaction
+          oldHash = existingSession[0]!.refreshTokenHash;
+
+          await tx
+            .update(mobileSessions)
+            .set({
+              refreshTokenHash,
+              deviceName,
+              platform,
+              deviceSecret: deviceSecret ?? null,
+              lastSeenAt: new Date(),
+            })
+            .where(eq(mobileSessions.id, existingSession[0]!.id));
+        } else {
+          // Create new session
+          await tx.insert(mobileSessions).values({
+            refreshTokenHash,
+            deviceName,
+            deviceId,
+            platform,
+            deviceSecret: deviceSecret ?? null,
+          });
+        }
+
+        // Mark token as used (not deleted - for audit trail)
+        await tx
+          .update(mobileTokens)
+          .set({ usedAt: new Date() })
+          .where(eq(mobileTokens.id, tokenRow.id));
+
+        // Generate access token
+        const accessToken = app.jwt.sign(
+          {
+            userId: owner.id,
+            username: owner.username,
+            role: 'owner',
+            serverIds,
+            mobile: true,
+            deviceId,
+          },
+          { expiresIn: MOBILE_ACCESS_EXPIRY }
+        );
+
+        return {
+          accessToken,
+          refreshToken: newRefreshToken,
+          owner: { id: owner.id, username: owner.username },
+          serverName,
+          serverIds,
+          oldRefreshTokenHash: oldHash,
+        };
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+
+      if (message === 'INVALID_TOKEN') {
+        return reply.unauthorized('Invalid mobile token');
+      }
+      if (message === 'TOKEN_ALREADY_USED') {
+        return reply.unauthorized('This pairing token has already been used');
+      }
+      if (message === 'TOKEN_EXPIRED') {
+        return reply.unauthorized('This pairing token has expired');
+      }
+      if (message === 'NO_OWNER') {
+        return reply.internalServerError('No owner account found');
+      }
+
+      app.log.error({ err }, 'Mobile pairing transaction failed');
+      return reply.internalServerError('Pairing failed. Please try again.');
+    }
+
+    // Redis operations AFTER transaction commits (to prevent inconsistency on rollback)
+    // Delete old refresh token from Redis if we updated an existing session
+    if (result.oldRefreshTokenHash) {
+      await app.redis.del(`${MOBILE_REFRESH_PREFIX}${result.oldRefreshTokenHash}`);
+    }
+
+    // Store new refresh token in Redis
     await app.redis.setex(
-      `${MOBILE_REFRESH_PREFIX}${refreshTokenHash}`,
+      `${MOBILE_REFRESH_PREFIX}${hashToken(result.refreshToken)}`,
       MOBILE_REFRESH_TTL,
-      JSON.stringify({ userId: owner.id, deviceId })
+      JSON.stringify({ userId: result.owner.id, deviceId })
     );
 
     app.log.info({ deviceName, platform, deviceId }, 'Mobile device paired');
 
     const response: MobilePairResponse = {
-      accessToken,
-      refreshToken,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       server: {
-        name: serverName,
-        url: '', // Client already knows the URL since they made the request
+        name: result.serverName,
+        url: '',
       },
       user: {
-        userId: owner.id,
-        username: owner.username,
+        userId: result.owner.id,
+        username: result.owner.username,
         role: 'owner',
       },
     };
@@ -443,15 +642,17 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
    * Rate limited: 30 attempts per IP per 15 minutes to prevent abuse
    */
   app.post('/refresh', async (request, reply) => {
-    // Rate limiting check
+    // Rate limiting check - use Lua script for atomic INCR + EXPIRE
     const clientIp = request.ip;
     const rateLimitKey = REDIS_KEYS.RATE_LIMIT_MOBILE_REFRESH(clientIp);
-    const currentCount = await app.redis.incr(rateLimitKey);
-
-    // Set TTL on first request
-    if (currentCount === 1) {
-      await app.redis.expire(rateLimitKey, CACHE_TTL.RATE_LIMIT);
-    }
+    const luaScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+      end
+      return current
+    `;
+    const currentCount = await app.redis.eval(luaScript, 1, rateLimitKey, CACHE_TTL.RATE_LIMIT) as number;
 
     if (currentCount > MOBILE_REFRESH_MAX_ATTEMPTS) {
       const ttl = await app.redis.ttl(rateLimitKey);
