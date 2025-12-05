@@ -15,9 +15,16 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 20,                        // Maximum connections
+  idleTimeoutMillis: 20000,       // Close idle connections after 20s
+  connectionTimeoutMillis: 10000, // Connection timeout (increased for complex queries)
+  maxUses: 7500,                  // Max queries per connection before refresh (prevents memory leaks)
+  allowExitOnIdle: false,         // Keep pool alive during idle periods
+});
+
+// Log pool errors for debugging
+pool.on('error', (err) => {
+  console.error('[DB Pool Error]', err.message);
 });
 
 export const db = drizzle(pool, { schema });
