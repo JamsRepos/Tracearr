@@ -8,9 +8,10 @@ interface PlaysChartProps {
   data: PlayStats[] | undefined;
   isLoading?: boolean;
   height?: number;
+  period?: 'day' | 'week' | 'month' | 'year';
 }
 
-export function PlaysChart({ data, isLoading, height = 200 }: PlaysChartProps) {
+export function PlaysChart({ data, isLoading, height = 200, period = 'month' }: PlaysChartProps) {
   const options = useMemo<Highcharts.Options>(() => {
     if (!data || data.length === 0) {
       return {};
@@ -35,13 +36,28 @@ export function PlaysChart({ data, isLoading, height = 200 }: PlaysChartProps) {
         enabled: false,
       },
       xAxis: {
-        type: 'datetime',
         categories: data.map((d) => d.date),
         labels: {
           style: {
             color: 'hsl(var(--muted-foreground))',
           },
-          format: '{value:%b %d}',
+          formatter: function () {
+            // this.value could be index (number) or category string depending on Highcharts version
+            const categories = this.axis.categories as string[];
+            const categoryValue = typeof this.value === 'number'
+              ? categories[this.value]
+              : this.value as string;
+            if (!categoryValue) return '';
+            const date = new Date(categoryValue);
+            if (isNaN(date.getTime())) return '';
+            if (period === 'year') {
+              // Short month name for yearly view (Dec, Jan, Feb)
+              return date.toLocaleDateString('en-US', { month: 'short' });
+            }
+            // M/D format for week/month views
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+          },
+          step: Math.ceil(data.length / 12), // Show ~12 labels
         },
         lineColor: 'hsl(var(--border))',
         tickColor: 'hsl(var(--border))',
@@ -93,7 +109,14 @@ export function PlaysChart({ data, isLoading, height = 200 }: PlaysChartProps) {
           color: 'hsl(var(--popover-foreground))',
         },
         formatter: function () {
-          return `<b>${this.x}</b><br/>Plays: ${this.y}`;
+          // With categories, this.x is the index. Use this.point.category for the actual value
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const categoryValue = (this as any).point?.category as string | undefined;
+          const date = categoryValue ? new Date(categoryValue) : null;
+          const dateStr = date && !isNaN(date.getTime())
+            ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Unknown';
+          return `<b>${dateStr}</b><br/>Plays: ${this.y}`;
         },
       },
       series: [
@@ -104,7 +127,7 @@ export function PlaysChart({ data, isLoading, height = 200 }: PlaysChartProps) {
         },
       ],
     };
-  }, [data, height]);
+  }, [data, height, period]);
 
   if (isLoading) {
     return <ChartSkeleton height={height} />;

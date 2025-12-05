@@ -5,23 +5,26 @@ import { ChartSkeleton } from '@/components/ui/skeleton';
 
 interface ConcurrentData {
   hour: string;
-  maxConcurrent: number;
+  total: number;
+  direct: number;
+  transcode: number;
 }
 
 interface ConcurrentChartProps {
   data: ConcurrentData[] | undefined;
   isLoading?: boolean;
   height?: number;
+  period?: 'day' | 'week' | 'month' | 'year';
 }
 
-export function ConcurrentChart({ data, isLoading, height = 250 }: ConcurrentChartProps) {
+export function ConcurrentChart({ data, isLoading, height = 250, period = 'month' }: ConcurrentChartProps) {
   const options = useMemo<Highcharts.Options>(() => {
     if (!data || data.length === 0) {
       return {};
     }
 
-    // Find the peak for highlighting
-    const maxValue = Math.max(...data.map((d) => d.maxConcurrent));
+    // Find the peak total for highlighting
+    const maxValue = Math.max(...data.map((d) => d.total));
 
     return {
       chart: {
@@ -39,20 +42,50 @@ export function ConcurrentChart({ data, isLoading, height = 250 }: ConcurrentCha
         enabled: false,
       },
       legend: {
-        enabled: false,
+        enabled: true,
+        align: 'right',
+        verticalAlign: 'top',
+        floating: true,
+        itemStyle: {
+          color: 'hsl(var(--muted-foreground))',
+          fontWeight: 'normal',
+          fontSize: '11px',
+        },
+        itemHoverStyle: {
+          color: 'hsl(var(--foreground))',
+        },
       },
       xAxis: {
-        type: 'datetime',
         categories: data.map((d) => d.hour),
+        // Calculate appropriate number of labels based on period
+        // Week: 7 labels (one per day), Month: ~10, Year: 12
+        tickPositions: (() => {
+          const numLabels = period === 'week' || period === 'day' ? 7 : period === 'month' ? 10 : 12;
+          const actualLabels = Math.min(numLabels, data.length);
+          return Array.from({ length: actualLabels }, (_, i) =>
+            Math.floor(i * (data.length - 1) / (actualLabels - 1 || 1))
+          );
+        })(),
         labels: {
           style: {
             color: 'hsl(var(--muted-foreground))',
           },
           formatter: function () {
-            const date = new Date(this.value as string);
+            // this.value could be index (number) or category string depending on Highcharts version
+            const categories = this.axis.categories as string[];
+            const categoryValue = typeof this.value === 'number'
+              ? categories[this.value]
+              : this.value as string;
+            if (!categoryValue) return '';
+            const date = new Date(categoryValue);
+            if (isNaN(date.getTime())) return '';
+            if (period === 'year') {
+              // Short month name for yearly view (Dec, Jan, Feb)
+              return date.toLocaleDateString('en-US', { month: 'short' });
+            }
+            // M/D format for week/month views
             return `${date.getMonth() + 1}/${date.getDate()}`;
           },
-          step: Math.ceil(data.length / 10), // Show ~10 labels
         },
         lineColor: 'hsl(var(--border))',
         tickColor: 'hsl(var(--border))',
@@ -68,32 +101,19 @@ export function ConcurrentChart({ data, isLoading, height = 250 }: ConcurrentCha
         },
         gridLineColor: 'hsl(var(--border))',
         min: 0,
+        allowDecimals: false,
         plotLines: [
           {
             value: maxValue,
             color: 'hsl(var(--destructive))',
             dashStyle: 'Dash',
             width: 1,
-            label: {
-              text: `Peak: ${maxValue}`,
-              align: 'right',
-              style: {
-                color: 'hsl(var(--destructive))',
-                fontSize: '10px',
-              },
-            },
           },
         ],
       },
       plotOptions: {
         area: {
-          fillColor: {
-            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-            stops: [
-              [0, 'hsl(var(--chart-3) / 0.3)'],
-              [1, 'hsl(var(--chart-3) / 0.05)'],
-            ],
-          },
+          stacking: 'normal',
           marker: {
             enabled: false,
             states: {
@@ -104,7 +124,6 @@ export function ConcurrentChart({ data, isLoading, height = 250 }: ConcurrentCha
             },
           },
           lineWidth: 2,
-          lineColor: 'hsl(var(--chart-3))',
           states: {
             hover: {
               lineWidth: 2,
@@ -119,20 +138,58 @@ export function ConcurrentChart({ data, isLoading, height = 250 }: ConcurrentCha
         style: {
           color: 'hsl(var(--popover-foreground))',
         },
+        shared: true,
         formatter: function () {
-          const date = new Date(String(this.x));
-          return `<b>${date.toLocaleDateString()} ${date.getHours()}:00</b><br/>Concurrent: ${this.y}`;
+          const points = this.points || [];
+          // With categories, this.x is the index. Use the category value from points[0].key
+          const categoryValue = points[0]?.key as string | undefined;
+          const date = categoryValue ? new Date(categoryValue) : null;
+          const dateStr = date && !isNaN(date.getTime())
+            ? `${date.toLocaleDateString()} ${date.getHours()}:00`
+            : 'Unknown';
+          let html = `<b>${dateStr}</b>`;
+
+          // Calculate total from stacked values
+          let total = 0;
+          points.forEach((point) => {
+            total += point.y || 0;
+            html += `<br/><span style="color:${point.color}">●</span> ${point.series.name}: ${point.y}`;
+          });
+          html += `<br/><b>Total: ${total}</b>`;
+
+          return html;
         },
       },
       series: [
         {
           type: 'area',
-          name: 'Concurrent Streams',
-          data: data.map((d) => d.maxConcurrent),
+          name: 'Direct Play',
+          data: data.map((d) => d.direct),
+          color: 'hsl(var(--chart-2))',
+          fillColor: {
+            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+            stops: [
+              [0, 'hsl(var(--chart-2) / 0.4)'],
+              [1, 'hsl(var(--chart-2) / 0.1)'],
+            ],
+          },
+        },
+        {
+          type: 'area',
+          name: 'Transcode',
+          data: data.map((d) => d.transcode),
+          color: 'hsl(var(--chart-4))',
+          fillColor: {
+            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+            stops: [
+              [0, 'hsl(var(--chart-4) / 0.4)'],
+              [1, 'hsl(var(--chart-4) / 0.1)'],
+            ],
+          },
         },
       ],
     };
-  }, [data, height]);
+  }, [data, height, period]);
 
   if (isLoading) {
     return <ChartSkeleton height={height} />;

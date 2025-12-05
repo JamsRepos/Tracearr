@@ -489,9 +489,9 @@ class ApiClient {
       return response;
     },
     concurrent: async (period?: string) => {
-      const response = await this.request<{ data: { hour: string; maxConcurrent: number }[] }>(
-        `/stats/concurrent?period=${period ?? 'month'}`
-      );
+      const response = await this.request<{
+        data: { hour: string; total: number; direct: number; transcode: number }[];
+      }>(`/stats/concurrent?period=${period ?? 'month'}`);
       return response.data;
     },
   };

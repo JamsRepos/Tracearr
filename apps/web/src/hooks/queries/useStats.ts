@@ -31,7 +31,7 @@ export function useUserStats() {
 
 export interface LocationStatsFilters {
   days?: number;
-  userId?: string;
+  serverUserId?: string;
   serverId?: string;
   mediaType?: 'movie' | 'episode' | 'track';
 }
