@@ -1,0 +1,112 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  # Project coverage - overall repository coverage
+  status:
+    project:
+      default:
+        # Current baseline ~28%, allow small drops
+        target: 25%
+        threshold: 2%
+        # Only check coverage on server package
+        paths:
+          - "apps/server/src/**"
+
+    # Patch coverage - new/modified code must meet threshold
+    patch:
+      default:
+        # New code should have reasonable coverage
+        target: 60%
+        threshold: 5%
+        paths:
+          - "apps/server/src/**"
+
+  # Ignore files that shouldn't count toward coverage
+  ignore:
+    - "**/*.test.ts"
+    - "**/*.spec.ts"
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/__tests__/**"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/*.d.ts"
+    - "**/types.ts"
+    # Config files
+    - "**/*.config.ts"
+    - "**/*.config.js"
+
+# Comment configuration for PRs
+comment:
+  layout: "header, diff, flags, components"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+# Component coverage - track coverage by area
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 2%
+
+  individual_components:
+    - component_id: utils
+      name: Utilities
+      paths:
+        - apps/server/src/utils/**
+
+    - component_id: services
+      name: Services
+      paths:
+        - apps/server/src/services/**
+
+    - component_id: routes
+      name: Routes
+      paths:
+        - apps/server/src/routes/**
+
+    - component_id: jobs
+      name: Background Jobs
+      paths:
+        - apps/server/src/jobs/**
+
+# Flag management for different test types
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: auto
+      - type: patch
+        target: 60%
+
+  individual_flags:
+    - name: unit
+      paths:
+        - apps/server/src/utils/**
+        - apps/server/src/services/mediaServer/**
+      carryforward: true
+
+    - name: services
+      paths:
+        - apps/server/src/services/**
+        - apps/server/src/jobs/**
+      carryforward: true
+
+    - name: routes
+      paths:
+        - apps/server/src/routes/**
+      carryforward: true
+
+    - name: integration
+      paths:
+        - apps/server/src/**
+      carryforward: true
+
+# GitHub integration
+github_checks:
+  annotations: true
