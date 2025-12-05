@@ -111,11 +111,14 @@ export const debugRoutes: FastifyPluginAsync = async (app) => {
       return { success: true, deleted: 0 };
     }
 
+    // Build explicit PostgreSQL array literal (Drizzle doesn't auto-convert JS arrays for ANY())
+    const userIdArray = sql.raw(`ARRAY[${userIds.map(id => `'${id}'::uuid`).join(',')}]`);
+
     // Delete violations for these users
-    await db.delete(violations).where(sql`user_id = ANY(${userIds})`);
+    await db.delete(violations).where(sql`user_id = ANY(${userIdArray})`);
 
     // Delete sessions for these users
-    await db.delete(sessions).where(sql`user_id = ANY(${userIds})`);
+    await db.delete(sessions).where(sql`user_id = ANY(${userIdArray})`);
 
     // Delete the users
     const deleted = await db

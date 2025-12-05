@@ -10,7 +10,7 @@ import {
   ruleIdParamSchema,
 } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { rules, serverUsers } from '../db/schema.js';
+import { rules, serverUsers, violations } from '../db/schema.js';
 
 export const ruleRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -146,8 +146,8 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       // Get violation count for this rule
       const violationCount = await db
         .select({ count: sql<number>`count(*)::int` })
-        .from(rules)
-        .where(eq(rules.id, id));
+        .from(violations)
+        .where(eq(violations.ruleId, id));
 
       return {
         ...rule,
