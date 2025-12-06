@@ -7,8 +7,8 @@
  * - Lifecycle management: start, stop, trigger
  */
 
-import { eq, and, desc, isNull, gte, inArray } from 'drizzle-orm';
-import { POLLING_INTERVALS, TIME_MS, REDIS_KEYS, CACHE_TTL, type ActiveSession, type SessionState, type Rule } from '@tracearr/shared';
+import { eq, and, desc, isNull, gte, lte, inArray } from 'drizzle-orm';
+import { POLLING_INTERVALS, TIME_MS, REDIS_KEYS, CACHE_TTL, SESSION_LIMITS, type ActiveSession, type SessionState, type Rule } from '@tracearr/shared';
 import { db } from '../../db/client.js';
 import { servers, serverUsers, sessions, users } from '../../db/schema.js';
 import { createMediaServerClient } from '../../services/mediaServer/index.js';
@@ -22,7 +22,13 @@ import { sseManager } from '../../services/sseManager.js';
 import type { PollerConfig, ServerWithToken, ServerProcessingResult } from './types.js';
 import { mapMediaSession } from './sessionMapper.js';
 import { batchGetRecentUserSessions, getActiveRules } from './database.js';
-import { calculatePauseAccumulation, calculateStopDuration, checkWatchCompletion } from './stateTracker.js';
+import {
+  calculatePauseAccumulation,
+  calculateStopDuration,
+  checkWatchCompletion,
+  shouldForceStopStaleSession,
+  shouldRecordSession,
+} from './stateTracker.js';
 import { createViolationInTransaction, broadcastViolations, doesRuleApplyToUser, type ViolationInsertResult } from './violations.js';
 import { enqueueNotification } from '../notificationQueue.js';
 
@@ -31,6 +37,7 @@ import { enqueueNotification } from '../notificationQueue.js';
 // ============================================================================
 
 let pollingInterval: NodeJS.Timeout | null = null;
+let staleSweepInterval: NodeJS.Timeout | null = null;
 let cacheService: CacheService | null = null;
 let pubSubService: PubSubService | null = null;
 let redisClient: Redis | null = null;
@@ -330,6 +337,7 @@ async function processServerSessions(
               year: processed.year || null,
               thumbPath: processed.thumbPath || null,
               startedAt: new Date(),
+              lastSeenAt: new Date(), // Track when we first saw this session
               totalDurationMs: processed.totalDurationMs || null,
               progressMs: processed.progressMs || null,
               // Pause tracking - use Jellyfin's precise timestamp if available, otherwise infer from state
@@ -507,6 +515,7 @@ async function processServerSessions(
           quality: string;
           bitrate: number;
           progressMs: number | null;
+          lastSeenAt: Date;
           lastPausedAt?: Date | null;
           pausedDurationMs?: number;
           watched?: boolean;
@@ -515,6 +524,7 @@ async function processServerSessions(
           quality: processed.quality,
           bitrate: processed.bitrate,
           progressMs: processed.progressMs || null,
+          lastSeenAt: now, // Track when we last saw this session (for stale detection)
         };
 
         // Handle state transitions for pause tracking
@@ -627,6 +637,10 @@ async function processServerSessions(
             stoppedSession.totalDurationMs
           );
 
+          // Check if session meets minimum play time threshold (default 120s)
+          // Short sessions are recorded but can be filtered from stats
+          const shortSession = !shouldRecordSession(durationMs);
+
           await db
             .update(sessions)
             .set({
@@ -636,6 +650,7 @@ async function processServerSessions(
               pausedDurationMs: finalPausedDurationMs,
               lastPausedAt: null, // Clear the pause timestamp
               watched,
+              shortSession,
             })
             .where(eq(sessions.id, stoppedSession.id));
         }
@@ -828,8 +843,122 @@ async function pollServers(): Promise<void> {
         `Poll complete: ${allNewSessions.length} new, ${allUpdatedSessions.length} updated, ${allStoppedKeys.length} stopped`
       );
     }
+
+    // Sweep for stale sessions that haven't been seen in a while
+    // This catches sessions where server went down or SSE missed the stop event
+    await sweepStaleSessions();
   } catch (error) {
     console.error('Polling error:', error);
+  }
+}
+
+// ============================================================================
+// Stale Session Detection
+// ============================================================================
+
+/**
+ * Sweep for stale sessions and force-stop them
+ *
+ * A session is considered stale when:
+ * - It hasn't been stopped (stoppedAt IS NULL)
+ * - It hasn't been seen in a poll for > STALE_SESSION_TIMEOUT_SECONDS (default 5 min)
+ *
+ * This catches sessions where:
+ * - Server became unreachable during playback
+ * - SSE connection dropped and we missed the stop event
+ * - The session hung on the media server side
+ *
+ * Stale sessions are marked with forceStopped = true to distinguish from normal stops.
+ * Sessions with insufficient play time (< MIN_PLAY_TIME_MS) are still recorded for
+ * audit purposes but can be filtered from stats queries.
+ */
+export async function sweepStaleSessions(): Promise<number> {
+  try {
+    // Calculate the stale threshold (sessions not seen in last 5 minutes)
+    const staleThreshold = new Date(
+      Date.now() - SESSION_LIMITS.STALE_SESSION_TIMEOUT_SECONDS * 1000
+    );
+
+    // Find all active sessions that haven't been seen recently
+    const staleSessions = await db
+      .select()
+      .from(sessions)
+      .where(
+        and(
+          isNull(sessions.stoppedAt), // Still active
+          lte(sessions.lastSeenAt, staleThreshold) // Not seen recently
+        )
+      );
+
+    if (staleSessions.length === 0) {
+      return 0;
+    }
+
+    console.log(`[Poller] Force-stopping ${staleSessions.length} stale session(s)`);
+
+    const now = new Date();
+
+    for (const staleSession of staleSessions) {
+      // Check if session should be force-stopped (using the stateTracker function)
+      if (!shouldForceStopStaleSession(staleSession.lastSeenAt)) {
+        // Shouldn't happen since we already filtered, but double-check
+        continue;
+      }
+
+      // Calculate final duration
+      const { durationMs, finalPausedDurationMs } = calculateStopDuration(
+        {
+          startedAt: staleSession.startedAt,
+          lastPausedAt: staleSession.lastPausedAt,
+          pausedDurationMs: staleSession.pausedDurationMs || 0,
+        },
+        now
+      );
+
+      // Check for watch completion
+      const watched =
+        staleSession.watched ||
+        checkWatchCompletion(staleSession.progressMs, staleSession.totalDurationMs);
+
+      // Check if session meets minimum play time threshold
+      const shortSession = !shouldRecordSession(durationMs);
+
+      // Force-stop the session
+      await db
+        .update(sessions)
+        .set({
+          state: 'stopped',
+          stoppedAt: now,
+          durationMs,
+          pausedDurationMs: finalPausedDurationMs,
+          lastPausedAt: null,
+          watched,
+          forceStopped: true, // Mark as force-stopped
+          shortSession,
+        })
+        .where(eq(sessions.id, staleSession.id));
+
+      // Remove from cache if cached
+      if (cacheService) {
+        await cacheService.deleteSessionById(staleSession.id);
+        await cacheService.removeUserSession(staleSession.serverUserId, staleSession.id);
+      }
+
+      // Publish stop event
+      if (pubSubService) {
+        await pubSubService.publish('session:stopped', staleSession.id);
+      }
+    }
+
+    // Invalidate dashboard stats after force-stopping sessions
+    if (redisClient) {
+      await redisClient.del(REDIS_KEYS.DASHBOARD_STATS);
+    }
+
+    return staleSessions.length;
+  } catch (error) {
+    console.error('[Poller] Error sweeping stale sessions:', error);
+    return 0;
   }
 }
 
@@ -869,6 +998,12 @@ export function startPoller(config: Partial<PollerConfig> = {}): void {
 
   // Then run on interval
   pollingInterval = setInterval(() => void pollServers(), mergedConfig.intervalMs);
+
+  // Start stale session sweep (runs every 60 seconds to detect abandoned sessions)
+  if (!staleSweepInterval) {
+    console.log(`Starting stale session sweep with ${SESSION_LIMITS.STALE_SWEEP_INTERVAL_MS}ms interval`);
+    staleSweepInterval = setInterval(() => void sweepStaleSessions(), SESSION_LIMITS.STALE_SWEEP_INTERVAL_MS);
+  }
 }
 
 /**
@@ -879,6 +1014,11 @@ export function stopPoller(): void {
     clearInterval(pollingInterval);
     pollingInterval = null;
     console.log('Session poller stopped');
+  }
+  if (staleSweepInterval) {
+    clearInterval(staleSweepInterval);
+    staleSweepInterval = null;
+    console.log('Stale session sweep stopped');
   }
 }
 

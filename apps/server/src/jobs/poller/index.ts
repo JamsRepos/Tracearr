@@ -6,20 +6,25 @@
  * - Automatic polling on configurable intervals
  * - Session state tracking (playing, paused, stopped)
  * - Pause duration accumulation
- * - Watch completion detection (80% threshold)
+ * - Watch completion detection (85% threshold)
  * - Session grouping for resume tracking
  * - Rule evaluation and violation creation
+ * - Stale session detection and force-stop (5 minute timeout, 60s sweep)
+ * - Minimum play time filtering (120s threshold)
  *
  * @example
- * import { initializePoller, startPoller, stopPoller } from './jobs/poller';
+ * import { initializePoller, startPoller, stopPoller, sweepStaleSessions } from './jobs/poller';
  *
  * // Initialize with cache services and Redis client
  * initializePoller(cacheService, pubSubService, redis);
  *
- * // Start polling
+ * // Start polling (also starts stale session sweep on 60s interval)
  * startPoller({ enabled: true, intervalMs: 15000 });
  *
- * // Stop polling
+ * // Manually trigger stale session sweep
+ * await sweepStaleSessions();
+ *
+ * // Stop polling (also stops stale session sweep)
  * stopPoller();
  */
 
@@ -33,6 +38,7 @@ export {
   stopPoller,
   triggerPoll,
   triggerReconciliationPoll,
+  sweepStaleSessions,
 } from './processor.js';
 
 // ============================================================================
