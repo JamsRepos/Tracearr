@@ -154,8 +154,6 @@ export class PlexClient implements IMediaServerClient, IMediaServerClientWithHis
    */
   async getServerStatistics(timespan: number = 6): Promise<PlexStatisticsDataPoint[]> {
     const url = `${this.baseUrl}/statistics/resources?timespan=${timespan}`;
-    console.log('[PlexClient] Fetching statistics from:', url);
-    console.log('[PlexClient] Headers:', JSON.stringify(this.buildHeaders(), null, 2));
 
     const data = await fetchJson<unknown>(url, {
       headers: this.buildHeaders(),
@@ -163,13 +161,7 @@ export class PlexClient implements IMediaServerClient, IMediaServerClientWithHis
       timeout: 10000,
     });
 
-    // DEBUG: Log the FULL raw response
-    console.log('[PlexClient] Full raw response:', JSON.stringify(data, null, 2));
-
-    const result = parseStatisticsResourcesResponse(data);
-    console.log('[PlexClient] Parsed result length:', result.length);
-
-    return result;
+    return parseStatisticsResourcesResponse(data);
   }
 
   // ==========================================================================
