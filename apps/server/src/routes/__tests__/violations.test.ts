@@ -693,7 +693,7 @@ describe('Violation Routes', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.data).toHaveLength(1);
-      expect(body.data[0].serverId).toBe(viewerServerId);
+      expect(body.data[0].user.serverId).toBe(viewerServerId);
     });
   });
 });
