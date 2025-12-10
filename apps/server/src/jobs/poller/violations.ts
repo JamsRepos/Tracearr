@@ -165,6 +165,7 @@ export async function createViolation(
         id: details.userId,
         username: details.username,
         thumbUrl: details.thumbUrl,
+        serverId: details.serverId,
       },
       rule: {
         id: rule.id,
@@ -299,6 +300,7 @@ export async function broadcastViolations(
         id: details.userId,
         username: details.username,
         thumbUrl: details.thumbUrl,
+        serverId: details.serverId,
       },
       rule: {
         id: rule.id,
