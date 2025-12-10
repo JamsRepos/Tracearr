@@ -111,7 +111,7 @@ export function Map() {
   return (
     <div className="-m-6 flex h-[calc(100vh-4rem)] flex-col">
       {/* Filter bar */}
-      <div className="relative z-[1000] flex items-center gap-3 border-b bg-card/50 px-4 py-2 backdrop-blur">
+      <div className="relative z-20 flex items-center gap-3 border-b bg-card/50 px-4 py-2 backdrop-blur">
         {/* Time range picker */}
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
 
@@ -125,7 +125,7 @@ export function Map() {
           <SelectTrigger className="w-[140px] h-8 text-sm">
             <SelectValue placeholder="All users" />
           </SelectTrigger>
-          <SelectContent className="z-[1001]">
+          <SelectContent>
             <SelectItem value="_all">All users</SelectItem>
             {users.map((user) => (
               <SelectItem key={user.id} value={user.id}>
@@ -143,7 +143,7 @@ export function Map() {
           <SelectTrigger className="w-[100px] h-8 text-sm">
             <SelectValue placeholder="All types" />
           </SelectTrigger>
-          <SelectContent className="z-[1001]">
+          <SelectContent>
             <SelectItem value="_all">All types</SelectItem>
             {availableMediaTypeOptions.map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>

@@ -74,8 +74,33 @@ function formatMediaTitle(session: ActiveSession): { primary: string; secondary:
   return { primary: mediaTitle, secondary: null };
 }
 
-// Custom popup styles for dark theme
+// Custom styles for popup and z-index fixes
 const popupStyles = `
+  /* Ensure map container doesn't overlap sidebars/modals */
+  .leaflet-container {
+    z-index: 0 !important;
+  }
+  .leaflet-pane {
+    z-index: 1 !important;
+  }
+  .leaflet-tile-pane {
+    z-index: 1 !important;
+  }
+  .leaflet-overlay-pane {
+    z-index: 2 !important;
+  }
+  .leaflet-marker-pane {
+    z-index: 3 !important;
+  }
+  .leaflet-tooltip-pane {
+    z-index: 4 !important;
+  }
+  .leaflet-popup-pane {
+    z-index: 5 !important;
+  }
+  .leaflet-control {
+    z-index: 10 !important;
+  }
   .leaflet-popup-content-wrapper {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));

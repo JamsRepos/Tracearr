@@ -9,8 +9,33 @@ import { useTheme } from '@/components/theme-provider';
 
 export type MapViewMode = 'heatmap' | 'circles';
 
-// Custom styles for dark theme and zoom control positioning
+// Custom styles for dark theme, zoom control, and z-index fixes
 const mapStyles = `
+  /* Ensure map container doesn't overlap sidebars/modals */
+  .leaflet-container {
+    z-index: 0 !important;
+  }
+  .leaflet-pane {
+    z-index: 1 !important;
+  }
+  .leaflet-tile-pane {
+    z-index: 1 !important;
+  }
+  .leaflet-overlay-pane {
+    z-index: 2 !important;
+  }
+  .leaflet-marker-pane {
+    z-index: 3 !important;
+  }
+  .leaflet-tooltip-pane {
+    z-index: 4 !important;
+  }
+  .leaflet-popup-pane {
+    z-index: 5 !important;
+  }
+  .leaflet-control {
+    z-index: 10 !important;
+  }
   .leaflet-control-zoom {
     border: 1px solid hsl(var(--border)) !important;
     border-radius: 0.5rem !important;
