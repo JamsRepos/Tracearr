@@ -2,7 +2,7 @@
  * Tautulli API integration and import service
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { TautulliImportProgress, TautulliImportResult } from '@tracearr/shared';
 import { db } from '../db/client.js';
@@ -11,7 +11,7 @@ import { refreshAggregates } from '../db/timescale.js';
 import { geoipService } from './geoip.js';
 import type { PubSubService } from './cache.js';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 1000; // Larger batches = fewer API calls
 const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000; // Base delay, will be multiplied by attempt number
@@ -264,7 +264,14 @@ export class TautulliService {
   }
 
   /**
-   * Import all history from Tautulli into Tracearr
+   * Import all history from Tautulli into Tracearr (OPTIMIZED)
+   *
+   * Performance improvements over original:
+   * - Pre-fetches all existing sessions (1 query vs N queries for dedup)
+   * - Batches INSERT operations (100 per batch vs individual inserts)
+   * - Batches UPDATE operations in transactions
+   * - Caches GeoIP lookups per IP address
+   * - Throttles WebSocket updates (every 100 records or 2 seconds)
    */
   static async importHistory(
     serverId: string,
@@ -315,13 +322,17 @@ export class TautulliService {
       message: 'Connecting to Tautulli...',
     };
 
-    const publishProgress = async () => {
+    // Throttled progress publishing (fire-and-forget, every 100 records or 2 seconds)
+    let lastProgressTime = Date.now();
+    const publishProgress = () => {
       if (pubSubService) {
-        await pubSubService.publish('import:progress', progress);
+        pubSubService.publish('import:progress', progress).catch((err: unknown) => {
+          console.warn('Failed to publish progress:', err);
+        });
       }
     };
 
-    await publishProgress();
+    publishProgress();
 
     // Get user mapping (Tautulli user_id → Tracearr user_id)
     const userMap = new Map<number, string>();
@@ -347,7 +358,61 @@ export class TautulliService {
     progress.totalRecords = total;
     progress.totalPages = Math.ceil(total / PAGE_SIZE);
     progress.message = `Found ${total} records to import`;
-    await publishProgress();
+    publishProgress();
+
+    // === OPTIMIZATION: Pre-fetch all existing sessions for this server ===
+    console.log('[Import] Pre-fetching existing sessions for deduplication...');
+    const existingSessions = await db
+      .select({
+        id: sessions.id,
+        externalSessionId: sessions.externalSessionId,
+        ratingKey: sessions.ratingKey,
+        startedAt: sessions.startedAt,
+        serverUserId: sessions.serverUserId,
+        totalDurationMs: sessions.totalDurationMs,
+        // Fields needed for change detection
+        stoppedAt: sessions.stoppedAt,
+        durationMs: sessions.durationMs,
+        pausedDurationMs: sessions.pausedDurationMs,
+        watched: sessions.watched,
+      })
+      .from(sessions)
+      .where(eq(sessions.serverId, serverId));
+
+    // Build O(1) lookup maps
+    type ExistingSession = (typeof existingSessions)[0];
+    const sessionByExternalId = new Map<string, ExistingSession>();
+    const sessionByTimeKey = new Map<string, ExistingSession>();
+
+    for (const s of existingSessions) {
+      if (s.externalSessionId) {
+        sessionByExternalId.set(s.externalSessionId, s);
+      }
+      if (s.ratingKey && s.serverUserId && s.startedAt) {
+        const timeKey = `${s.serverUserId}:${s.ratingKey}:${s.startedAt.getTime()}`;
+        sessionByTimeKey.set(timeKey, s);
+      }
+    }
+    console.log(`[Import] Pre-fetched ${existingSessions.length} existing sessions`);
+
+    // === OPTIMIZATION: GeoIP cache ===
+    const geoCache = new Map<string, ReturnType<typeof geoipService.lookup>>();
+
+    // === OPTIMIZATION: Batch collections ===
+    // Inserts are batched per page (100 records) and flushed at end of each page
+    const insertBatch: (typeof sessions.$inferInsert)[] = [];
+
+    // Update batches - collected and flushed per page
+    interface SessionUpdate {
+      id: string;
+      externalSessionId?: string;
+      stoppedAt: Date;
+      durationMs: number;
+      pausedDurationMs: number;
+      watched: boolean;
+      progressMs?: number;
+    }
+    const updateBatch: SessionUpdate[] = [];
 
     let imported = 0;
     let skipped = 0;
@@ -357,12 +422,40 @@ export class TautulliService {
     // Track skipped users for warning message
     const skippedUsers = new Map<number, { username: string; count: number }>();
 
+    // Helper to flush batches
+    const flushBatches = async () => {
+      // Flush inserts
+      if (insertBatch.length > 0) {
+        await db.insert(sessions).values(insertBatch);
+        insertBatch.length = 0;
+      }
+
+      // Flush updates in a transaction
+      if (updateBatch.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const update of updateBatch) {
+            await tx
+              .update(sessions)
+              .set({
+                externalSessionId: update.externalSessionId,
+                stoppedAt: update.stoppedAt,
+                durationMs: update.durationMs,
+                pausedDurationMs: update.pausedDurationMs,
+                watched: update.watched,
+                progressMs: update.progressMs,
+              })
+              .where(eq(sessions.id, update.id));
+          }
+        });
+        updateBatch.length = 0;
+      }
+    };
+
     // Process all pages
     while (page * PAGE_SIZE < total) {
       progress.status = 'processing';
       progress.currentPage = page + 1;
       progress.message = `Processing page ${page + 1} of ${progress.totalPages}`;
-      await publishProgress();
 
       const { records } = await tautulli.getHistory(page * PAGE_SIZE, PAGE_SIZE);
 
@@ -395,81 +488,94 @@ export class TautulliService {
             continue;
           }
 
-          // Check for existing session by externalSessionId
-          // Convert reference_id to string for DB comparison
           const referenceIdStr = String(record.reference_id);
-          const existingByRef = await db
-            .select()
-            .from(sessions)
-            .where(
-              and(
-                eq(sessions.serverId, serverId),
-                eq(sessions.externalSessionId, referenceIdStr)
-              )
-            )
-            .limit(1);
 
-          if (existingByRef.length > 0) {
-            // Session already imported - update with final data
-            const existing = existingByRef[0]!;
-            await db
-              .update(sessions)
-              .set({
-                stoppedAt: new Date(record.stopped * 1000),
-                durationMs: record.duration * 1000,
-                pausedDurationMs: record.paused_counter * 1000,
-                watched: record.watched_status === 1,
-                progressMs: Math.round(
-                  (record.percent_complete / 100) * (existing.totalDurationMs ?? 0)
-                ),
-              })
-              .where(eq(sessions.id, existing.id));
+          // === OPTIMIZATION: O(1) lookup instead of DB query ===
+          const existingByRef = sessionByExternalId.get(referenceIdStr);
+          if (existingByRef) {
+            // Calculate new values
+            const newStoppedAt = new Date(record.stopped * 1000);
+            const newDurationMs = record.duration * 1000;
+            const newPausedDurationMs = record.paused_counter * 1000;
+            const newWatched = record.watched_status === 1;
+            const newProgressMs = Math.round(
+              (record.percent_complete / 100) * (existingByRef.totalDurationMs ?? 0)
+            );
+
+            // Only update if something actually changed
+            const stoppedAtChanged = existingByRef.stoppedAt?.getTime() !== newStoppedAt.getTime();
+            const durationChanged = existingByRef.durationMs !== newDurationMs;
+            const pausedChanged = existingByRef.pausedDurationMs !== newPausedDurationMs;
+            const watchedChanged = existingByRef.watched !== newWatched;
+
+            if (stoppedAtChanged || durationChanged || pausedChanged || watchedChanged) {
+              updateBatch.push({
+                id: existingByRef.id,
+                stoppedAt: newStoppedAt,
+                durationMs: newDurationMs,
+                pausedDurationMs: newPausedDurationMs,
+                watched: newWatched,
+                progressMs: newProgressMs,
+              });
+            }
 
             skipped++;
             progress.skippedRecords++;
             continue;
           }
 
-          // Check for duplicate by ratingKey + startedAt (fallback dedup)
+          // Fallback dedup check
           const startedAt = new Date(record.started * 1000);
-          // Convert rating_key to string for DB comparison (can be number or empty string)
-          const ratingKeyStr = typeof record.rating_key === 'number' ? String(record.rating_key) : null;
-          const existingByTime = ratingKeyStr
-            ? await db
-                .select()
-                .from(sessions)
-                .where(
-                  and(
-                    eq(sessions.serverId, serverId),
-                    eq(sessions.serverUserId, serverUserId),
-                    eq(sessions.ratingKey, ratingKeyStr),
-                    eq(sessions.startedAt, startedAt)
-                  )
-                )
-                .limit(1)
-            : [];
+          const ratingKeyStr =
+            typeof record.rating_key === 'number' ? String(record.rating_key) : null;
 
-          if (existingByTime.length > 0) {
-            // Update with externalSessionId for future dedup
-            const existingSession = existingByTime[0]!;
-            await db
-              .update(sessions)
-              .set({
-                externalSessionId: referenceIdStr,
-                stoppedAt: new Date(record.stopped * 1000),
-                durationMs: record.duration * 1000,
-                pausedDurationMs: record.paused_counter * 1000,
-                watched: record.watched_status === 1,
-              })
-              .where(eq(sessions.id, existingSession.id));
+          if (ratingKeyStr) {
+            const timeKey = `${serverUserId}:${ratingKeyStr}:${startedAt.getTime()}`;
+            const existingByTime = sessionByTimeKey.get(timeKey);
 
-            skipped++;
-            progress.skippedRecords++;
-            continue;
+            if (existingByTime) {
+              // Calculate new values
+              const newStoppedAt = new Date(record.stopped * 1000);
+              const newDurationMs = record.duration * 1000;
+              const newPausedDurationMs = record.paused_counter * 1000;
+              const newWatched = record.watched_status === 1;
+
+              // Check if externalSessionId needs to be set (fallback match means it was missing)
+              const needsExternalId = !existingByTime.externalSessionId;
+
+              // Check if other fields changed
+              const stoppedAtChanged = existingByTime.stoppedAt?.getTime() !== newStoppedAt.getTime();
+              const durationChanged = existingByTime.durationMs !== newDurationMs;
+              const pausedChanged = existingByTime.pausedDurationMs !== newPausedDurationMs;
+              const watchedChanged = existingByTime.watched !== newWatched;
+
+              // Only update if externalSessionId is missing OR something actually changed
+              if (needsExternalId || stoppedAtChanged || durationChanged || pausedChanged || watchedChanged) {
+                updateBatch.push({
+                  id: existingByTime.id,
+                  externalSessionId: referenceIdStr,
+                  stoppedAt: newStoppedAt,
+                  durationMs: newDurationMs,
+                  pausedDurationMs: newPausedDurationMs,
+                  watched: newWatched,
+                });
+              }
+
+              // Add to lookup map for this session
+              sessionByExternalId.set(referenceIdStr, existingByTime);
+
+              skipped++;
+              progress.skippedRecords++;
+              continue;
+            }
           }
 
-          // Lookup GeoIP data
-          const geo = geoipService.lookup(record.ip_address);
+          // === OPTIMIZATION: Cached GeoIP lookup ===
+          let geo = geoCache.get(record.ip_address);
+          if (!geo) {
+            geo = geoipService.lookup(record.ip_address);
+            geoCache.set(record.ip_address, geo);
+          }
 
           // Map media type
           let mediaType: 'movie' | 'episode' | 'track' = 'movie';
@@ -479,40 +585,35 @@ export class TautulliService {
             mediaType = 'track';
           }
 
-          // Insert new session
-          // session_key can be string, number, or null - convert to string
-          const sessionKey = record.session_key != null
-            ? String(record.session_key)
-            : `tautulli-${record.reference_id}`;
-          await db.insert(sessions).values({
+          const sessionKey =
+            record.session_key != null
+              ? String(record.session_key)
+              : `tautulli-${record.reference_id}`;
+
+          // === OPTIMIZATION: Collect insert instead of executing ===
+          insertBatch.push({
             serverId,
             serverUserId,
             sessionKey,
-            // Convert rating_key to string (can be number or empty string from API)
-            ratingKey: typeof record.rating_key === 'number' ? String(record.rating_key) : null,
-            // reference_id is always a number from API, convert to string
-            externalSessionId: String(record.reference_id),
-            state: 'stopped', // Historical data is always stopped
+            ratingKey: ratingKeyStr,
+            externalSessionId: referenceIdStr,
+            state: 'stopped',
             mediaType,
             mediaTitle: record.full_title || record.title,
-            // Enhanced metadata from Tautulli
             grandparentTitle: record.grandparent_title || null,
-            // Handle number or empty string from API
-            seasonNumber: typeof record.parent_media_index === 'number' ? record.parent_media_index : null,
+            seasonNumber:
+              typeof record.parent_media_index === 'number' ? record.parent_media_index : null,
             episodeNumber: typeof record.media_index === 'number' ? record.media_index : null,
             year: record.year || null,
-            // Tautulli provides thumb which is season poster for episodes, show/movie poster for others
             thumbPath: record.thumb || null,
             startedAt,
-            lastSeenAt: startedAt, // For historical data, use startedAt as lastSeenAt
+            lastSeenAt: startedAt,
             stoppedAt: new Date(record.stopped * 1000),
             durationMs: record.duration * 1000,
-            totalDurationMs: null, // Tautulli doesn't provide total duration directly
-            progressMs: null, // Will calculate from percent_complete if needed
-            // Pause tracking from Tautulli
+            totalDurationMs: null,
+            progressMs: null,
             pausedDurationMs: record.paused_counter * 1000,
             watched: record.watched_status === 1,
-            // Network/device info
             ipAddress: record.ip_address || '0.0.0.0',
             geoCity: geo.city,
             geoRegion: geo.region,
@@ -528,26 +629,49 @@ export class TautulliService {
             bitrate: null,
           });
 
+          // Add to lookup map to prevent duplicates within same import
+          sessionByExternalId.set(referenceIdStr, {
+            id: '', // Will be assigned by DB
+            externalSessionId: referenceIdStr,
+            ratingKey: ratingKeyStr,
+            startedAt,
+            serverUserId,
+            totalDurationMs: null,
+            // Include fields needed for change detection (use values we're inserting)
+            stoppedAt: new Date(record.stopped * 1000),
+            durationMs: record.duration * 1000,
+            pausedDurationMs: record.paused_counter * 1000,
+            watched: record.watched_status === 1,
+          });
+
           imported++;
           progress.importedRecords++;
         } catch (error) {
-          console.error('Error importing record:', record.reference_id, error);
+          console.error('Error processing record:', record.reference_id, error);
           errors++;
           progress.errorRecords++;
         }
 
-        // Publish progress every 10 records
-        if (progress.processedRecords % 10 === 0) {
-          await publishProgress();
+        // === OPTIMIZATION: Throttled progress updates ===
+        const now = Date.now();
+        if (progress.processedRecords % 100 === 0 || now - lastProgressTime > 2000) {
+          publishProgress();
+          lastProgressTime = now;
         }
       }
+
+      // Flush batches at end of each page
+      await flushBatches();
 
       page++;
     }
 
+    // Final flush for any remaining records
+    await flushBatches();
+
     // Refresh TimescaleDB aggregates so imported data appears in stats immediately
     progress.message = 'Refreshing aggregates...';
-    await publishProgress();
+    publishProgress();
     try {
       await refreshAggregates();
     } catch (err) {
@@ -561,19 +685,21 @@ export class TautulliService {
       const skippedUserList = [...skippedUsers.values()]
         .sort((a, b) => b.count - a.count)
         .slice(0, 5) // Show top 5 skipped users
-        .map(u => `${u.username} (${u.count} records)`)
+        .map((u) => `${u.username} (${u.count} records)`)
         .join(', ');
 
       const moreUsers = skippedUsers.size > 5 ? ` and ${skippedUsers.size - 5} more` : '';
       message += `. Warning: ${skippedUsers.size} users not found in Tracearr: ${skippedUserList}${moreUsers}. Sync your server to import these users first.`;
 
-      console.warn(`Tautulli import skipped users: ${[...skippedUsers.values()].map(u => u.username).join(', ')}`);
+      console.warn(
+        `Tautulli import skipped users: ${[...skippedUsers.values()].map((u) => u.username).join(', ')}`
+      );
     }
 
     // Final progress update
     progress.status = 'complete';
     progress.message = message;
-    await publishProgress();
+    publishProgress();
 
     return {
       success: true,
@@ -581,11 +707,14 @@ export class TautulliService {
       skipped,
       errors,
       message,
-      skippedUsers: skippedUsers.size > 0 ? [...skippedUsers.entries()].map(([id, data]) => ({
-        tautulliUserId: id,
-        username: data.username,
-        recordCount: data.count,
-      })) : undefined,
+      skippedUsers:
+        skippedUsers.size > 0
+          ? [...skippedUsers.entries()].map(([id, data]) => ({
+              tautulliUserId: id,
+              username: data.username,
+              recordCount: data.count,
+            }))
+          : undefined,
     };
   }
 }
