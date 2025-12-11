@@ -488,13 +488,28 @@ function ServerCard({
 function NotificationSettings() {
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
+  const [webhookFormat, setWebhookFormat] = useState<string>('json');
+  const [ntfyTopic, setNtfyTopic] = useState<string>('');
+
+  // Sync state with loaded settings
+  useEffect(() => {
+    if (settings) {
+      setWebhookFormat(settings.webhookFormat ?? 'json');
+      setNtfyTopic(settings.ntfyTopic ?? '');
+    }
+  }, [settings]);
 
   const handleToggle = (key: keyof SettingsType, value: boolean) => {
     updateSettings.mutate({ [key]: value });
   };
 
-  const handleUrlChange = (key: 'discordWebhookUrl' | 'customWebhookUrl', value: string) => {
+  const handleUrlChange = (key: 'discordWebhookUrl' | 'customWebhookUrl' | 'ntfyTopic', value: string) => {
     updateSettings.mutate({ [key]: value || null });
+  };
+
+  const handleWebhookFormatChange = (value: string) => {
+    setWebhookFormat(value);
+    updateSettings.mutate({ webhookFormat: value as 'json' | 'ntfy' | 'apprise' });
   };
 
   if (isLoading) {
@@ -607,14 +622,57 @@ function NotificationSettings() {
             <Label htmlFor="customWebhook">Custom Webhook URL</Label>
             <Input
               id="customWebhook"
-              placeholder="https://your-service.com/webhook"
+              placeholder={
+                webhookFormat === 'ntfy'
+                  ? 'https://ntfy.sh/ (or your self-hosted ntfy server)'
+                  : webhookFormat === 'apprise'
+                    ? 'http://apprise:8000/notify/myconfig'
+                    : 'https://your-service.com/webhook'
+              }
               defaultValue={settings?.customWebhookUrl ?? ''}
               onBlur={(e) => { handleUrlChange('customWebhookUrl', e.target.value); }}
             />
             <p className="text-xs text-muted-foreground">
-              Send notifications to a custom endpoint via POST request
+              {webhookFormat === 'ntfy'
+                ? 'Post to your ntfy server root URL (topic is specified separately below)'
+                : webhookFormat === 'apprise'
+                  ? 'Post to your Apprise API endpoint with notification configuration'
+                  : 'Send notifications to a custom endpoint via POST request'}
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="webhookFormat">Webhook Format</Label>
+            <Select value={webhookFormat} onValueChange={handleWebhookFormatChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="json">Raw JSON (default)</SelectItem>
+                <SelectItem value="ntfy">Ntfy</SelectItem>
+                <SelectItem value="apprise">Apprise</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose the payload format for your webhook endpoint
+            </p>
+          </div>
+
+          {webhookFormat === 'ntfy' && (
+            <div className="space-y-2">
+              <Label htmlFor="ntfyTopic">Ntfy Topic</Label>
+              <Input
+                id="ntfyTopic"
+                placeholder="tracearr"
+                value={ntfyTopic}
+                onChange={(e) => setNtfyTopic(e.target.value)}
+                onBlur={(e) => { handleUrlChange('ntfyTopic', e.target.value); }}
+              />
+              <p className="text-xs text-muted-foreground">
+                The ntfy topic to publish notifications to
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
