@@ -1,1 +1,1 @@
-ALTER TABLE "settings" ALTER COLUMN "primary_auth_method" SET NOT NULL;
+ALTER TABLE "settings" ADD COLUMN "primary_auth_method" varchar(20) DEFAULT 'local' NOT NULL;
