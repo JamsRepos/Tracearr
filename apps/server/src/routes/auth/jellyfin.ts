@@ -60,7 +60,7 @@ export const jellyfinRoutes: FastifyPluginAsync = async (app) => {
         try {
           const authResult = await JellyfinClient.authenticate(server.url, username, password);
 
-          if (authResult && authResult.isAdmin) {
+          if (authResult?.isAdmin) {
             // User is admin on this server - proceed with login
             app.log.info({ username, serverId: server.id }, 'Jellyfin admin authentication successful');
 

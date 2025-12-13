@@ -36,7 +36,7 @@ export const setupRoutes: FastifyPluginAsync = async (app) => {
         .from(settings)
         .limit(1);
       if (settingsRow[0]?.primaryAuthMethod) {
-        primaryAuthMethod = settingsRow[0].primaryAuthMethod as 'jellyfin' | 'local';
+        primaryAuthMethod = settingsRow[0].primaryAuthMethod;
       }
     } catch {
       // Column doesn't exist yet (migration not run) - use default
