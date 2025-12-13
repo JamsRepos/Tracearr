@@ -22,7 +22,12 @@ import { setupRoutes } from '../setup.js';
 
 /**
  * Helper to mock db.select with multiple chained calls
- * Setup route uses Promise.all with 3 parallel queries
+ * Setup route uses Promise.all with 4 parallel queries:
+ * 1. All servers
+ * 2. Jellyfin servers (where type = 'jellyfin')
+ * 3. Owners (where role = 'owner')
+ * 4. Password users (where passwordHash is not null)
+ * Plus a 5th query for settings (which may fail and default to 'local')
  */
 function mockDbSelectMultiple(results: unknown[][]) {
   let callIndex = 0;
@@ -70,9 +75,10 @@ describe('Setup Routes', () => {
     it('returns needsSetup true when no owners exist', async () => {
       app = await buildTestApp();
 
-      // Mock: servers exist, no owners, no password users
+      // Mock: servers exist, no jellyfin servers, no owners, no password users
       mockDbSelectMultiple([
         [{ id: 'server-1' }], // servers query
+        [], // jellyfin servers query
         [], // owners query (empty = needs setup)
         [], // password users query
       ]);
@@ -87,16 +93,19 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: true,
         hasServers: true,
+        hasJellyfinServers: false,
         hasPasswordAuth: false,
+        primaryAuthMethod: 'local',
       });
     });
 
     it('returns needsSetup false when owner exists', async () => {
       app = await buildTestApp();
 
-      // Mock: servers exist, owner exists, password user exists
+      // Mock: servers exist, jellyfin servers exist, owner exists, password user exists
       mockDbSelectMultiple([
         [{ id: 'server-1' }], // servers query
+        [{ id: 'server-1' }], // jellyfin servers query
         [{ id: 'user-1' }], // owners query (has owner)
         [{ id: 'user-1' }], // password users query
       ]);
@@ -111,16 +120,19 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: false,
         hasServers: true,
+        hasJellyfinServers: true,
         hasPasswordAuth: true,
+        primaryAuthMethod: 'local',
       });
     });
 
     it('returns hasServers false when no servers configured', async () => {
       app = await buildTestApp();
 
-      // Mock: no servers, no owners, no password users
+      // Mock: no servers, no jellyfin servers, no owners, no password users
       mockDbSelectMultiple([
         [], // servers query (empty)
+        [], // jellyfin servers query
         [], // owners query
         [], // password users query
       ]);
@@ -135,16 +147,19 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: true,
         hasServers: false,
+        hasJellyfinServers: false,
         hasPasswordAuth: false,
+        primaryAuthMethod: 'local',
       });
     });
 
     it('returns hasPasswordAuth true when user has password set', async () => {
       app = await buildTestApp();
 
-      // Mock: no servers, owner exists, password user exists
+      // Mock: no servers, no jellyfin servers, owner exists, password user exists
       mockDbSelectMultiple([
         [], // servers query
+        [], // jellyfin servers query
         [{ id: 'user-1' }], // owners query
         [{ id: 'user-1' }], // password users query (has password)
       ]);
@@ -159,16 +174,19 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: false,
         hasServers: false,
+        hasJellyfinServers: false,
         hasPasswordAuth: true,
+        primaryAuthMethod: 'local',
       });
     });
 
     it('returns hasPasswordAuth false when no users have passwords', async () => {
       app = await buildTestApp();
 
-      // Mock: servers exist, owner exists, no password users
+      // Mock: servers exist, jellyfin servers exist, owner exists, no password users
       mockDbSelectMultiple([
         [{ id: 'server-1' }], // servers query
+        [{ id: 'server-1' }], // jellyfin servers query
         [{ id: 'user-1' }], // owners query
         [], // password users query (empty)
       ]);
@@ -183,7 +201,9 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: false,
         hasServers: true,
+        hasJellyfinServers: true,
         hasPasswordAuth: false,
+        primaryAuthMethod: 'local',
       });
     });
 
@@ -193,6 +213,7 @@ describe('Setup Routes', () => {
       // Mock: completely empty database
       mockDbSelectMultiple([
         [], // no servers
+        [], // no jellyfin servers
         [], // no owners
         [], // no password users
       ]);
@@ -207,7 +228,9 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: true,
         hasServers: false,
+        hasJellyfinServers: false,
         hasPasswordAuth: false,
+        primaryAuthMethod: 'local',
       });
     });
 
@@ -217,6 +240,7 @@ describe('Setup Routes', () => {
       // Mock: fully configured installation
       mockDbSelectMultiple([
         [{ id: 'server-1' }, { id: 'server-2' }], // multiple servers
+        [{ id: 'server-1' }], // jellyfin servers
         [{ id: 'owner-1' }], // owner exists
         [{ id: 'owner-1' }, { id: 'user-2' }], // multiple password users
       ]);
@@ -231,7 +255,9 @@ describe('Setup Routes', () => {
       expect(body).toEqual({
         needsSetup: false,
         hasServers: true,
+        hasJellyfinServers: true,
         hasPasswordAuth: true,
+        primaryAuthMethod: 'local',
       });
     });
   });
