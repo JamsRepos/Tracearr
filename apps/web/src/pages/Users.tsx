@@ -34,16 +34,14 @@ const userColumns: ColumnDef<ServerUserWithIdentity>[] = [
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium">{user.username}</span>
+              <span className="font-medium">{user.identityName ?? user.username}</span>
               {user.role === 'owner' && (
                 <span title="Server Owner">
                   <Crown className="h-4 w-4 text-yellow-500" />
                 </span>
               )}
             </div>
-            {user.email && (
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-            )}
+            <p className="text-xs text-muted-foreground">@{user.username}</p>
           </div>
         </div>
       );

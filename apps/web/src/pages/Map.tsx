@@ -103,7 +103,7 @@ export function Map() {
   // Build summary text
   const summaryContext = useMemo(() => {
     const parts: string[] = [];
-    if (selectedUser) parts.push(selectedUser.username);
+    if (selectedUser) parts.push(selectedUser.identityName ?? selectedUser.username);
     if (selectedMediaType) parts.push(selectedMediaType.label);
     return parts.join(' · ') || 'All activity';
   }, [selectedUser, selectedMediaType]);
@@ -129,7 +129,7 @@ export function Map() {
             <SelectItem value="_all">All users</SelectItem>
             {users.map((user) => (
               <SelectItem key={user.id} value={user.id}>
-                {user.username}
+                {user.identityName ?? user.username}
               </SelectItem>
             ))}
           </SelectContent>
