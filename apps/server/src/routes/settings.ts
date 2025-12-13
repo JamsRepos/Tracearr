@@ -230,12 +230,22 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         .limit(1);
 
       if (existing.length === 0) {
-        // Create with provided values
+        // Create with provided values - use full updateData with defaults for required fields
+        // Note: mobileEnabled is not in updateData, so it will use the database default (false)
         await db.insert(settings).values({
           id: SETTINGS_ID,
           allowGuestAccess: updateData.allowGuestAccess ?? false,
           discordWebhookUrl: updateData.discordWebhookUrl ?? null,
           customWebhookUrl: updateData.customWebhookUrl ?? null,
+          webhookFormat: updateData.webhookFormat ?? null,
+          ntfyTopic: updateData.ntfyTopic ?? null,
+          pollerEnabled: updateData.pollerEnabled ?? true,
+          pollerIntervalMs: updateData.pollerIntervalMs ?? 15000,
+          tautulliUrl: updateData.tautulliUrl ?? null,
+          tautulliApiKey: updateData.tautulliApiKey ?? null,
+          externalUrl: updateData.externalUrl ?? null,
+          basePath: updateData.basePath ?? '',
+          trustProxy: updateData.trustProxy ?? false,
           primaryAuthMethod: updateData.primaryAuthMethod ?? 'local',
         });
       } else {
