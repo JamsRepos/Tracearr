@@ -33,16 +33,99 @@ on:
           - production
         default: 'preview'
 
+# Prevent concurrent builds that could cause version conflicts
 concurrency:
-  group: mobile-build-${{ github.ref }}
+  group: mobile-build
   cancel-in-progress: false
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
 jobs:
+  # Atomically prepare and reserve version numbers before builds start
+  prepare-versions:
+    name: Prepare Versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/mobile
+    outputs:
+      marketing-version: ${{ steps.versions.outputs.marketing-version }}
+      android-version-code: ${{ steps.versions.outputs.android-version-code }}
+      ios-build-number: ${{ steps.versions.outputs.ios-build-number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@main
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Reserve version numbers
+        id: versions
+        run: |
+          # Extract marketing version from git tag
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          VERSION="${VERSION%%-*}"
+          echo "Marketing version: $VERSION"
+          echo "marketing-version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Sync current versions from EAS remote
+          echo "Syncing versions from EAS remote..."
+          eas build:version:sync --platform all --non-interactive
+
+          # Read current versions
+          CURRENT_ANDROID_VC=$(jq -r '.expo.android.versionCode // 0' app.json)
+          CURRENT_IOS_BN=$(jq -r '.expo.ios.buildNumber // "0"' app.json)
+
+          # Increment versions
+          NEXT_ANDROID_VC=$((CURRENT_ANDROID_VC + 1))
+          NEXT_IOS_BN=$((CURRENT_IOS_BN + 1))
+
+          echo "Android versionCode: $CURRENT_ANDROID_VC -> $NEXT_ANDROID_VC"
+          echo "iOS buildNumber: $CURRENT_IOS_BN -> $NEXT_IOS_BN"
+
+          # Update app.json with all versions
+          jq --arg v "$VERSION" \
+             --argjson vc "$NEXT_ANDROID_VC" \
+             --arg bn "$NEXT_IOS_BN" \
+             '.expo.version = $v | .expo.android.versionCode = $vc | .expo.ios.buildNumber = $bn' \
+             app.json > tmp.json && mv tmp.json app.json
+
+          # Push reserved versions back to EAS remote BEFORE building
+          # This ensures no other build can use these version numbers
+          echo "Reserving versions in EAS remote..."
+          eas build:version:set --platform all --non-interactive
+
+          # Output for build jobs
+          echo "android-version-code=$NEXT_ANDROID_VC" >> $GITHUB_OUTPUT
+          echo "ios-build-number=$NEXT_IOS_BN" >> $GITHUB_OUTPUT
+
+          echo "Versions reserved successfully"
+
   build-android:
     name: Build Android
+    needs: [prepare-versions]
     if: inputs.platform == 'android' || inputs.platform == 'both'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -100,13 +183,17 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Sync version from git tag
+      - name: Set versions from prepare job
         run: |
-          VERSION="${{ inputs.tag }}"
-          VERSION="${VERSION#v}"
-          VERSION="${VERSION%%-*}"
-          echo "Setting app version to: $VERSION"
-          jq --arg v "$VERSION" '.expo.version = $v' app.json > tmp.json && mv tmp.json app.json
+          VERSION="${{ needs.prepare-versions.outputs.marketing-version }}"
+          VERSION_CODE="${{ needs.prepare-versions.outputs.android-version-code }}"
+
+          echo "Setting version: $VERSION, versionCode: $VERSION_CODE"
+
+          jq --arg v "$VERSION" \
+             --argjson vc "$VERSION_CODE" \
+             '.expo.version = $v | .expo.android.versionCode = $vc' \
+             app.json > tmp.json && mv tmp.json app.json
 
       - name: Build Android locally
         id: build
@@ -136,6 +223,7 @@ jobs:
 
   build-ios:
     name: Build iOS
+    needs: [prepare-versions]
     if: inputs.platform == 'ios' || inputs.platform == 'both'
     runs-on: macos-14
     timeout-minutes: 90
@@ -179,13 +267,17 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Sync version from git tag
+      - name: Set versions from prepare job
         run: |
-          VERSION="${{ inputs.tag }}"
-          VERSION="${VERSION#v}"
-          VERSION="${VERSION%%-*}"
-          echo "Setting app version to: $VERSION"
-          jq --arg v "$VERSION" '.expo.version = $v' app.json > tmp.json && mv tmp.json app.json
+          VERSION="${{ needs.prepare-versions.outputs.marketing-version }}"
+          BUILD_NUMBER="${{ needs.prepare-versions.outputs.ios-build-number }}"
+
+          echo "Setting version: $VERSION, buildNumber: $BUILD_NUMBER"
+
+          jq --arg v "$VERSION" \
+             --arg bn "$BUILD_NUMBER" \
+             '.expo.version = $v | .expo.ios.buildNumber = $bn' \
+             app.json > tmp.json && mv tmp.json app.json
 
       - name: Build iOS locally
         id: build
@@ -213,7 +305,7 @@ jobs:
 
   upload-and-submit:
     name: Upload and Submit
-    needs: [build-android, build-ios]
+    needs: [prepare-versions, build-android, build-ios]
     if: always() && (needs.build-android.result == 'success' || needs.build-ios.result == 'success')
     runs-on: ubuntu-latest
     defaults:
@@ -297,7 +389,7 @@ jobs:
 
   summary:
     name: Build Summary
-    needs: [build-android, build-ios, upload-and-submit]
+    needs: [prepare-versions, build-android, build-ios, upload-and-submit]
     if: always()
     runs-on: ubuntu-latest
 
@@ -311,6 +403,11 @@ jobs:
             echo "**Platform**: ${{ inputs.platform }}"
             echo "**Distribution**: ${{ inputs.distribution }}"
             echo "**Profile**: ${{ inputs.profile }}"
+            echo ""
+            echo "### Version Info"
+            echo "- **Marketing Version**: ${{ needs.prepare-versions.outputs.marketing-version }}"
+            echo "- **Android versionCode**: ${{ needs.prepare-versions.outputs.android-version-code }}"
+            echo "- **iOS buildNumber**: ${{ needs.prepare-versions.outputs.ios-build-number }}"
             echo ""
             echo "### Build Results"
             echo ""
