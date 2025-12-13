@@ -127,13 +127,6 @@
       "when": 1765665030269,
       "tag": "0017_slim_warstar",
       "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1765665198761,
-      "tag": "0018_wonderful_sister_grimm",
-      "breakpoints": true
     }
   ]
 }

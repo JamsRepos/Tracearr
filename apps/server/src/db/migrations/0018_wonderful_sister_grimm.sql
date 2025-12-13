@@ -1,1 +1,0 @@
-ALTER TABLE "settings" ALTER COLUMN "primary_auth_method" SET NOT NULL;
