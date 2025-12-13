@@ -33,13 +33,8 @@ const plexLoginSchema = z.object({
   forwardUrl: z.url().optional(),
 });
 
-const jellyfinLoginSchema = z.object({
-  type: z.literal('jellyfin'),
-  username: z.string().min(1),
-  password: z.string().min(1),
-});
-
-const loginSchema = z.discriminatedUnion('type', [localLoginSchema, plexLoginSchema, jellyfinLoginSchema]);
+// Note: Jellyfin login is handled at /auth/jellyfin/login, not here
+const loginSchema = z.discriminatedUnion('type', [localLoginSchema, plexLoginSchema]);
 
 export const localRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -136,7 +131,6 @@ export const localRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    // Jellyfin login is handled at /auth/jellyfin/login
     // This should not be reached due to discriminated union, but handle gracefully
     return reply.badRequest('Invalid login type');
   });
