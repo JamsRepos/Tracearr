@@ -111,7 +111,9 @@ export function Violations() {
                 <User className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
-            <span className="font-medium">{violation.user.username}</span>
+            <span className="font-medium">
+              {violation.user.identityName ?? violation.user.username}
+            </span>
           </Link>
         );
       },

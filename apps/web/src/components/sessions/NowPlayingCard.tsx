@@ -156,7 +156,9 @@ export function NowPlayingCard({ session }: NowPlayingCardProps) {
                   {session.user.username.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium">{session.user.username}</span>
+              <span className="text-sm font-medium">
+                {session.user.identityName ?? session.user.username}
+              </span>
             </div>
 
             <div className="flex items-center gap-1.5">

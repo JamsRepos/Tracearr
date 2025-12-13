@@ -41,6 +41,12 @@ export const updateUserSchema = z.object({
   trustScore: z.number().int().min(0).max(100).optional(),
 });
 
+export const updateUserIdentitySchema = z.object({
+  name: z.string().max(255).nullable().optional(),
+});
+
+export type UpdateUserIdentityInput = z.infer<typeof updateUserIdentitySchema>;
+
 export const userIdParamSchema = z.object({
   id: uuidSchema,
 });

@@ -12,7 +12,7 @@ import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
 import type { Rule, ViolationSeverity, ViolationWithDetails } from '@tracearr/shared';
 import { WS_EVENTS } from '@tracearr/shared';
 import { db } from '../../db/client.js';
-import { servers, serverUsers, sessions, violations } from '../../db/schema.js';
+import { servers, serverUsers, sessions, violations, users } from '../../db/schema.js';
 import type * as schema from '../../db/schema.js';
 import type { RuleEvaluationResult } from '../../services/rules.js';
 import type { PubSubService } from '../../services/cache.js';
@@ -140,11 +140,13 @@ export async function createViolation(
       userId: serverUsers.id,
       username: serverUsers.username,
       thumbUrl: serverUsers.thumbUrl,
+      identityName: users.name,
       serverId: servers.id,
       serverName: servers.name,
       serverType: servers.type,
     })
     .from(serverUsers)
+    .innerJoin(users, eq(serverUsers.userId, users.id))
     .innerJoin(sessions, eq(sessions.id, sessionId))
     .innerJoin(servers, eq(servers.id, sessions.serverId))
     .where(eq(serverUsers.id, serverUserId))
@@ -166,6 +168,7 @@ export async function createViolation(
         username: details.username,
         thumbUrl: details.thumbUrl,
         serverId: details.serverId,
+        identityName: details.identityName,
       },
       rule: {
         id: rule.id,
@@ -274,12 +277,14 @@ export async function broadcastViolations(
       userId: serverUsers.id,
       username: serverUsers.username,
       thumbUrl: serverUsers.thumbUrl,
+      identityName: users.name,
       serverId: servers.id,
       serverName: servers.name,
       serverType: servers.type,
     })
     .from(sessions)
     .innerJoin(serverUsers, eq(serverUsers.id, sessions.serverUserId))
+    .innerJoin(users, eq(serverUsers.userId, users.id))
     .innerJoin(servers, eq(servers.id, sessions.serverId))
     .where(eq(sessions.id, sessionId))
     .limit(1);
@@ -301,6 +306,7 @@ export async function broadcastViolations(
         username: details.username,
         thumbUrl: details.thumbUrl,
         serverId: details.serverId,
+        identityName: details.identityName,
       },
       rule: {
         id: rule.id,

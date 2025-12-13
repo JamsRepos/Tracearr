@@ -14,7 +14,7 @@ import { db } from '../../db/client.js';
 import { resolveDateRange } from './utils.js';
 
 interface LocationFilters {
-  users: { id: string; username: string }[];
+  users: { id: string; username: string; identityName: string | null }[];
   servers: { id: string; name: string }[];
   mediaTypes: ('movie' | 'episode' | 'track')[];
 }
@@ -143,15 +143,16 @@ export const locationsRoutes: FastifyPluginAsync = async (app) => {
         // Query 2: Cascading filter options - each filter type uses conditions from OTHER active filters
         // Note: ORDER BY not allowed within UNION subqueries, sorting done in application code
         db.execute(sql`
-          SELECT 'user' as filter_type, su.id::text as id, su.username as name
+          SELECT 'user' as filter_type, su.id::text as id, su.username as name, u.name as identity_name
           FROM sessions s
           JOIN server_users su ON su.id = s.server_user_id
+          JOIN users u ON su.user_id = u.id
           ${userFilterWhereClause}
-          GROUP BY su.id, su.username
+          GROUP BY su.id, su.username, u.name
 
           UNION ALL
 
-          SELECT 'server' as filter_type, sv.id::text as id, sv.name as name
+          SELECT 'server' as filter_type, sv.id::text as id, sv.name as name, NULL as identity_name
           FROM sessions s
           JOIN servers sv ON sv.id = s.server_id
           ${serverFilterWhereClause}
@@ -159,7 +160,7 @@ export const locationsRoutes: FastifyPluginAsync = async (app) => {
 
           UNION ALL
 
-          SELECT 'media' as filter_type, s.media_type as id, s.media_type as name
+          SELECT 'media' as filter_type, s.media_type as id, s.media_type as name, NULL as identity_name
           FROM sessions s
           ${mediaFilterWhereClause} AND s.media_type IS NOT NULL
           GROUP BY s.media_type
@@ -168,12 +169,12 @@ export const locationsRoutes: FastifyPluginAsync = async (app) => {
 
       // Parse filter results (no caching - cascading filters depend on current selections)
       // Sorting done here since ORDER BY not allowed within UNION subqueries
-      const filters = filtersResult.rows as { filter_type: string; id: string; name: string }[];
+      const filters = filtersResult.rows as { filter_type: string; id: string; name: string; identity_name: string | null }[];
       availableFilters = {
         users: filters
           .filter(f => f.filter_type === 'user')
-          .map(f => ({ id: f.id, username: f.name }))
-          .sort((a, b) => a.username.localeCompare(b.username)),
+          .map(f => ({ id: f.id, username: f.name, identityName: f.identity_name }))
+          .sort((a, b) => (a.identityName ?? a.username).localeCompare(b.identityName ?? b.username)),
         servers: filters
           .filter(f => f.filter_type === 'server')
           .map(f => ({ id: f.id, name: f.name }))

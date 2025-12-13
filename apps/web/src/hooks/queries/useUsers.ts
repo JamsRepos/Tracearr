@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
 
 export function useUsers(params: { page?: number; pageSize?: number; serverId?: string } = {}) {
   return useQuery({
@@ -52,6 +53,24 @@ export function useUpdateUser() {
       queryClient.setQueryData(['users', 'detail', variables.id], data);
       // Invalidate users list
       void queryClient.invalidateQueries({ queryKey: ['users', 'list'] });
+    },
+  });
+}
+
+export function useUpdateUserIdentity() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string | null }) =>
+      api.users.updateIdentity(id, { name }),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['users', 'full', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['users', 'list'] });
+      toast({ title: 'Display Name Updated' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to Update', description: error.message, variant: 'destructive' });
     },
   });
 }

@@ -187,7 +187,7 @@ export interface Session {
 }
 
 export interface ActiveSession extends Session {
-  user: Pick<ServerUser, 'id' | 'username' | 'thumbUrl'>;
+  user: Pick<ServerUser, 'id' | 'username' | 'thumbUrl'> & { identityName: string | null };
   server: Pick<Server, 'id' | 'name' | 'type'>;
 }
 
@@ -292,7 +292,7 @@ export interface ViolationSessionInfo {
 
 export interface ViolationWithDetails extends Violation {
   rule: Pick<Rule, 'id' | 'name' | 'type'>;
-  user: Pick<ServerUser, 'id' | 'username' | 'thumbUrl' | 'serverId'>;
+  user: Pick<ServerUser, 'id' | 'username' | 'thumbUrl' | 'serverId'> & { identityName: string | null };
   server?: Pick<Server, 'id' | 'name' | 'type'>;
   session?: ViolationSessionInfo;
   relatedSessions?: ViolationSessionInfo[];
@@ -352,7 +352,7 @@ export interface LocationStatsSummary {
 }
 
 export interface LocationFilterOptions {
-  users: { id: string; username: string }[];
+  users: { id: string; username: string; identityName: string | null }[];
   servers: { id: string; name: string }[];
   mediaTypes: ('movie' | 'episode' | 'track')[];
 }
@@ -392,6 +392,7 @@ export interface QualityStats {
 export interface TopUserStats {
   serverUserId: string;
   username: string;
+  identityName: string | null;
   thumbUrl: string | null;
   serverId: string | null;
   trustScore: number;

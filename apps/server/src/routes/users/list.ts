@@ -13,6 +13,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import {
   updateUserSchema,
+  updateUserIdentitySchema,
   userIdParamSchema,
   paginationSchema,
   serverIdFilterSchema,
@@ -20,6 +21,7 @@ import {
 import { db } from '../../db/client.js';
 import { serverUsers, sessions, servers, users } from '../../db/schema.js';
 import { hasServerAccess } from '../../utils/serverFiltering.js';
+import { updateUser } from '../../services/userService.js';
 
 export const listRoutes: FastifyPluginAsync = async (app) => {
   // Combined schema for pagination and server filter
@@ -266,6 +268,56 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
       }
 
       return updatedServerUser;
+    }
+  );
+
+  /**
+   * PATCH /:id/identity - Update user identity (display name)
+   * Owner-only. Updates the users table (identity), not server_users.
+   */
+  app.patch(
+    '/:id/identity',
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const params = userIdParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.badRequest('Invalid user ID');
+      }
+
+      const body = updateUserIdentitySchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.badRequest('Invalid request body');
+      }
+
+      const { id } = params.data;
+      const authUser = request.user;
+
+      // Only owners can update user identity
+      if (authUser.role !== 'owner') {
+        return reply.forbidden('Only owners can update user identity');
+      }
+
+      // Get serverUser to find userId (the identity)
+      const serverUserRows = await db
+        .select({ userId: serverUsers.userId, serverId: serverUsers.serverId })
+        .from(serverUsers)
+        .where(eq(serverUsers.id, id))
+        .limit(1);
+
+      const serverUser = serverUserRows[0];
+      if (!serverUser) {
+        return reply.notFound('User not found');
+      }
+
+      // Verify access
+      if (!hasServerAccess(authUser, serverUser.serverId)) {
+        return reply.forbidden('Access denied');
+      }
+
+      // Update the identity record (users table)
+      const updated = await updateUser(serverUser.userId, { name: body.data.name });
+
+      return { success: true, name: updated.name };
     }
   );
 };

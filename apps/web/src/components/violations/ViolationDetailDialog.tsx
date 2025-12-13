@@ -169,7 +169,7 @@ export function ViolationDetailDialog({
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
-                  alt={violation.user.username}
+                  alt={violation.user.identityName ?? violation.user.username}
                   className="h-16 w-16 rounded-full object-cover"
                 />
               ) : (
@@ -177,10 +177,11 @@ export function ViolationDetailDialog({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg truncate">{violation.user.username}</h3>
-              {violation.server?.name && (
-                <p className="text-sm text-muted-foreground truncate">{violation.server.name}</p>
-              )}
+              <h3 className="font-semibold text-lg truncate">{violation.user.identityName ?? violation.user.username}</h3>
+              <p className="text-sm text-muted-foreground truncate">
+                @{violation.user.username}
+                {violation.server?.name && ` • ${violation.server.name}`}
+              </p>
             </div>
             <SeverityBadge severity={violation.severity} />
           </div>

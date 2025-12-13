@@ -6,6 +6,7 @@ import { getAvatarUrl, getTrustScoreColor } from './utils';
 interface UserRowProps {
   userId: string;
   username: string;
+  identityName?: string | null;
   thumbUrl?: string | null;
   serverId?: string | null;
   trustScore: number;
@@ -20,6 +21,7 @@ interface UserRowProps {
 export function UserRow({
   userId,
   username,
+  identityName,
   thumbUrl,
   serverId,
   trustScore,
@@ -30,6 +32,7 @@ export function UserRow({
   className,
   style,
 }: UserRowProps) {
+  const displayName = identityName ?? username;
   const avatarUrl = getAvatarUrl(serverId, thumbUrl, 40);
 
   return (
@@ -49,7 +52,7 @@ export function UserRow({
         {avatarUrl ? (
           <img
             src={avatarUrl}
-            alt={username}
+            alt={displayName}
             className="h-full w-full object-cover"
             loading="lazy"
           />
@@ -62,7 +65,7 @@ export function UserRow({
 
       {/* Name & Top Content */}
       <div className="flex-1 min-w-0">
-        <p className="truncate font-medium">{username}</p>
+        <p className="truncate font-medium">{displayName}</p>
         {topContent && (
           <p className="truncate text-xs text-muted-foreground">
             Loves: <span className="font-medium">{topContent}</span>

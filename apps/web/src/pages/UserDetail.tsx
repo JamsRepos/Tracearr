@@ -5,6 +5,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { TrustScoreBadge } from '@/components/users/TrustScoreBadge';
 import { UserLocationsCard } from '@/components/users/UserLocationsCard';
 import { UserDevicesCard } from '@/components/users/UserDevicesCard';
+import { EditUserNameDialog } from '@/components/users/EditUserNameDialog';
 import { SeverityBadge } from '@/components/violations/SeverityBadge';
 import { ActiveSessionBadge } from '@/components/sessions/ActiveSessionBadge';
 import { getAvatarUrl } from '@/components/users/utils';
@@ -22,6 +23,7 @@ import {
   Globe,
   XCircle,
   Bot,
+  Pencil,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -33,6 +35,7 @@ import {
   useUserTerminations,
 } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Format duration in human readable format
@@ -245,8 +248,11 @@ export function UserDetail() {
   const [sessionsPage, setSessionsPage] = useState(1);
   const [violationsPage, setViolationsPage] = useState(1);
   const [terminationsPage, setTerminationsPage] = useState(1);
+  const [isEditNameOpen, setIsEditNameOpen] = useState(false);
   const pageSize = 10;
   const { selectedServerId } = useServer();
+  const { user: authUser } = useAuth();
+  const isOwner = authUser?.role === 'owner';
 
   // Use the aggregate endpoint for initial load (1 request instead of 6)
   const { data: fullData, isLoading } = useUserFull(id!);
@@ -365,7 +371,7 @@ export function UserDetail() {
             Back
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold">{user.username}</h1>
+        <h1 className="text-3xl font-bold">{user.identityName ?? user.username}</h1>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -392,13 +398,24 @@ export function UserDetail() {
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-semibold">{user.username}</h2>
+                  <h2 className="text-xl font-semibold">{user.identityName ?? user.username}</h2>
+                  {isOwner && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setIsEditNameOpen(true)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                   {user.role === 'owner' && (
                     <span title="Server Owner">
                       <Crown className="h-5 w-5 text-yellow-500" />
                     </span>
                   )}
                 </div>
+                <p className="text-sm text-muted-foreground">@{user.username}</p>
                 {user.email && (
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 )}
@@ -527,6 +544,15 @@ export function UserDetail() {
           />
         </CardContent>
       </Card>
+
+      {/* Edit Display Name Dialog */}
+      <EditUserNameDialog
+        open={isEditNameOpen}
+        onOpenChange={setIsEditNameOpen}
+        userId={id!}
+        currentName={user.identityName}
+        username={user.username}
+      />
     </div>
   );
 }

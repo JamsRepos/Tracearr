@@ -233,7 +233,9 @@ export function StreamCard({
                         <User className="h-3 w-3 text-muted-foreground" />
                       )}
                     </div>
-                    <span className="text-xs font-medium">{session.user.username}</span>
+                    <span className="text-xs font-medium">
+                      {session.user.identityName ?? session.user.username}
+                    </span>
                   </Link>
 
                   {/* Meta info */}

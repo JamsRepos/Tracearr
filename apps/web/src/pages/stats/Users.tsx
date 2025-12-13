@@ -82,6 +82,7 @@ export function StatsUsers() {
                   <UserCard
                     userId={podiumUsers[1].serverUserId}
                     username={podiumUsers[1].username}
+                    identityName={podiumUsers[1].identityName}
                     thumbUrl={podiumUsers[1].thumbUrl}
                     serverId={podiumUsers[1].serverId}
                     trustScore={podiumUsers[1].trustScore}
@@ -100,6 +101,7 @@ export function StatsUsers() {
                   <UserCard
                     userId={podiumUsers[0].serverUserId}
                     username={podiumUsers[0].username}
+                    identityName={podiumUsers[0].identityName}
                     thumbUrl={podiumUsers[0].thumbUrl}
                     serverId={podiumUsers[0].serverId}
                     trustScore={podiumUsers[0].trustScore}
@@ -118,6 +120,7 @@ export function StatsUsers() {
                   <UserCard
                     userId={podiumUsers[2].serverUserId}
                     username={podiumUsers[2].username}
+                    identityName={podiumUsers[2].identityName}
                     thumbUrl={podiumUsers[2].thumbUrl}
                     serverId={podiumUsers[2].serverId}
                     trustScore={podiumUsers[2].trustScore}
@@ -147,6 +150,7 @@ export function StatsUsers() {
                     key={user.serverUserId}
                     userId={user.serverUserId}
                     username={user.username}
+                    identityName={user.identityName}
                     thumbUrl={user.thumbUrl}
                     serverId={user.serverId}
                     trustScore={user.trustScore}

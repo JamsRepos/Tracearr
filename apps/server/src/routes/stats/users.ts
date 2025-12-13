@@ -144,10 +144,12 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       // Query server_users with session stats
       // Stats are per-server-account (ServerUser), not per-identity (User)
       // Include server_id for avatar proxy and top genre/show
+      // Join with users table to get identity name
       const topUsersResult = await db.execute(sql`
         SELECT
           su.id as server_user_id,
           su.username,
+          u.name as identity_name,
           su.thumb_url,
           su.server_id::text,
           su.trust_score,
@@ -156,9 +158,10 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
           MODE() WITHIN GROUP (ORDER BY s.media_type) as top_media_type,
           MODE() WITHIN GROUP (ORDER BY COALESCE(s.grandparent_title, s.media_title)) as top_content
         FROM server_users su
+        INNER JOIN users u ON su.user_id = u.id
         LEFT JOIN sessions s ON s.server_user_id = su.id ${dateJoinFilter}
         WHERE true ${serverFilter}
-        GROUP BY su.id, su.username, su.thumb_url, su.server_id, su.trust_score
+        GROUP BY su.id, su.username, u.name, su.thumb_url, su.server_id, su.trust_score
         ORDER BY watch_time_ms DESC
         LIMIT 10
       `);
@@ -166,6 +169,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       const topUsers: TopUserStats[] = (topUsersResult.rows as {
         server_user_id: string;
         username: string;
+        identity_name: string | null;
         thumb_url: string | null;
         server_id: string | null;
         trust_score: number;
@@ -176,6 +180,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       }[]).map((r) => ({
         serverUserId: r.server_user_id,
         username: r.username,
+        identityName: r.identity_name,
         thumbUrl: r.thumb_url,
         serverId: r.server_id,
         trustScore: r.trust_score,

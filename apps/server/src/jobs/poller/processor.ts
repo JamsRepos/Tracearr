@@ -146,8 +146,23 @@ async function processServerSessions(
     const sessionExternalIds = [...new Set(processedSessions.map((s) => s.externalUserId))];
 
     const serverUsersList = await db
-      .select()
+      .select({
+        id: serverUsers.id,
+        userId: serverUsers.userId,
+        serverId: serverUsers.serverId,
+        externalId: serverUsers.externalId,
+        username: serverUsers.username,
+        email: serverUsers.email,
+        thumbUrl: serverUsers.thumbUrl,
+        isServerAdmin: serverUsers.isServerAdmin,
+        trustScore: serverUsers.trustScore,
+        sessionCount: serverUsers.sessionCount,
+        createdAt: serverUsers.createdAt,
+        updatedAt: serverUsers.updatedAt,
+        identityName: users.name,
+      })
       .from(serverUsers)
+      .innerJoin(users, eq(serverUsers.userId, users.id))
       .where(
         and(
           eq(serverUsers.serverId, server.id),
@@ -237,10 +252,16 @@ async function processServerSessions(
       for (let i = 0; i < serverUsersToCreate.length; i++) {
         const serverUserToCreate = serverUsersToCreate[i]!;
         const newServerUser = newServerUsers[i];
-        if (newServerUser) {
+        const newIdentityUser = newIdentityUsers[i];
+        if (newServerUser && newIdentityUser) {
           sessionServerUserIds[serverUserToCreate.sessionIndex] = newServerUser.id;
-          serverUserById.set(newServerUser.id, newServerUser);
-          serverUserByExternalId.set(serverUserToCreate.externalId, newServerUser);
+          // Add to cache with identityName from the identity user
+          const serverUserWithIdentity = {
+            ...newServerUser,
+            identityName: newIdentityUser.name,
+          };
+          serverUserById.set(newServerUser.id, serverUserWithIdentity);
+          serverUserByExternalId.set(serverUserToCreate.externalId, serverUserWithIdentity);
         }
       }
     }
@@ -275,8 +296,13 @@ async function processServerSessions(
       // Get server user details from cache
       const serverUserFromCache = serverUserById.get(serverUserId);
       const userDetail = serverUserFromCache
-        ? { id: serverUserFromCache.id, username: serverUserFromCache.username, thumbUrl: serverUserFromCache.thumbUrl }
-        : { id: serverUserId, username: 'Unknown', thumbUrl: null };
+        ? {
+            id: serverUserFromCache.id,
+            username: serverUserFromCache.username,
+            thumbUrl: serverUserFromCache.thumbUrl,
+            identityName: serverUserFromCache.identityName,
+          }
+        : { id: serverUserId, username: 'Unknown', thumbUrl: null, identityName: null };
 
       // Get GeoIP location
       const geo: GeoLocation = geoipService.lookup(processed.ipAddress);

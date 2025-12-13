@@ -14,7 +14,7 @@
 import { eq, and, isNull } from 'drizzle-orm';
 import type { PlexPlaySessionNotification, ActiveSession } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { servers, sessions, serverUsers } from '../db/schema.js';
+import { servers, sessions, serverUsers, users } from '../db/schema.js';
 import { createMediaServerClient } from '../services/mediaServer/index.js';
 import { sseManager } from '../services/sseManager.js';
 import type { CacheService, PubSubService } from '../services/cache.js';
@@ -319,10 +319,16 @@ async function createNewSession(
     return;
   }
 
-  // Get or create server user
+  // Get or create server user (with identity name from users table)
   const serverUserRows = await db
-    .select()
+    .select({
+      id: serverUsers.id,
+      username: serverUsers.username,
+      thumbUrl: serverUsers.thumbUrl,
+      identityName: users.name,
+    })
     .from(serverUsers)
+    .innerJoin(users, eq(serverUsers.userId, users.id))
     .where(
       and(
         eq(serverUsers.serverId, serverId),
@@ -411,8 +417,13 @@ async function createNewSession(
   // Get server user details
   const serverUserFromDb = serverUserRows[0];
   const userDetail = serverUserFromDb
-    ? { id: serverUserFromDb.id, username: serverUserFromDb.username, thumbUrl: serverUserFromDb.thumbUrl }
-    : { id: serverUserId, username: 'Unknown', thumbUrl: null };
+    ? {
+        id: serverUserFromDb.id,
+        username: serverUserFromDb.username,
+        thumbUrl: serverUserFromDb.thumbUrl,
+        identityName: serverUserFromDb.identityName,
+      }
+    : { id: serverUserId, username: 'Unknown', thumbUrl: null, identityName: null };
 
   // Build active session
   const activeSession: ActiveSession = {

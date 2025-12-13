@@ -6,6 +6,7 @@ import { getAvatarUrl, getTrustScoreColor, getTrustScoreBg, MEDALS } from './uti
 interface UserCardProps {
   userId: string;
   username: string;
+  identityName?: string | null;
   thumbUrl?: string | null;
   serverId?: string | null;
   trustScore: number;
@@ -21,6 +22,7 @@ interface UserCardProps {
 export function UserCard({
   userId,
   username,
+  identityName,
   thumbUrl,
   serverId,
   trustScore,
@@ -31,6 +33,7 @@ export function UserCard({
   className,
   style,
 }: UserCardProps) {
+  const displayName = identityName ?? username;
   const avatarUrl = getAvatarUrl(serverId, thumbUrl);
   const medal = MEDALS[rank];
 
@@ -70,7 +73,7 @@ export function UserCard({
           {avatarUrl ? (
             <img
               src={avatarUrl}
-              alt={username}
+              alt={displayName}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"
             />
@@ -83,7 +86,7 @@ export function UserCard({
       </div>
 
       {/* Name */}
-      <h3 className="relative z-10 mt-4 w-full px-2 text-center text-base font-semibold line-clamp-2 break-words">{username}</h3>
+      <h3 className="relative z-10 mt-4 w-full px-2 text-center text-base font-semibold line-clamp-2 break-words">{displayName}</h3>
 
       {/* Stats */}
       <div className="relative z-10 mt-2 flex items-center gap-4 text-sm">

@@ -92,7 +92,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       toast({
         title: 'New Stream Started',
-        description: `${session.user.username} is watching ${session.mediaTitle}`,
+        description: `${session.user.identityName ?? session.user.username} is watching ${session.mediaTitle}`,
       });
     });
 
@@ -123,7 +123,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       toast({
         title: `New Violation: ${violation.rule.name}`,
-        description: `${violation.user.username} triggered ${violation.rule.type}`,
+        description: `${violation.user.identityName ?? violation.user.username} triggered ${violation.rule.type}`,
         variant: severityColors[violation.severity],
       });
     });

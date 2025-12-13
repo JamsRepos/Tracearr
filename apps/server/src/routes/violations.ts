@@ -10,7 +10,7 @@ import {
   type ViolationSessionInfo,
 } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { violations, rules, serverUsers, sessions, servers } from '../db/schema.js';
+import { violations, rules, serverUsers, sessions, servers, users } from '../db/schema.js';
 import { hasServerAccess } from '../utils/serverFiltering.js';
 import { getTrustScorePenalty } from '../jobs/poller/violations.js';
 
@@ -114,6 +114,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
           serverUserId: violations.serverUserId,
           username: serverUsers.username,
           userThumb: serverUsers.thumbUrl,
+          identityName: users.name,
           serverId: serverUsers.serverId,
           serverName: servers.name,
           sessionId: violations.sessionId,
@@ -145,6 +146,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
         .from(violations)
         .innerJoin(rules, eq(violations.ruleId, rules.id))
         .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+        .innerJoin(users, eq(serverUsers.userId, users.id))
         .innerJoin(servers, eq(serverUsers.serverId, servers.id))
         .innerJoin(sessions, eq(violations.sessionId, sessions.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -489,6 +491,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
           username: v.username,
           thumbUrl: v.userThumb,
           serverId: v.serverId,
+          identityName: v.identityName,
         },
         server: {
           id: v.serverId,
@@ -558,6 +561,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
           serverUserId: violations.serverUserId,
           username: serverUsers.username,
           userThumb: serverUsers.thumbUrl,
+          identityName: users.name,
           serverId: serverUsers.serverId,
           serverName: servers.name,
           sessionId: violations.sessionId,
@@ -575,6 +579,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
         .from(violations)
         .innerJoin(rules, eq(violations.ruleId, rules.id))
         .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+        .innerJoin(users, eq(serverUsers.userId, users.id))
         .innerJoin(servers, eq(serverUsers.serverId, servers.id))
         .innerJoin(sessions, eq(violations.sessionId, sessions.id))
         .where(eq(violations.id, id))

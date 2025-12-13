@@ -113,6 +113,7 @@ export {
   serverIdParamSchema,
   // User
   updateUserSchema,
+  updateUserIdentitySchema,
   userIdParamSchema,
   // Session
   sessionQuerySchema,
@@ -147,6 +148,7 @@ export type {
   CallbackInput,
   CreateServerInput,
   UpdateUserInput,
+  UpdateUserIdentityInput,
   SessionQueryInput,
   CreateRuleInput,
   UpdateRuleInput,

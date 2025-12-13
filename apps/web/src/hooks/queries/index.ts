@@ -26,6 +26,7 @@ export {
   useUserFull,
   useUserSessions,
   useUpdateUser,
+  useUpdateUserIdentity,
   useUserLocations,
   useUserDevices,
   useUserTerminations,

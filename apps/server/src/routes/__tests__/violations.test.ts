@@ -60,6 +60,7 @@ interface MockViolationWithJoins {
   serverUserId: string;
   username: string;
   userThumb: string | null;
+  identityName: string | null;
   serverId: string;
   serverName: string;
   sessionId: string;
@@ -87,6 +88,7 @@ function createTestViolation(
     serverUserId: overrides.serverUserId ?? randomUUID(),
     username: overrides.username ?? 'testuser',
     userThumb: overrides.userThumb ?? null,
+    identityName: overrides.identityName ?? null,
     serverId,
     serverName: overrides.serverName ?? 'Test Server',
     sessionId: overrides.sessionId ?? randomUUID(),
@@ -128,8 +130,8 @@ function createViewerUser(): AuthUser {
 }
 
 /**
- * Helper to create the mock chain for violation queries with 4 innerJoins
- * (rules, serverUsers, servers, sessions)
+ * Helper to create the mock chain for violation queries with 5 innerJoins
+ * (rules, serverUsers, users, servers, sessions)
  */
 function createViolationSelectMock(resolvedValue: unknown) {
   return {
@@ -138,10 +140,12 @@ function createViolationSelectMock(resolvedValue: unknown) {
         innerJoin: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             innerJoin: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                orderBy: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockReturnValue({
-                    offset: vi.fn().mockResolvedValue(resolvedValue),
+              innerJoin: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                  orderBy: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                      offset: vi.fn().mockResolvedValue(resolvedValue),
+                    }),
                   }),
                 }),
               }),
@@ -155,6 +159,7 @@ function createViolationSelectMock(resolvedValue: unknown) {
 
 /**
  * Helper to create the mock chain for single violation queries (GET /:id)
+ * with 5 innerJoins (rules, serverUsers, users, servers, sessions)
  */
 function createSingleViolationSelectMock(resolvedValue: unknown) {
   return {
@@ -163,8 +168,10 @@ function createSingleViolationSelectMock(resolvedValue: unknown) {
         innerJoin: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             innerJoin: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue(resolvedValue),
+              innerJoin: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockResolvedValue(resolvedValue),
+                }),
               }),
             }),
           }),
