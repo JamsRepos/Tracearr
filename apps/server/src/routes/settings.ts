@@ -27,22 +27,74 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Get or create settings
-      let settingsRow = await db
-        .select()
-        .from(settings)
-        .where(eq(settings.id, SETTINGS_ID))
-        .limit(1);
+      // First try to get settings - if primaryAuthMethod column doesn't exist, this will fail
+      let settingsRow;
+      let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
+
+      try {
+        // Try full select including primaryAuthMethod
+        settingsRow = await db
+          .select()
+          .from(settings)
+          .where(eq(settings.id, SETTINGS_ID))
+          .limit(1);
+
+        // If we got here, column exists - extract the value
+        const row = settingsRow[0];
+        if (row && 'primaryAuthMethod' in row && row.primaryAuthMethod) {
+          primaryAuthMethod = row.primaryAuthMethod;
+        }
+      } catch {
+        // Column doesn't exist yet - select without primaryAuthMethod
+        // We need to explicitly select each column
+        settingsRow = await db
+          .select({
+            id: settings.id,
+            allowGuestAccess: settings.allowGuestAccess,
+            discordWebhookUrl: settings.discordWebhookUrl,
+            customWebhookUrl: settings.customWebhookUrl,
+            webhookFormat: settings.webhookFormat,
+            ntfyTopic: settings.ntfyTopic,
+            pollerEnabled: settings.pollerEnabled,
+            pollerIntervalMs: settings.pollerIntervalMs,
+            tautulliUrl: settings.tautulliUrl,
+            tautulliApiKey: settings.tautulliApiKey,
+            externalUrl: settings.externalUrl,
+            basePath: settings.basePath,
+            trustProxy: settings.trustProxy,
+            mobileEnabled: settings.mobileEnabled,
+            updatedAt: settings.updatedAt,
+          })
+          .from(settings)
+          .where(eq(settings.id, SETTINGS_ID))
+          .limit(1);
+        // Use default since column doesn't exist
+        primaryAuthMethod = 'local';
+      }
 
       // Create default settings if not exists
       if (settingsRow.length === 0) {
-        const inserted = await db
-          .insert(settings)
-          .values({
-            id: SETTINGS_ID,
-            allowGuestAccess: false,
-          })
-          .returning();
-        settingsRow = inserted;
+        try {
+          const inserted = await db
+            .insert(settings)
+            .values({
+              id: SETTINGS_ID,
+              allowGuestAccess: false,
+              primaryAuthMethod: 'local',
+            })
+            .returning();
+          settingsRow = inserted;
+        } catch {
+          // Column doesn't exist - insert without primaryAuthMethod
+          const inserted = await db
+            .insert(settings)
+            .values({
+              id: SETTINGS_ID,
+              allowGuestAccess: false,
+            })
+            .returning();
+          settingsRow = inserted;
+        }
       }
 
       const row = settingsRow[0];
@@ -64,6 +116,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         basePath: row.basePath,
         trustProxy: row.trustProxy,
         mobileEnabled: row.mobileEnabled,
+        primaryAuthMethod,
       };
 
       return result;
@@ -103,6 +156,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         externalUrl: string | null;
         basePath: string;
         trustProxy: boolean;
+        primaryAuthMethod: 'jellyfin' | 'local';
         updatedAt: Date;
       }> = {
         updatedAt: new Date(),
@@ -164,6 +218,10 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         updateData.trustProxy = body.data.trustProxy;
       }
 
+      if (body.data.primaryAuthMethod !== undefined) {
+        updateData.primaryAuthMethod = body.data.primaryAuthMethod;
+      }
+
       // Ensure settings row exists
       const existing = await db
         .select()
@@ -178,6 +236,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
           allowGuestAccess: updateData.allowGuestAccess ?? false,
           discordWebhookUrl: updateData.discordWebhookUrl ?? null,
           customWebhookUrl: updateData.customWebhookUrl ?? null,
+          primaryAuthMethod: updateData.primaryAuthMethod ?? 'local',
         });
       } else {
         // Update existing
@@ -199,6 +258,12 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.internalServerError('Failed to update settings');
       }
 
+      // Handle case where primaryAuthMethod column might not exist yet (before migration)
+      let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
+      if ('primaryAuthMethod' in row && row.primaryAuthMethod) {
+        primaryAuthMethod = row.primaryAuthMethod;
+      }
+
       const result: Settings = {
         allowGuestAccess: row.allowGuestAccess,
         discordWebhookUrl: row.discordWebhookUrl,
@@ -213,6 +278,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         basePath: row.basePath,
         trustProxy: row.trustProxy,
         mobileEnabled: row.mobileEnabled,
+        primaryAuthMethod,
       };
 
       return result;

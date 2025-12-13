@@ -40,6 +40,7 @@ import {
   AlertTriangle,
   Plus,
   Clock,
+  KeyRound,
 } from 'lucide-react';
 import { MediaServerIcon } from '@/components/icons/MediaServerIcon';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -847,6 +848,38 @@ function AccessSettings() {
             onCheckedChange={(checked) => { handleToggle('allowGuestAccess', checked); }}
           />
         </div>
+
+        <div className="space-y-2">
+          <Label className="text-base">Primary Authentication Method</Label>
+          <p className="text-sm text-muted-foreground">
+            Choose which authentication method is shown by default on the login page
+          </p>
+          <Select
+            value={settings?.primaryAuthMethod ?? 'local'}
+            onValueChange={(value: 'jellyfin' | 'local') => {
+              updateSettings.mutate({ primaryAuthMethod: value });
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="local">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  <span>Local Account</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="jellyfin">
+                <div className="flex items-center gap-2">
+                  <MediaServerIcon type="jellyfin" className="h-4 w-4" />
+                  <span>Jellyfin Admin</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="rounded-lg bg-muted/50 p-4">
           <p className="text-sm text-muted-foreground">
             <strong>Note:</strong> In v1, Tracearr only supports single-owner access. Even with

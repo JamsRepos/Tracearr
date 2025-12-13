@@ -224,7 +224,9 @@ class ApiClient {
     status: () => this.request<{
       needsSetup: boolean;
       hasServers: boolean;
+      hasJellyfinServers: boolean;
       hasPasswordAuth: boolean;
+      primaryAuthMethod: 'jellyfin' | 'local';
     }>('/setup/status'),
   };
 
@@ -274,6 +276,13 @@ class ApiClient {
       this.request<PlexCheckPinResponse>('/auth/plex/check-pin', {
         method: 'POST',
         body: JSON.stringify({ pinId }),
+      }),
+
+    // Jellyfin Admin Login - Authenticate with Jellyfin username/password
+    loginJellyfin: (data: { username: string; password: string }) =>
+      this.request<{ accessToken: string; refreshToken: string; user: User }>('/auth/jellyfin/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
 
     // Plex OAuth - Step 3: Connect with selected server (only for setup)

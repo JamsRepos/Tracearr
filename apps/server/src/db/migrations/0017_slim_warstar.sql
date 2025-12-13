@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "primary_auth_method" varchar(20) DEFAULT 'local';

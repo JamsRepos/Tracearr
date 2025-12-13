@@ -217,6 +217,8 @@ export const updateSettingsSchema = z.object({
   externalUrl: z.url().nullable().optional(),
   basePath: z.string().max(100).optional(),
   trustProxy: z.boolean().optional(),
+  // Authentication settings
+  primaryAuthMethod: z.enum(['jellyfin', 'local']).optional(),
 });
 
 // Tautulli import schemas

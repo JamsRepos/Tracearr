@@ -5,7 +5,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { isNotNull, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { servers, users } from '../db/schema.js';
+import { servers, users, settings } from '../db/schema.js';
 
 export const setupRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -21,16 +21,34 @@ export const setupRoutes: FastifyPluginAsync = async (app) => {
    */
   app.get('/status', async () => {
     // Check for servers and users in parallel
-    const [serverList, ownerList, passwordUserList] = await Promise.all([
+    const [serverList, jellyfinServerList, ownerList, passwordUserList] = await Promise.all([
       db.select({ id: servers.id }).from(servers).limit(1),
+      db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'jellyfin')).limit(1),
       db.select({ id: users.id }).from(users).where(eq(users.role, 'owner')).limit(1),
       db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1),
     ]);
 
+    // Try to get primaryAuthMethod from settings, but handle case where column doesn't exist yet
+    let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
+    try {
+      const settingsRow = await db
+        .select({ primaryAuthMethod: settings.primaryAuthMethod })
+        .from(settings)
+        .limit(1);
+      if (settingsRow[0]?.primaryAuthMethod) {
+        primaryAuthMethod = settingsRow[0].primaryAuthMethod as 'jellyfin' | 'local';
+      }
+    } catch {
+      // Column doesn't exist yet (migration not run) - use default
+      primaryAuthMethod = 'local';
+    }
+
     return {
       needsSetup: ownerList.length === 0,
       hasServers: serverList.length > 0,
+      hasJellyfinServers: jellyfinServerList.length > 0,
       hasPasswordAuth: passwordUserList.length > 0,
+      primaryAuthMethod,
     };
   });
 };
