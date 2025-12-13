@@ -1,6 +1,6 @@
 {
-  "id": "557d36e4-13aa-427e-8450-1da83382a0fe",
-  "prevId": "9f9c5ef9-2c35-4c31-be56-3211630bcdb2",
+  "id": "60ebf6cd-93a8-469f-a2a4-5219bca7a982",
+  "prevId": "557d36e4-13aa-427e-8450-1da83382a0fe",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1635,7 +1635,7 @@
           "name": "primary_auth_method",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": "'local'"
         },
         "updated_at": {
