@@ -61,7 +61,11 @@ export const WS_EVENTS = {
 
 // Redis key prefixes
 export const REDIS_KEYS = {
+  // Active sessions: SET of session IDs for atomic add/remove
+  ACTIVE_SESSION_IDS: 'tracearr:sessions:active:ids',
+  // Legacy: JSON array of sessions (deprecated, kept for migration)
   ACTIVE_SESSIONS: 'tracearr:sessions:active',
+  // Individual session data
   SESSION_BY_ID: (id: string) => `tracearr:sessions:${id}`,
   USER_SESSIONS: (userId: string) => `tracearr:users:${userId}:sessions`,
   DASHBOARD_STATS: 'tracearr:stats:dashboard',
