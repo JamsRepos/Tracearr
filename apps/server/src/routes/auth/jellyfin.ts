@@ -72,8 +72,8 @@ export const jellyfinRoutes: FastifyPluginAsync = async (app) => {
               user = await createUser({
                 username,
                 role: 'admin',
-                email: null, // Jellyfin doesn't expose email in auth response
-                thumbnail: null, // Can be populated later via sync
+                email: undefined, // Jellyfin doesn't expose email in auth response
+                thumbnail: undefined, // Can be populated later via sync
               });
               app.log.info({ userId: user.id, username }, 'Created new user from Jellyfin admin login');
             } else {
