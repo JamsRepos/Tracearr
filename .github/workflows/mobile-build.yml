@@ -106,20 +106,10 @@ jobs:
           echo "Android versionCode: $CURRENT_ANDROID_VC -> $NEXT_ANDROID_VC"
           echo "iOS buildNumber: $CURRENT_IOS_BN -> $NEXT_IOS_BN"
 
-          # Update app.json with all versions
-          jq --arg v "$VERSION" \
-             --argjson vc "$NEXT_ANDROID_VC" \
-             --arg bn "$NEXT_IOS_BN" \
-             '.expo.version = $v | .expo.android.versionCode = $vc | .expo.ios.buildNumber = $bn' \
-             app.json > tmp.json && mv tmp.json app.json
-
-          # Push reserved versions back to EAS remote BEFORE building
-          # This ensures no other build can use these version numbers
-          echo "Reserving versions in EAS remote..."
-          eas build:version:set --platform android
-          eas build:version:set --platform ios
-
           # Output for build jobs
+          # Note: We don't push to EAS remote here because eas build:version:set
+          # doesn't support non-interactive mode. Concurrency controls prevent
+          # version conflicts. The build jobs will set versions in app.json.
           echo "android-version-code=$NEXT_ANDROID_VC" >> $GITHUB_OUTPUT
           echo "ios-build-number=$NEXT_IOS_BN" >> $GITHUB_OUTPUT
 
