@@ -290,6 +290,8 @@ export function Login() {
 
       if (result.accessToken && result.refreshToken) {
         tokenStorage.setTokens(result.accessToken, result.refreshToken);
+        setJellyfinUsername('');
+        setJellyfinPassword('');
         void refetch();
         toast({ title: 'Success', description: 'Logged in successfully!' });
         void navigate('/');
