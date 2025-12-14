@@ -90,13 +90,14 @@ jobs:
           echo "Marketing version: $VERSION"
           echo "marketing-version=$VERSION" >> $GITHUB_OUTPUT
 
-          # Sync current versions from EAS remote
-          echo "Syncing versions from EAS remote..."
-          eas build:version:sync --platform all
+          # Get current versions from EAS remote (works with appVersionSource: remote)
+          echo "Getting current versions from EAS remote..."
+          REMOTE_VERSIONS=$(eas build:version:get --platform all --json --non-interactive 2>/dev/null || echo '{}')
+          echo "Remote versions: $REMOTE_VERSIONS"
 
-          # Read current versions
-          CURRENT_ANDROID_VC=$(jq -r '.expo.android.versionCode // 0' app.json)
-          CURRENT_IOS_BN=$(jq -r '.expo.ios.buildNumber // "0"' app.json)
+          # Parse current versions (default to 0 if not set)
+          CURRENT_ANDROID_VC=$(echo "$REMOTE_VERSIONS" | jq -r '.versionCode // "0"')
+          CURRENT_IOS_BN=$(echo "$REMOTE_VERSIONS" | jq -r '.buildNumber // "0"')
 
           # Increment versions
           NEXT_ANDROID_VC=$((CURRENT_ANDROID_VC + 1))
@@ -115,7 +116,8 @@ jobs:
           # Push reserved versions back to EAS remote BEFORE building
           # This ensures no other build can use these version numbers
           echo "Reserving versions in EAS remote..."
-          eas build:version:set --platform all
+          eas build:version:set --platform android
+          eas build:version:set --platform ios
 
           # Output for build jobs
           echo "android-version-code=$NEXT_ANDROID_VC" >> $GITHUB_OUTPUT
