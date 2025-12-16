@@ -479,10 +479,25 @@ export interface Settings {
 // Tautulli import types
 export interface TautulliImportProgress {
   status: 'idle' | 'fetching' | 'processing' | 'complete' | 'error';
+  /** Expected total from API (may differ from actual if API count is stale) */
   totalRecords: number;
+  /** Actual records fetched from API so far */
+  fetchedRecords: number;
+  /** Records processed (looped through) */
   processedRecords: number;
+  /** New sessions inserted */
   importedRecords: number;
+  /** Existing sessions updated with new data */
+  updatedRecords: number;
+  /** Total skipped (sum of duplicate + unknownUser + activeSession) */
   skippedRecords: number;
+  /** Skipped: already exists in DB or duplicate in this import */
+  duplicateRecords: number;
+  /** Skipped: user not found in Tracearr (need to sync server first) */
+  unknownUserRecords: number;
+  /** Skipped: in-progress sessions without reference_id */
+  activeSessionRecords: number;
+  /** Records that failed to process */
   errorRecords: number;
   currentPage: number;
   totalPages: number;
@@ -492,6 +507,7 @@ export interface TautulliImportProgress {
 export interface TautulliImportResult {
   success: boolean;
   imported: number;
+  updated: number;
   skipped: number;
   errors: number;
   message: string;
