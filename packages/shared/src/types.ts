@@ -448,9 +448,14 @@ export interface ServerResourceStats {
 // Webhook format types
 export type WebhookFormat = 'json' | 'ntfy' | 'apprise';
 
+// Unit system for display preferences (stored in settings)
+export type UnitSystem = 'metric' | 'imperial';
+
 // Settings types
 export interface Settings {
   allowGuestAccess: boolean;
+  // Display preferences
+  unitSystem: UnitSystem;
   discordWebhookUrl: string | null;
   customWebhookUrl: string | null;
   webhookFormat: WebhookFormat | null;

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { SeverityBadge } from '@/components/violations/SeverityBadge';
 import { getAvatarUrl } from '@/components/users/utils';
 import { getViolationDescription, getViolationDetails } from '@/utils/violationDescription';
+import { useSettings } from '@/hooks/queries';
 import type { ViolationWithDetails } from '@tracearr/shared';
 import {
   User,
@@ -57,11 +58,14 @@ export function ViolationDetailDialog({
   isAcknowledging = false,
   isDismissing = false,
 }: ViolationDetailDialogProps) {
+  const { data: settings } = useSettings();
+  const unitSystem = settings?.unitSystem ?? 'metric';
+
   if (!violation) return null;
 
   const avatarUrl = getAvatarUrl(violation.user.serverId, violation.user.thumbUrl, 80);
-  const description = getViolationDescription(violation);
-  const details = getViolationDetails(violation);
+  const description = getViolationDescription(violation, unitSystem);
+  const details = getViolationDetails(violation, unitSystem);
   const ruleIcon = ruleIcons[violation.rule.type] ?? <AlertTriangle className="h-4 w-4" />;
   const isPending = !violation.acknowledgedAt;
 

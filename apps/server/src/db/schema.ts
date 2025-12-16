@@ -470,10 +470,18 @@ export const terminationLogs = pgTable(
   ]
 );
 
+// Unit system enum for display preferences
+export const unitSystemEnum = ['metric', 'imperial'] as const;
+
 // Application settings (single row)
 export const settings = pgTable('settings', {
   id: integer('id').primaryKey().default(1),
   allowGuestAccess: boolean('allow_guest_access').notNull().default(false),
+  // Display preferences
+  unitSystem: varchar('unit_system', { length: 20 })
+    .notNull()
+    .$type<(typeof unitSystemEnum)[number]>()
+    .default('metric'),
   discordWebhookUrl: text('discord_webhook_url'),
   customWebhookUrl: text('custom_webhook_url'),
   webhookFormat: text('webhook_format').$type<'json' | 'ntfy' | 'apprise'>(), // Format for custom webhook payloads

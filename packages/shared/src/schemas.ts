@@ -206,9 +206,14 @@ export const locationStatsQuerySchema = z
 // Webhook format enum
 export const webhookFormatSchema = z.enum(['json', 'ntfy', 'apprise']);
 
+// Unit system enum for display preferences
+export const unitSystemSchema = z.enum(['metric', 'imperial']);
+
 // Settings schemas
 export const updateSettingsSchema = z.object({
   allowGuestAccess: z.boolean().optional(),
+  // Display preferences
+  unitSystem: unitSystemSchema.optional(),
   discordWebhookUrl: z.url().nullable().optional(),
   customWebhookUrl: z.url().nullable().optional(),
   webhookFormat: webhookFormatSchema.nullable().optional(),

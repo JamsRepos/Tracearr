@@ -113,6 +113,10 @@ function GeneralSettings() {
     updateSettings.mutate({ pollerIntervalMs: ms });
   };
 
+  const handleUnitSystemChange = (value: 'metric' | 'imperial') => {
+    updateSettings.mutate({ unitSystem: value });
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -137,6 +141,25 @@ function GeneralSettings() {
         <CardDescription>Configure basic application settings</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label className="text-base">Unit System</Label>
+          <p className="text-sm text-muted-foreground">
+            Choose how distances and speeds are displayed
+          </p>
+          <Select
+            value={settings?.unitSystem ?? 'metric'}
+            onValueChange={handleUnitSystemChange}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="metric">Metric (km, km/h)</SelectItem>
+              <SelectItem value="imperial">Imperial (mi, mph)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-center justify-between">
           <div>
             <Label className="text-base">Session Sync</Label>

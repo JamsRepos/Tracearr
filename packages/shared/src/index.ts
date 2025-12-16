@@ -58,6 +58,7 @@ export type {
   // Settings
   Settings,
   WebhookFormat,
+  UnitSystem,
   // Tautulli import
   TautulliImportProgress,
   TautulliImportResult,
@@ -184,6 +185,16 @@ export {
   SSE_CONFIG,
   PLEX_SSE_EVENTS,
   SSE_STATE,
+  // Unit conversion
+  UNIT_CONVERSION,
+  kmToMiles,
+  milesToKm,
+  formatDistance,
+  formatSpeed,
+  getDistanceUnit,
+  getSpeedUnit,
+  toMetricDistance,
+  fromMetricDistance,
 } from './constants.js';
 
 // Role helper exports

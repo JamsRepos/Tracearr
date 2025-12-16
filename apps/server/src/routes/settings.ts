@@ -51,6 +51,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
           .select({
             id: settings.id,
             allowGuestAccess: settings.allowGuestAccess,
+            unitSystem: settings.unitSystem,
             discordWebhookUrl: settings.discordWebhookUrl,
             customWebhookUrl: settings.customWebhookUrl,
             webhookFormat: settings.webhookFormat,
@@ -104,6 +105,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
 
       const result: Settings = {
         allowGuestAccess: row.allowGuestAccess,
+        unitSystem: row.unitSystem,
         discordWebhookUrl: row.discordWebhookUrl,
         customWebhookUrl: row.customWebhookUrl,
         webhookFormat: row.webhookFormat,
@@ -276,6 +278,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
 
       const result: Settings = {
         allowGuestAccess: row.allowGuestAccess,
+        unitSystem: row.unitSystem,
         discordWebhookUrl: row.discordWebhookUrl,
         customWebhookUrl: row.customWebhookUrl,
         webhookFormat: row.webhookFormat,
@@ -362,6 +365,7 @@ export interface NotificationSettings {
   ntfyTopic: string | null;
   webhookSecret: string | null;
   mobileEnabled: boolean;
+  unitSystem: 'metric' | 'imperial';
 }
 
 /**
@@ -375,6 +379,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       webhookFormat: settings.webhookFormat,
       ntfyTopic: settings.ntfyTopic,
       mobileEnabled: settings.mobileEnabled,
+      unitSystem: settings.unitSystem,
     })
     .from(settings)
     .where(eq(settings.id, SETTINGS_ID))
@@ -390,6 +395,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       ntfyTopic: null,
       webhookSecret: null,
       mobileEnabled: false,
+      unitSystem: 'metric',
     };
   }
 
@@ -400,5 +406,6 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
     ntfyTopic: settingsRow.ntfyTopic,
     webhookSecret: null, // TODO: Add webhookSecret column to settings table in Phase 4
     mobileEnabled: settingsRow.mobileEnabled,
+    unitSystem: settingsRow.unitSystem,
   };
 }

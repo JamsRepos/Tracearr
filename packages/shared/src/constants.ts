@@ -184,6 +184,97 @@ export const GEOIP_CONFIG = {
   DEFAULT_UNKNOWN_LOCATION: 'Unknown',
 } as const;
 
+// Unit conversion constants
+export const UNIT_CONVERSION = {
+  KM_TO_MILES: 0.621371,
+  MILES_TO_KM: 1.60934,
+} as const;
+
+// Unit system types and utilities
+export type UnitSystem = 'metric' | 'imperial';
+
+/**
+ * Convert kilometers to miles
+ */
+export function kmToMiles(km: number): number {
+  return km * UNIT_CONVERSION.KM_TO_MILES;
+}
+
+/**
+ * Convert miles to kilometers
+ */
+export function milesToKm(miles: number): number {
+  return miles * UNIT_CONVERSION.MILES_TO_KM;
+}
+
+/**
+ * Format distance based on unit system
+ * @param km - Distance in kilometers (internal unit)
+ * @param unitSystem - User's preferred unit system
+ * @param decimals - Number of decimal places (default: 0)
+ */
+export function formatDistance(km: number, unitSystem: UnitSystem, decimals = 0): string {
+  if (unitSystem === 'imperial') {
+    const miles = kmToMiles(km);
+    return `${miles.toFixed(decimals)} mi`;
+  }
+  return `${km.toFixed(decimals)} km`;
+}
+
+/**
+ * Format speed based on unit system
+ * @param kmh - Speed in km/h (internal unit)
+ * @param unitSystem - User's preferred unit system
+ * @param decimals - Number of decimal places (default: 0)
+ */
+export function formatSpeed(kmh: number, unitSystem: UnitSystem, decimals = 0): string {
+  if (unitSystem === 'imperial') {
+    const mph = kmToMiles(kmh);
+    return `${mph.toFixed(decimals)} mph`;
+  }
+  return `${kmh.toFixed(decimals)} km/h`;
+}
+
+/**
+ * Get distance unit label
+ */
+export function getDistanceUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? 'mi' : 'km';
+}
+
+/**
+ * Get speed unit label
+ */
+export function getSpeedUnit(unitSystem: UnitSystem): string {
+  return unitSystem === 'imperial' ? 'mph' : 'km/h';
+}
+
+/**
+ * Convert display value to internal metric value (for form inputs)
+ * @param value - Value in user's preferred unit
+ * @param unitSystem - User's preferred unit system
+ * @returns Value in kilometers (internal unit)
+ */
+export function toMetricDistance(value: number, unitSystem: UnitSystem): number {
+  if (unitSystem === 'imperial') {
+    return milesToKm(value);
+  }
+  return value;
+}
+
+/**
+ * Convert internal metric value to display value (for form inputs)
+ * @param km - Value in kilometers (internal unit)
+ * @param unitSystem - User's preferred unit system
+ * @returns Value in user's preferred unit
+ */
+export function fromMetricDistance(km: number, unitSystem: UnitSystem): number {
+  if (unitSystem === 'imperial') {
+    return kmToMiles(km);
+  }
+  return km;
+}
+
 // Time constants in milliseconds (avoid magic numbers)
 export const TIME_MS = {
   SECOND: 1000,

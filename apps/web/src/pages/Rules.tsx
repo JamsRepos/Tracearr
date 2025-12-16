@@ -32,8 +32,14 @@ import {
   Users,
   Globe,
 } from 'lucide-react';
-import type { Rule, RuleType, RuleParams } from '@tracearr/shared';
-import { useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRule } from '@/hooks/queries';
+import type { Rule, RuleType, RuleParams, UnitSystem } from '@tracearr/shared';
+import {
+  getSpeedUnit,
+  getDistanceUnit,
+  fromMetricDistance,
+  toMetricDistance,
+} from '@tracearr/shared';
+import { useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRule, useSettings } from '@/hooks/queries';
 
 const RULE_TYPES: { value: RuleType; label: string; icon: React.ReactNode; description: string }[] = [
   {
@@ -87,46 +93,65 @@ function RuleParamsForm({
   type,
   params,
   onChange,
+  unitSystem,
 }: {
   type: RuleType;
   params: RuleParams;
   onChange: (params: RuleParams) => void;
+  unitSystem: UnitSystem;
 }) {
+  const speedUnit = getSpeedUnit(unitSystem);
+  const distanceUnit = getDistanceUnit(unitSystem);
+
   switch (type) {
-    case 'impossible_travel':
+    case 'impossible_travel': {
+      // Convert metric value to display value
+      const displayValue = Math.round(fromMetricDistance((params as { maxSpeedKmh: number }).maxSpeedKmh, unitSystem));
+      const defaultDisplay = Math.round(fromMetricDistance(500, unitSystem));
       return (
         <div className="space-y-2">
-          <Label htmlFor="maxSpeedKmh">Max Speed (km/h)</Label>
+          <Label htmlFor="maxSpeedKmh">Max Speed ({speedUnit})</Label>
           <Input
             id="maxSpeedKmh"
             type="number"
-            value={(params as { maxSpeedKmh: number }).maxSpeedKmh}
-            onChange={(e) =>
-              { onChange({ ...params, maxSpeedKmh: parseInt(e.target.value) || 0 }); }
-            }
+            value={displayValue}
+            onChange={(e) => {
+              // Convert display value back to metric for storage
+              const inputValue = parseInt(e.target.value) || 0;
+              const metricValue = Math.round(toMetricDistance(inputValue, unitSystem));
+              onChange({ ...params, maxSpeedKmh: metricValue });
+            }}
           />
           <p className="text-xs text-muted-foreground">
-            Maximum realistic travel speed. Default: 500 km/h (airplane speed)
+            Maximum realistic travel speed. Default: {defaultDisplay} {speedUnit} (airplane speed)
           </p>
         </div>
       );
-    case 'simultaneous_locations':
+    }
+    case 'simultaneous_locations': {
+      // Convert metric value to display value
+      const displayValue = Math.round(fromMetricDistance((params as { minDistanceKm: number }).minDistanceKm, unitSystem));
+      const defaultDisplay = Math.round(fromMetricDistance(100, unitSystem));
       return (
         <div className="space-y-2">
-          <Label htmlFor="minDistanceKm">Min Distance (km)</Label>
+          <Label htmlFor="minDistanceKm">Min Distance ({distanceUnit})</Label>
           <Input
             id="minDistanceKm"
             type="number"
-            value={(params as { minDistanceKm: number }).minDistanceKm}
-            onChange={(e) =>
-              { onChange({ ...params, minDistanceKm: parseInt(e.target.value) || 0 }); }
-            }
+            value={displayValue}
+            onChange={(e) => {
+              // Convert display value back to metric for storage
+              const inputValue = parseInt(e.target.value) || 0;
+              const metricValue = Math.round(toMetricDistance(inputValue, unitSystem));
+              onChange({ ...params, minDistanceKm: metricValue });
+            }}
           />
           <p className="text-xs text-muted-foreground">
-            Minimum distance between locations to trigger. Default: 100 km
+            Minimum distance between locations to trigger. Default: {defaultDisplay} {distanceUnit}
           </p>
         </div>
       );
+    }
     case 'device_velocity':
       return (
         <div className="space-y-4">
@@ -207,11 +232,13 @@ function RuleDialog({
   onSave,
   onClose,
   isLoading,
+  unitSystem,
 }: {
   rule?: Rule;
   onSave: (data: RuleFormData) => void;
   onClose: () => void;
   isLoading?: boolean;
+  unitSystem: UnitSystem;
 }) {
   const isEditing = !!rule;
   const [formData, setFormData] = useState<RuleFormData>({
@@ -277,6 +304,7 @@ function RuleDialog({
         type={formData.type}
         params={formData.params}
         onChange={(params) => { setFormData({ ...formData, params }); }}
+        unitSystem={unitSystem}
       />
 
       <div className="flex items-center justify-between">
@@ -305,13 +333,17 @@ function RuleCard({
   onEdit,
   onDelete,
   onToggle,
+  unitSystem,
 }: {
   rule: Rule;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
+  unitSystem: UnitSystem;
 }) {
   const ruleType = RULE_TYPES.find((t) => t.value === rule.type);
+  const speedUnit = getSpeedUnit(unitSystem);
+  const distanceUnit = getDistanceUnit(unitSystem);
 
   return (
     <Card className={!rule.isActive ? 'opacity-60' : ''}>
@@ -333,10 +365,10 @@ function RuleCard({
               </p>
               <div className="mt-2 text-xs text-muted-foreground">
                 {rule.type === 'impossible_travel' && (
-                  <span>Max speed: {(rule.params as { maxSpeedKmh: number }).maxSpeedKmh} km/h</span>
+                  <span>Max speed: {Math.round(fromMetricDistance((rule.params as { maxSpeedKmh: number }).maxSpeedKmh, unitSystem))} {speedUnit}</span>
                 )}
                 {rule.type === 'simultaneous_locations' && (
-                  <span>Min distance: {(rule.params as { minDistanceKm: number }).minDistanceKm} km</span>
+                  <span>Min distance: {Math.round(fromMetricDistance((rule.params as { minDistanceKm: number }).minDistanceKm, unitSystem))} {distanceUnit}</span>
                 )}
                 {rule.type === 'device_velocity' && (
                   <span>
@@ -374,10 +406,13 @@ function RuleCard({
 
 export function Rules() {
   const { data: rules, isLoading } = useRules();
+  const { data: settings } = useSettings();
   const createRule = useCreateRule();
   const updateRule = useUpdateRule();
   const deleteRule = useDeleteRule();
   const toggleRule = useToggleRule();
+
+  const unitSystem = settings?.unitSystem ?? 'metric';
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | undefined>();
@@ -471,6 +506,7 @@ export function Rules() {
               onSave={editingRule ? handleUpdate : handleCreate}
               onClose={() => { setIsDialogOpen(false); }}
               isLoading={createRule.isPending || updateRule.isPending}
+              unitSystem={unitSystem}
             />
           </DialogContent>
         </Dialog>
@@ -517,6 +553,7 @@ export function Rules() {
               onEdit={() => { openEditDialog(rule); }}
               onDelete={() => { setDeleteConfirmId(rule.id); }}
               onToggle={() => { handleToggle(rule); }}
+              unitSystem={unitSystem}
             />
           ))}
         </div>

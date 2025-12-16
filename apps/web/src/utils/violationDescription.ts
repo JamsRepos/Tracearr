@@ -1,9 +1,10 @@
-import type { ViolationWithDetails } from '@tracearr/shared';
+import type { ViolationWithDetails, UnitSystem } from '@tracearr/shared';
+import { formatSpeed, formatDistance } from '@tracearr/shared';
 
 /**
  * Format violation data into readable description based on rule type
  */
-export function getViolationDescription(violation: ViolationWithDetails): string {
+export function getViolationDescription(violation: ViolationWithDetails, unitSystem: UnitSystem = 'metric'): string {
   const data = violation.data;
   const ruleType = violation.rule?.type;
 
@@ -16,7 +17,7 @@ export function getViolationDescription(violation: ViolationWithDetails): string
       const from = data.fromCity || data.fromLocation || 'unknown location';
       const to = data.toCity || data.toLocation || 'unknown location';
       const speed = typeof data.calculatedSpeedKmh === 'number'
-        ? `${Math.round(data.calculatedSpeedKmh)} km/h`
+        ? formatSpeed(data.calculatedSpeedKmh, unitSystem)
         : 'impossible speed';
       return `Traveled from ${from} to ${to} at ${speed}`;
     }
@@ -63,7 +64,7 @@ export function getViolationDescription(violation: ViolationWithDetails): string
 /**
  * Get detailed violation information formatted for display
  */
-export function getViolationDetails(violation: ViolationWithDetails): Record<string, unknown> {
+export function getViolationDetails(violation: ViolationWithDetails, unitSystem: UnitSystem = 'metric'): Record<string, unknown> {
   const data = violation.data;
   const ruleType = violation.rule?.type;
 
@@ -80,10 +81,10 @@ export function getViolationDetails(violation: ViolationWithDetails): Record<str
       if (data.toCity) details['To City'] = data.toCity;
       if (data.toLocation) details['To Location'] = data.toLocation;
       if (typeof data.calculatedSpeedKmh === 'number') {
-        details['Calculated Speed'] = `${Math.round(data.calculatedSpeedKmh)} km/h`;
+        details['Calculated Speed'] = formatSpeed(data.calculatedSpeedKmh, unitSystem);
       }
       if (typeof data.distanceKm === 'number') {
-        details['Distance'] = `${Math.round(data.distanceKm)} km`;
+        details['Distance'] = formatDistance(data.distanceKm, unitSystem);
       }
       if (typeof data.timeWindowMinutes === 'number') {
         details['Time Window'] = `${Math.round(data.timeWindowMinutes)} minutes`;

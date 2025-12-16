@@ -178,6 +178,7 @@ async function processNotificationJob(job: Job<NotificationJobData>): Promise<vo
     ntfyTopic: settings.ntfyTopic,
     // Fill in defaults for other Settings fields
     allowGuestAccess: false,
+    unitSystem: settings.unitSystem ?? 'metric' as const, // Display preference for units
     pollerEnabled: true,
     pollerIntervalMs: 15000,
     tautulliUrl: null,
