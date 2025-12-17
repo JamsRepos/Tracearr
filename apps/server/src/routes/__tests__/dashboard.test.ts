@@ -123,6 +123,8 @@ function createActiveSession(overrides: Partial<ActiveSession> = {}): ActiveSess
     platform: overrides.platform ?? 'Chrome',
     quality: overrides.quality ?? '1080p',
     isTranscode: overrides.isTranscode ?? false,
+    videoDecision: overrides.videoDecision ?? 'directplay',
+    audioDecision: overrides.audioDecision ?? 'directplay',
     bitrate: overrides.bitrate ?? 20000,
     user: overrides.user ?? {
       id: randomUUID(),
