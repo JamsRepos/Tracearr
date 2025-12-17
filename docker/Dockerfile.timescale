@@ -19,4 +19,6 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove curl gnupg
 
 # Enable TimescaleDB in PostgreSQL config
-RUN echo "shared_preload_libraries = 'timescaledb'" >> /usr/share/postgresql/postgresql.conf.sample
+# Set unlimited tuple decompression to allow migrations on compressed hypertables
+RUN echo "shared_preload_libraries = 'timescaledb'" >> /usr/share/postgresql/postgresql.conf.sample \
+    && echo "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" >> /usr/share/postgresql/postgresql.conf.sample

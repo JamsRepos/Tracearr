@@ -53,6 +53,8 @@ services:
     # For Toolkit support, use the supervised deployment instead
     image: timescale/timescaledb:latest-pg16
     container_name: tracearr-db
+    # Allow unlimited tuple decompression for migrations on compressed hypertables
+    command: postgres -c timescaledb.max_tuples_decompressed_per_dml_transaction=0
     environment:
       - POSTGRES_USER=tracearr
       - POSTGRES_PASSWORD=${DB_PASSWORD:-tracearr}

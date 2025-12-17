@@ -74,6 +74,8 @@ listen_addresses = '127.0.0.1'
 port = 5432
 log_timezone = 'UTC'
 timezone = 'UTC'
+# Allow unlimited tuple decompression for migrations on compressed hypertables
+timescaledb.max_tuples_decompressed_per_dml_transaction = 0
 EOF
 
     # Allow local connections
@@ -184,6 +186,21 @@ if command -v timescaledb-tune &> /dev/null; then
     timescaledb-tune --pg-config=/usr/lib/postgresql/15/bin/pg_config \
         --conf-path=/data/postgres/postgresql.conf \
         --yes --quiet 2>/dev/null || warn "timescaledb-tune failed (non-fatal)"
+fi
+
+# =============================================================================
+# Ensure TimescaleDB decompression limit is set (for existing databases)
+# =============================================================================
+# This setting allows migrations to modify compressed hypertable data.
+# Without it, bulk UPDATEs on compressed sessions will fail with
+# "tuple decompression limit exceeded" errors.
+if [ -f /data/postgres/postgresql.conf ]; then
+    if ! grep -q "max_tuples_decompressed_per_dml_transaction" /data/postgres/postgresql.conf; then
+        log "Adding TimescaleDB decompression setting for migrations..."
+        echo "" >> /data/postgres/postgresql.conf
+        echo "# Allow unlimited tuple decompression for migrations on compressed hypertables" >> /data/postgres/postgresql.conf
+        echo "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" >> /data/postgres/postgresql.conf
+    fi
 fi
 
 # =============================================================================
