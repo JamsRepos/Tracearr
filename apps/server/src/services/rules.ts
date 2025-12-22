@@ -283,7 +283,8 @@ export class RuleEngine {
       (params as unknown as { blockedCountries?: string[] }).blockedCountries ??
       [];
 
-    if (!session.geoCountry || countries.length === 0) {
+    // Skip local/private IPs - they have no meaningful geo location
+    if (!session.geoCountry || session.geoCountry === 'Local Network' || countries.length === 0) {
       return { violated: false, severity: 'low', data: {} };
     }
 

@@ -1042,6 +1042,34 @@ describe('RuleEngine', () => {
       const results = await ruleEngine.evaluateSession(session, [rule], []);
       expect(results).toHaveLength(0);
     });
+
+    it('should NOT violate for Local Network IPs (allowlist mode)', async () => {
+      // Local/private IPs return 'Local Network' as country - should be skipped
+      const session = createMockSession({
+        geoCountry: 'Local Network',
+      });
+
+      const rule = createMockRule('geo_restriction', {
+        params: { mode: 'allowlist', countries: ['US', 'CA', 'GB'] },
+      });
+
+      const results = await ruleEngine.evaluateSession(session, [rule], []);
+      expect(results).toHaveLength(0);
+    });
+
+    it('should NOT violate for Local Network IPs (blocklist mode)', async () => {
+      // Local/private IPs should be skipped regardless of mode
+      const session = createMockSession({
+        geoCountry: 'Local Network',
+      });
+
+      const rule = createMockRule('geo_restriction', {
+        params: { mode: 'blocklist', countries: ['Local Network'] }, // Even if explicitly listed
+      });
+
+      const results = await ruleEngine.evaluateSession(session, [rule], []);
+      expect(results).toHaveLength(0);
+    });
   });
 
   describe('unknown rule type', () => {
