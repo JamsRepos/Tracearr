@@ -36,10 +36,26 @@ import { triggerReconciliationPoll } from './poller/index.js';
 let cacheService: CacheService | null = null;
 let pubSubService: PubSubService | null = null;
 
+// Server down notification threshold in milliseconds
+// Delay prevents false alarms from brief connection blips
+
+const SERVER_DOWN_THRESHOLD_MS = 60 * 1000;
+
+// Track pending server down notifications (can be cancelled if server comes back up)
+const pendingServerDownNotifications = new Map<string, NodeJS.Timeout>();
+
+// Track servers that have been notified as down (server_down was sent)
+// Used to determine if we should send server_up when connection is restored
+const notifiedDownServers = new Set<string>();
+
 // Store wrapped handlers so we can properly remove them
 interface SessionEvent {
   serverId: string;
   notification: PlexPlaySessionNotification;
+}
+interface FallbackEvent {
+  serverId: string;
+  serverName: string;
 }
 const wrappedHandlers = {
   playing: (e: SessionEvent) => void handlePlaying(e),
@@ -47,6 +63,11 @@ const wrappedHandlers = {
   stopped: (e: SessionEvent) => void handleStopped(e),
   progress: (e: SessionEvent) => void handleProgress(e),
   reconciliation: () => void handleReconciliation(),
+  fallbackActivated: (e: FallbackEvent) => handleFallbackActivated(e),
+  fallbackDeactivated: (e: FallbackEvent) =>
+    void handleFallbackDeactivated(e).catch((err: unknown) =>
+      console.error('[SSEProcessor] Error in fallbackDeactivated handler:', err)
+    ),
 };
 
 /**
@@ -75,6 +96,10 @@ export function startSSEProcessor(): void {
   sseManager.on('plex:session:stopped', wrappedHandlers.stopped);
   sseManager.on('plex:session:progress', wrappedHandlers.progress);
   sseManager.on('reconciliation:needed', wrappedHandlers.reconciliation);
+
+  // Subscribe to server health events (SSE connection state changes)
+  sseManager.on('fallback:activated', wrappedHandlers.fallbackActivated);
+  sseManager.on('fallback:deactivated', wrappedHandlers.fallbackDeactivated);
 }
 
 /**
@@ -89,6 +114,18 @@ export function stopSSEProcessor(): void {
   sseManager.off('plex:session:stopped', wrappedHandlers.stopped);
   sseManager.off('plex:session:progress', wrappedHandlers.progress);
   sseManager.off('reconciliation:needed', wrappedHandlers.reconciliation);
+  sseManager.off('fallback:activated', wrappedHandlers.fallbackActivated);
+  sseManager.off('fallback:deactivated', wrappedHandlers.fallbackDeactivated);
+
+  // Clear any pending server down notifications
+  for (const [serverId, timeout] of pendingServerDownNotifications) {
+    clearTimeout(timeout);
+    console.log(`[SSEProcessor] Cancelled pending server down notification for ${serverId}`);
+  }
+  pendingServerDownNotifications.clear();
+
+  // Clear notified down servers state
+  notifiedDownServers.clear();
 }
 
 /**
@@ -226,6 +263,82 @@ async function handleProgress(event: {
 async function handleReconciliation(): Promise<void> {
   console.log('[SSEProcessor] Triggering reconciliation poll');
   await triggerReconciliationPoll();
+}
+
+/**
+ * Handle SSE fallback activated (server became unreachable after SSE retries exhausted)
+ * Schedules a server_down notification after a threshold delay to prevent false alarms
+ */
+function handleFallbackActivated(event: FallbackEvent): void {
+  const { serverId, serverName } = event;
+
+  // Cancel any existing pending notification for this server (shouldn't happen, but be safe)
+  const existing = pendingServerDownNotifications.get(serverId);
+  if (existing) {
+    clearTimeout(existing);
+  }
+
+  console.log(
+    `[SSEProcessor] Server ${serverName} SSE connection failed, ` +
+      `scheduling server_down notification in ${SERVER_DOWN_THRESHOLD_MS / 1000}s`
+  );
+
+  // Schedule the notification after threshold delay
+  const timeout = setTimeout(() => {
+    pendingServerDownNotifications.delete(serverId);
+    notifiedDownServers.add(serverId); // Mark as down so we know to send server_up later
+    console.log(`[SSEProcessor] Server ${serverName} is DOWN (threshold exceeded)`);
+
+    enqueueNotification({
+      type: 'server_down',
+      payload: { serverName, serverId },
+    }).catch((error: unknown) => {
+      console.error(`[SSEProcessor] Error enqueueing server_down notification:`, error);
+    });
+  }, SERVER_DOWN_THRESHOLD_MS);
+
+  pendingServerDownNotifications.set(serverId, timeout);
+}
+
+/**
+ * Handle SSE fallback deactivated (server came back online, SSE connection restored)
+ * Cancels pending server_down notification if server recovers before threshold
+ * Sends server_up notification if server was previously marked as down
+ */
+async function handleFallbackDeactivated(event: FallbackEvent): Promise<void> {
+  const { serverId, serverName } = event;
+
+  // Check if there's a pending server_down notification to cancel
+  const pending = pendingServerDownNotifications.get(serverId);
+  if (pending) {
+    clearTimeout(pending);
+    pendingServerDownNotifications.delete(serverId);
+    console.log(
+      `[SSEProcessor] Server ${serverName} recovered before threshold, ` +
+        `cancelled pending server_down notification`
+    );
+    // Don't send server_up since we never sent server_down
+    return;
+  }
+
+  // Only send server_up if we actually sent a server_down notification
+  if (!notifiedDownServers.has(serverId)) {
+    // Server was never marked as down (e.g., initial connection or no prior fallback)
+    return;
+  }
+
+  // Server was previously down (notification was sent), now it's back up
+  notifiedDownServers.delete(serverId);
+  console.log(`[SSEProcessor] Server ${serverName} is back UP (SSE restored)`);
+
+  try {
+    await enqueueNotification({
+      type: 'server_up',
+      payload: { serverName, serverId },
+    });
+  } catch (error) {
+    console.error(`[SSEProcessor] Error enqueueing server_up notification:`, error);
+  }
 }
 
 /**
