@@ -176,6 +176,27 @@
       "when": 1766265639534,
       "tag": "0024_small_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1766499871230,
+      "tag": "0025_red_mentallo",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1766503528916,
+      "tag": "0026_common_boom_boom",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1766590000000,
+      "tag": "0027_covering_index_optimization",
+      "breakpoints": true
     }
   ]
 }
