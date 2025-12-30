@@ -21,6 +21,9 @@ concurrency:
   group: mobile-release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  HUSKY: 0
+
 jobs:
   # Check if this is a prerelease (alpha, beta, rc)
   check-release-type:

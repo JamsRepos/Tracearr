@@ -20,12 +20,12 @@ Ready-to-use Docker Compose files for deploying Tracearr via **Portainer**, **Pr
 
 Single container with TimescaleDB, Redis, and Tracearr bundled. Best for home servers and simple deployments.
 
-| Pros                                         | Cons                                                    |
-| -------------------------------------------- | ------------------------------------------------------- |
-| Zero configuration — just deploy and go      | Requires minimum **2GB RAM** (PostgreSQL + Redis + App) |
-| Secrets auto-generated on first run          | Less flexible for scaling                               |
-| Includes TimescaleDB Toolkit for analytics   | Can't use existing database infrastructure              |
-| Single container to manage                   |                                                         |
+| Pros                                       | Cons                                                    |
+| ------------------------------------------ | ------------------------------------------------------- |
+| Zero configuration — just deploy and go    | Requires minimum **2GB RAM** (PostgreSQL + Redis + App) |
+| Secrets auto-generated on first run        | Less flexible for scaling                               |
+| Includes TimescaleDB Toolkit for analytics | Can't use existing database infrastructure              |
+| Single container to manage                 |                                                         |
 
 ```bash
 docker compose -f docker-compose.supervised-example.yml up -d
@@ -41,11 +41,11 @@ Open `http://your-server:3000` and connect your media server.
 
 Traditional multi-container setup. Use this if you want more control or already have database infrastructure.
 
-| Pros                                       | Cons                                              |
-| ------------------------------------------ | ------------------------------------------------- |
-| Lower memory per container (~1GB for app)  | Requires generating secrets manually              |
-| More control over individual services      | More containers to manage                         |
-| Can integrate with existing PostgreSQL     | TimescaleDB Toolkit not included in official image |
+| Pros                                      | Cons                                               |
+| ----------------------------------------- | -------------------------------------------------- |
+| Lower memory per container (~1GB for app) | Requires generating secrets manually               |
+| More control over individual services     | More containers to manage                          |
+| Can integrate with existing PostgreSQL    | TimescaleDB Toolkit not included in official image |
 
 ```bash
 # 1. Generate secrets

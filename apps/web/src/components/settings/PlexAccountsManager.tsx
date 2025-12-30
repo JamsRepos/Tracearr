@@ -12,14 +12,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import {
-  Link2,
-  Unlink,
-  Loader2,
-  XCircle,
-  Server,
-  Plus,
-} from 'lucide-react';
+import { Link2, Unlink, Loader2, XCircle, Server, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import type { PlexAccount } from '@/lib/api';
@@ -34,7 +27,10 @@ interface PlexAccountsManagerProps {
   onAccountLinked?: () => void; // Callback after linking account
 }
 
-export function PlexAccountsManager({ compact = false, onAccountLinked }: PlexAccountsManagerProps) {
+export function PlexAccountsManager({
+  compact = false,
+  onAccountLinked,
+}: PlexAccountsManagerProps) {
   const queryClient = useQueryClient();
   const [showManageDialog, setShowManageDialog] = useState(false);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState<string | null>(null);
@@ -148,13 +144,16 @@ export function PlexAccountsManager({ compact = false, onAccountLinked }: PlexAc
       }, 2000);
 
       // Stop polling after 5 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (isLinking) {
-          setIsLinking(false);
-          setLinkError('OAuth timeout - please try again');
-        }
-      }, 5 * 60 * 1000);
+      setTimeout(
+        () => {
+          clearInterval(pollInterval);
+          if (isLinking) {
+            setIsLinking(false);
+            setLinkError('OAuth timeout - please try again');
+          }
+        },
+        5 * 60 * 1000
+      );
     } catch (error) {
       setIsLinking(false);
       setLinkError(error instanceof Error ? error.message : 'Failed to start OAuth');
@@ -287,13 +286,7 @@ export function PlexAccountsManager({ compact = false, onAccountLinked }: PlexAc
   );
 }
 
-function PlexAccountCard({
-  account,
-  onUnlink,
-}: {
-  account: PlexAccount;
-  onUnlink: () => void;
-}) {
+function PlexAccountCard({ account, onUnlink }: { account: PlexAccount; onUnlink: () => void }) {
   const canUnlink = account.serverCount === 0;
 
   return (
@@ -305,7 +298,9 @@ function PlexAccountCard({
         </Avatar>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-medium">{account.plexUsername ?? account.plexEmail ?? 'Plex Account'}</span>
+            <span className="font-medium">
+              {account.plexUsername ?? account.plexEmail ?? 'Plex Account'}
+            </span>
             {account.allowLogin && (
               <Badge variant="secondary" className="text-xs">
                 Login Enabled
@@ -361,9 +356,7 @@ function ManageDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Linked Plex Accounts</DialogTitle>
-          <DialogDescription>
-            Manage the Plex accounts you can add servers from.
-          </DialogDescription>
+          <DialogDescription>Manage the Plex accounts you can add servers from.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[400px] space-y-3 overflow-y-auto py-4">
           {isLoading ? (

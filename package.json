@@ -28,7 +28,8 @@
     "test:unit:coverage": "turbo test:unit:coverage",
     "test:services:coverage": "turbo test:services:coverage",
     "test:routes:coverage": "turbo test:routes:coverage",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -37,9 +38,11 @@
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
-    "prettier-plugin-tailwindcss": "^0.7.2",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.18.0"

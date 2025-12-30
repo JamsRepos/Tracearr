@@ -16,6 +16,9 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/coverage/**',
       'apps/mobile/plugins/**',
+      'apps/mobile/.expo/**',
+      'apps/mobile/**.config.js',
+      'apps/mobile/**.config.mjs',
     ],
   },
   {

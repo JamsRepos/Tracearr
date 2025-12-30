@@ -244,7 +244,9 @@ function ServerSettings() {
   const [connectingPlexServer, setConnectingPlexServer] = useState<string | null>(null);
 
   // Plex account selection state
-  const [plexAccounts, setPlexAccounts] = useState<{ id: string; plexUsername: string | null; plexEmail: string | null }[]>([]);
+  const [plexAccounts, setPlexAccounts] = useState<
+    { id: string; plexUsername: string | null; plexEmail: string | null }[]
+  >([]);
   const [selectedPlexAccountId, setSelectedPlexAccountId] = useState<string | null>(null);
 
   // Update server type when user data loads (non-owners can't add Plex)
@@ -500,9 +502,7 @@ function ServerSettings() {
         <Card>
           <CardHeader>
             <CardTitle>Linked Plex Accounts</CardTitle>
-            <CardDescription>
-              Manage the Plex accounts you can add servers from
-            </CardDescription>
+            <CardDescription>Manage the Plex accounts you can add servers from</CardDescription>
           </CardHeader>
           <CardContent>
             <PlexAccountsManager onAccountLinked={() => void fetchPlexServers()} />
@@ -563,9 +563,7 @@ function ServerSettings() {
                 {plexDialogStep === 'loading' && (
                   <div className="flex flex-col items-center justify-center gap-3 py-8">
                     <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-                    <p className="text-muted-foreground text-sm">
-                      Loading linked Plex accounts...
-                    </p>
+                    <p className="text-muted-foreground text-sm">Loading linked Plex accounts...</p>
                   </div>
                 )}
 
@@ -575,7 +573,8 @@ function ServerSettings() {
                     <div>
                       <p className="font-medium">No Plex Accounts Linked</p>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        Link a Plex account first using the &quot;Linked Plex Accounts&quot; section below.
+                        Link a Plex account first using the &quot;Linked Plex Accounts&quot; section
+                        below.
                       </p>
                     </div>
                     {connectError && <p className="text-destructive text-sm">{connectError}</p>}
@@ -605,7 +604,8 @@ function ServerSettings() {
                         </SelectContent>
                       </Select>
                       <p className="text-muted-foreground text-xs">
-                        You have {plexAccounts.length} Plex accounts linked. Select which one to add a server from.
+                        You have {plexAccounts.length} Plex accounts linked. Select which one to add
+                        a server from.
                       </p>
                     </div>
                   </div>
@@ -650,7 +650,8 @@ function ServerSettings() {
                       <div>
                         <p className="font-medium">All Servers Connected</p>
                         <p className="text-muted-foreground mt-1 text-sm">
-                          All your owned Plex servers from this account are already connected to Tracearr.
+                          All your owned Plex servers from this account are already connected to
+                          Tracearr.
                         </p>
                       </div>
                     </div>

@@ -245,7 +245,12 @@ describe('Plex Auth Routes', () => {
           // First call for token, returns existing server token
           // Subsequent calls return connected servers list
           return Object.assign(
-            Promise.resolve([{ token: mockExistingServer.token, machineIdentifier: mockExistingServer.machineIdentifier }]),
+            Promise.resolve([
+              {
+                token: mockExistingServer.token,
+                machineIdentifier: mockExistingServer.machineIdentifier,
+              },
+            ]),
             makeChain([{ token: mockExistingServer.token }])
           );
         }),

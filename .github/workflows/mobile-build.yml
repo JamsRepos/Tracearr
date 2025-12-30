@@ -40,6 +40,7 @@ concurrency:
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  HUSKY: 0
 
 jobs:
   # Atomically prepare and reserve version numbers before builds start

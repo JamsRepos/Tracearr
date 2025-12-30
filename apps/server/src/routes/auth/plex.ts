@@ -193,7 +193,10 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
             })
             .where(eq(users.id, user.id));
 
-          app.log.info({ userId: user.id, plexAccountId: account.id }, 'Plex user login via plex_accounts');
+          app.log.info(
+            { userId: user.id, plexAccountId: account.id },
+            'Plex user login via plex_accounts'
+          );
 
           return {
             authorized: true,
@@ -239,7 +242,10 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
             plexToken: authResult.token,
             allowLogin: true,
           });
-          app.log.info({ userId: user.id, plexAccountId: authResult.id }, 'Auto-migrated user to plex_accounts');
+          app.log.info(
+            { userId: user.id, plexAccountId: authResult.id },
+            'Auto-migrated user to plex_accounts'
+          );
         }
 
         // Update user display info
