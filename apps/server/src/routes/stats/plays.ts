@@ -16,39 +16,38 @@ import { db } from '../../db/client.js';
 import { resolveDateRange } from './utils.js';
 import { validateServerAccess } from '../../utils/serverFiltering.js';
 
-// UUID validation regex for defensive checks
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// UUID validation regex for defensive checks (used by commented buildEngagementServerFilter)
+// const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Minimum session duration for a "valid" play (2 minutes in milliseconds)
 const MIN_PLAY_DURATION_MS = 120000;
 
-/**
- * Build SQL server filter fragment for engagement view queries.
- * Uses UUID casting since engagement view has uuid type for server_id.
- */
-function buildEngagementServerFilter(
-  serverId: string | undefined,
-  authUser: { role: string; serverIds: string[] }
-): ReturnType<typeof sql> {
-  if (serverId) {
-    if (!UUID_REGEX.test(serverId)) {
-      return sql`AND false`;
-    }
-    return sql`AND server_id = ${serverId}::uuid`;
-  }
-  if (authUser.role !== 'owner') {
-    const validServerIds = authUser.serverIds.filter((id) => UUID_REGEX.test(id));
-    if (validServerIds.length === 0) {
-      return sql`AND false`;
-    } else if (validServerIds.length === 1) {
-      return sql`AND server_id = ${validServerIds[0]}::uuid`;
-    } else {
-      const serverIdList = validServerIds.map((id) => sql`${id}::uuid`);
-      return sql`AND server_id IN (${sql.join(serverIdList, sql`, `)})`;
-    }
-  }
-  return sql``;
-}
+// NOTE: Kept for potential future use with daily_content_engagement view queries
+// Currently unused since plays-by-dayofweek now queries sessions table directly
+// for proper timezone handling.
+// function buildEngagementServerFilter(
+//   serverId: string | undefined,
+//   authUser: { role: string; serverIds: string[] }
+// ): ReturnType<typeof sql> {
+//   if (serverId) {
+//     if (!UUID_REGEX.test(serverId)) {
+//       return sql`AND false`;
+//     }
+//     return sql`AND server_id = ${serverId}::uuid`;
+//   }
+//   if (authUser.role !== 'owner') {
+//     const validServerIds = authUser.serverIds.filter((id) => UUID_REGEX.test(id));
+//     if (validServerIds.length === 0) {
+//       return sql`AND false`;
+//     } else if (validServerIds.length === 1) {
+//       return sql`AND server_id = ${validServerIds[0]}::uuid`;
+//     } else {
+//       const serverIdList = validServerIds.map((id) => sql`${id}::uuid`);
+//       return sql`AND server_id IN (${sql.join(serverIdList, sql`, `)})`;
+//     }
+//   }
+//   return sql``;
+// }
 
 /**
  * Build SQL server filter fragment for sessions table queries.
