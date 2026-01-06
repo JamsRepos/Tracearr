@@ -1721,6 +1721,7 @@ function ImportSettings() {
   const [tautulliProgress, setTautulliProgress] = useState<TautulliImportProgress | null>(null);
   const [isTautulliImporting, setIsTautulliImporting] = useState(false);
   const [overwriteFriendlyNames, setOverwriteFriendlyNames] = useState(false);
+  const [includeStreamDetails, setIncludeStreamDetails] = useState(false);
   const [_tautulliActiveJobId, setTautulliActiveJobId] = useState<string | null>(null);
 
   // Jellystat state
@@ -1928,7 +1929,11 @@ function ImportSettings() {
     });
 
     try {
-      const result = await api.import.tautulli.start(selectedPlexServerId, overwriteFriendlyNames);
+      const result = await api.import.tautulli.start(
+        selectedPlexServerId,
+        overwriteFriendlyNames,
+        includeStreamDetails
+      );
       if (result.jobId) {
         setTautulliActiveJobId(result.jobId);
       }
@@ -2136,6 +2141,8 @@ function ImportSettings() {
                 isTautulliImporting={isTautulliImporting}
                 overwriteFriendlyNames={overwriteFriendlyNames}
                 setOverwriteFriendlyNames={setOverwriteFriendlyNames}
+                includeStreamDetails={includeStreamDetails}
+                setIncludeStreamDetails={setIncludeStreamDetails}
                 handleStartTautulliImport={handleStartTautulliImport}
                 tautulliProgressData={tautulliProgressData}
               />
@@ -2171,6 +2178,8 @@ function ImportSettings() {
             isTautulliImporting={isTautulliImporting}
             overwriteFriendlyNames={overwriteFriendlyNames}
             setOverwriteFriendlyNames={setOverwriteFriendlyNames}
+            includeStreamDetails={includeStreamDetails}
+            setIncludeStreamDetails={setIncludeStreamDetails}
             handleStartTautulliImport={handleStartTautulliImport}
             tautulliProgressData={tautulliProgressData}
           />
@@ -2208,6 +2217,8 @@ interface TautulliImportSectionProps {
   isTautulliImporting: boolean;
   overwriteFriendlyNames: boolean;
   setOverwriteFriendlyNames: (overwrite: boolean) => void;
+  includeStreamDetails: boolean;
+  setIncludeStreamDetails: (include: boolean) => void;
   handleStartTautulliImport: () => Promise<void>;
   tautulliProgressData: ImportProgressData | null;
 }
@@ -2226,6 +2237,8 @@ function TautulliImportSection({
   isTautulliImporting,
   overwriteFriendlyNames,
   setOverwriteFriendlyNames,
+  includeStreamDetails,
+  setIncludeStreamDetails,
   handleStartTautulliImport,
   tautulliProgressData,
 }: TautulliImportSectionProps) {
@@ -2353,6 +2366,33 @@ function TautulliImportSection({
                   <p className="text-muted-foreground text-xs">
                     By default, Tracearr keeps any custom names already set. Enable this to replace
                     all existing names with the ones from Tautulli.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="includeStreamDetails"
+                  checked={includeStreamDetails}
+                  onCheckedChange={(checked: boolean | 'indeterminate') =>
+                    setIncludeStreamDetails(checked === true)
+                  }
+                  disabled={isTautulliImporting}
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="includeStreamDetails"
+                    className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+                  >
+                    Include detailed stream data (codecs, bitrate, resolution)
+                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-500">
+                      BETA
+                    </span>
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Fetches additional quality data for each session via separate API calls. This
+                    enables bandwidth and quality statistics but significantly increases import
+                    time.
                   </p>
                 </div>
               </div>

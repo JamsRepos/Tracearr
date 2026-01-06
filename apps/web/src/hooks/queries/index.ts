@@ -13,6 +13,16 @@ export {
   useConcurrentStats,
   useEngagementStats,
   useShowStats,
+  // Device compatibility
+  useDeviceCompatibility,
+  useDeviceCompatibilityMatrix,
+  useDeviceHealth,
+  useTranscodeHotspots,
+  useTopTranscodingUsers,
+  // Bandwidth stats
+  useBandwidthDaily,
+  useBandwidthTopUsers,
+  useBandwidthSummary,
   type LocationStatsFilters,
   type StatsTimeRange,
   type EngagementStatsOptions,

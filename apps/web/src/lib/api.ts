@@ -38,6 +38,15 @@ import type {
   EngagementStats,
   ShowStatsResponse,
   MediaType,
+  // New analytics types
+  DeviceCompatibilityResponse,
+  DeviceCompatibilityMatrix,
+  DeviceHealthResponse,
+  TranscodeHotspotsResponse,
+  TopTranscodingUsersResponse,
+  DailyBandwidthResponse,
+  BandwidthTopUsersResponse,
+  BandwidthSummary,
 } from '@tracearr/shared';
 
 // Re-export shared types needed by frontend components
@@ -752,6 +761,65 @@ class ApiClient {
       if (options?.orderBy) params.set('orderBy', options.orderBy);
       return this.request<ShowStatsResponse>(`/stats/shows?${params.toString()}`);
     },
+
+    // Device compatibility stats
+    deviceCompatibility: async (timeRange?: StatsTimeRange, serverId?: string, minSessions = 5) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      params.set('minSessions', String(minSessions));
+      return this.request<DeviceCompatibilityResponse>(
+        `/stats/device-compatibility?${params.toString()}`
+      );
+    },
+    deviceCompatibilityMatrix: async (
+      timeRange?: StatsTimeRange,
+      serverId?: string,
+      minSessions = 5
+    ) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      params.set('minSessions', String(minSessions));
+      return this.request<DeviceCompatibilityMatrix>(
+        `/stats/device-compatibility/matrix?${params.toString()}`
+      );
+    },
+    deviceHealth: async (timeRange?: StatsTimeRange, serverId?: string) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      return this.request<DeviceHealthResponse>(
+        `/stats/device-compatibility/health?${params.toString()}`
+      );
+    },
+    transcodeHotspots: async (timeRange?: StatsTimeRange, serverId?: string) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      return this.request<TranscodeHotspotsResponse>(
+        `/stats/device-compatibility/hotspots?${params.toString()}`
+      );
+    },
+    topTranscodingUsers: async (timeRange?: StatsTimeRange, serverId?: string) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      return this.request<TopTranscodingUsersResponse>(
+        `/stats/device-compatibility/top-transcoding-users?${params.toString()}`
+      );
+    },
+
+    // Bandwidth stats
+    bandwidthDaily: async (
+      timeRange?: StatsTimeRange,
+      serverId?: string,
+      serverUserId?: string
+    ) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      if (serverUserId) params.set('serverUserId', serverUserId);
+      return this.request<DailyBandwidthResponse>(`/stats/bandwidth/daily?${params.toString()}`);
+    },
+    bandwidthTopUsers: async (timeRange?: StatsTimeRange, serverId?: string) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      return this.request<BandwidthTopUsersResponse>(
+        `/stats/bandwidth/top-users?${params.toString()}`
+      );
+    },
+    bandwidthSummary: async (timeRange?: StatsTimeRange, serverId?: string) => {
+      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      return this.request<BandwidthSummary>(`/stats/bandwidth/summary?${params.toString()}`);
+    },
   };
 
   // Settings
@@ -795,10 +863,14 @@ class ApiClient {
           users?: number;
           historyRecords?: number;
         }>('/import/tautulli/test', { method: 'POST', body: JSON.stringify({ url, apiKey }) }),
-      start: (serverId: string, overwriteFriendlyNames: boolean = false) =>
+      start: (
+        serverId: string,
+        overwriteFriendlyNames: boolean = false,
+        includeStreamDetails: boolean = false
+      ) =>
         this.request<{ status: string; jobId?: string; message: string }>('/import/tautulli', {
           method: 'POST',
-          body: JSON.stringify({ serverId, overwriteFriendlyNames }),
+          body: JSON.stringify({ serverId, overwriteFriendlyNames, includeStreamDetails }),
         }),
       getActive: (serverId: string) =>
         this.request<{

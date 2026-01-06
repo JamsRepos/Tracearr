@@ -27,6 +27,7 @@ export interface TautulliImportJobData {
   userId: string; // Audit trail - who initiated the import
   checkpoint?: number; // Resume from this page (for future use)
   overwriteFriendlyNames?: boolean; // Whether to overwrite existing friendly names
+  includeStreamDetails?: boolean; // (BETA) Fetch detailed codec/bitrate info via additional API calls
 }
 
 export interface JellystatImportJobData {
@@ -192,7 +193,7 @@ async function processImportJob(job: Job<ImportJobData>): Promise<ImportJobResul
 async function processTautulliImportJob(
   job: Job<TautulliImportJobData>
 ): Promise<TautulliImportResult> {
-  const { serverId, overwriteFriendlyNames = false } = job.data;
+  const { serverId, overwriteFriendlyNames = false, includeStreamDetails = false } = job.data;
   const pubSubService = getPubSubService();
 
   // Progress callback to update job and publish to WebSocket
@@ -229,6 +230,32 @@ async function processTautulliImportJob(
     onProgress,
     { overwriteFriendlyNames }
   );
+
+  // (BETA) Enrich sessions with detailed stream data
+  if (includeStreamDetails && result.success) {
+    console.log(`[Import] Starting stream details enrichment for server ${serverId}`);
+    if (pubSubService) {
+      await pubSubService.publish('import:progress', {
+        status: 'enriching',
+        message: '(BETA) Fetching detailed stream data...',
+        jobId: job.id,
+      });
+    }
+
+    try {
+      const enrichResult = await TautulliService.enrichStreamDetails(
+        serverId,
+        pubSubService ?? undefined,
+        onProgress
+      );
+      console.log(
+        `[Import] Stream enrichment complete: ${enrichResult.enriched} enriched, ${enrichResult.failed} failed, ${enrichResult.skipped} skipped`
+      );
+    } catch (error) {
+      // Don't fail the import if enrichment fails - it's a best-effort enhancement
+      console.error(`[Import] Stream enrichment failed:`, error);
+    }
+  }
 
   // Publish final result (note: TautulliService already publishes final progress,
   // but this is a fallback to ensure frontend receives completion notification)
@@ -311,7 +338,8 @@ export async function getActiveImportForServer(serverId: string): Promise<string
 export async function enqueueImport(
   serverId: string,
   userId: string,
-  overwriteFriendlyNames: boolean
+  overwriteFriendlyNames: boolean,
+  includeStreamDetails: boolean = false
 ): Promise<string> {
   if (!importQueue) {
     throw new Error('Import queue not initialized');
@@ -329,6 +357,7 @@ export async function enqueueImport(
     serverId,
     userId,
     overwriteFriendlyNames,
+    includeStreamDetails,
   });
 
   const jobId = job.id ?? `unknown-${Date.now()}`;

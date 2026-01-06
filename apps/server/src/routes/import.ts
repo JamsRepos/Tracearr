@@ -52,7 +52,7 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only server owners can import data');
     }
 
-    const { serverId, overwriteFriendlyNames = false } = body.data;
+    const { serverId, overwriteFriendlyNames = false, includeStreamDetails = false } = body.data;
 
     // Sync server users first to ensure we have all users before importing history
     try {
@@ -66,7 +66,12 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
 
     // Enqueue import job
     try {
-      const jobId = await enqueueImport(serverId, authUser.userId, overwriteFriendlyNames);
+      const jobId = await enqueueImport(
+        serverId,
+        authUser.userId,
+        overwriteFriendlyNames,
+        includeStreamDetails
+      );
 
       return {
         status: 'queued',
@@ -88,8 +93,24 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       TautulliService.importHistory(serverId, pubSubService ?? undefined, undefined, {
         overwriteFriendlyNames,
       })
-        .then((result) => {
+        .then(async (result) => {
           console.log(`[Import] Tautulli import completed:`, result);
+
+          // (BETA) Enrich with stream details
+          if (includeStreamDetails && result.success) {
+            console.log(`[Import] Starting stream details enrichment for server ${serverId}`);
+            try {
+              const enrichResult = await TautulliService.enrichStreamDetails(
+                serverId,
+                pubSubService ?? undefined
+              );
+              console.log(
+                `[Import] Stream enrichment complete: ${enrichResult.enriched} enriched, ${enrichResult.failed} failed`
+              );
+            } catch (enrichError) {
+              console.error(`[Import] Stream enrichment failed:`, enrichError);
+            }
+          }
         })
         .catch((err: unknown) => {
           console.error(`[Import] Tautulli import failed:`, err);

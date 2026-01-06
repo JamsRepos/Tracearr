@@ -1383,3 +1383,159 @@ export interface VersionInfo {
   // When the last check occurred (ISO timestamp)
   lastChecked: string | null;
 }
+
+// =============================================================================
+// Device Compatibility Types
+// =============================================================================
+
+// Device-codec compatibility row
+export interface DeviceCompatibilityRow {
+  deviceType: string;
+  videoCodec: string;
+  audioCodec: string;
+  sessionCount: number;
+  videoDirectCount: number;
+  audioDirectCount: number;
+  fullDirectCount: number;
+  anyTranscodeCount: number;
+  videoDirectPct: number;
+  audioDirectPct: number;
+  fullDirectPct: number;
+}
+
+// Device compatibility response with summary
+export interface DeviceCompatibilityResponse {
+  data: DeviceCompatibilityRow[];
+  summary: {
+    totalSessions: number;
+    directPlayPct: number;
+    uniqueDevices: number;
+    uniqueCodecs: number;
+  };
+}
+
+// Simplified matrix view for heatmap display
+export interface DeviceCompatibilityMatrix {
+  codecs: string[];
+  devices: {
+    device: string;
+    codecs: Record<string, { sessions: number; directPct: number }>;
+  }[];
+}
+
+// Device health ranking row
+export interface DeviceHealthRow {
+  device: string;
+  sessions: number;
+  directPlayCount: number;
+  transcodeCount: number;
+  directPlayPct: number;
+}
+
+// Device health response
+export interface DeviceHealthResponse {
+  data: DeviceHealthRow[];
+}
+
+// Transcode hotspot row
+export interface TranscodeHotspotRow {
+  device: string;
+  videoCodec: string;
+  audioCodec: string;
+  sessions: number;
+  directCount: number;
+  transcodeCount: number;
+  directPlayPct: number;
+  pctOfTotalTranscodes: number;
+}
+
+// Transcode hotspots response
+export interface TranscodeHotspotsResponse {
+  data: TranscodeHotspotRow[];
+  totalTranscodes: number;
+}
+
+// Top transcoding user row
+export interface TopTranscodingUserRow {
+  serverUserId: string;
+  username: string;
+  avatar: string | null;
+  totalSessions: number;
+  directPlayCount: number;
+  transcodeCount: number;
+  directPlayPct: number;
+  pctOfTotalTranscodes: number;
+}
+
+// Top transcoding users response
+export interface TopTranscodingUsersResponse {
+  data: TopTranscodingUserRow[];
+  totalTranscodes: number;
+}
+
+// =============================================================================
+// Bandwidth Stats Types
+// =============================================================================
+
+// Daily bandwidth row
+export interface DailyBandwidthRow {
+  date: string;
+  sessions: number;
+  /** Total data transferred in bytes */
+  totalBytes: number;
+  /** Total data transferred in GB (human-readable) */
+  totalGb: number;
+  avgBitrate: number;
+  peakBitrate: number;
+  totalDurationMs: number;
+  avgBitrateMbps: number;
+  totalHours: number;
+}
+
+// Daily bandwidth response
+export interface DailyBandwidthResponse {
+  data: DailyBandwidthRow[];
+  usingAggregate: boolean;
+}
+
+// Top bandwidth user
+export interface BandwidthTopUser {
+  username: string;
+  /** Display name from linked identity (null if no linked user) */
+  identityName: string | null;
+  /** Avatar URL from server user */
+  thumbUrl: string | null;
+  serverUserId: string;
+  /** Total data transferred in bytes */
+  totalBytes: number;
+  /** Total data transferred in GB (human-readable) */
+  totalGb: number;
+  sessions: number;
+  avgBitrate: number;
+  totalDurationMs: number;
+  avgBitrateMbps: number;
+  totalHours: number;
+}
+
+// Top bandwidth users response
+export interface BandwidthTopUsersResponse {
+  data: BandwidthTopUser[];
+}
+
+// Bandwidth summary
+export interface BandwidthSummary {
+  totalSessions: number;
+  /** Total data transferred in bytes */
+  totalBytes: number;
+  /** Total data transferred in GB (human-readable) */
+  totalGb: number;
+  avgBitrate: number;
+  peakBitrate: number;
+  minBitrate: number;
+  medianBitrate: number;
+  totalDurationMs: number;
+  uniqueUsers: number;
+  avgBitrateMbps: number;
+  peakBitrateMbps: number;
+  totalHours: number;
+}

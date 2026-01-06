@@ -10,6 +10,10 @@ import {
   TrendingUp,
   Film,
   UserCircle,
+  Gauge,
+  Smartphone,
+  Activity,
+  Cpu,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -41,6 +45,15 @@ export const navigation: NavEntry[] = [
       { name: 'Activity', href: '/stats/activity', icon: TrendingUp },
       { name: 'Library', href: '/stats/library', icon: Film },
       { name: 'Users', href: '/stats/users', icon: UserCircle },
+    ],
+  },
+  {
+    name: 'Performance',
+    icon: Gauge,
+    children: [
+      { name: 'Devices', href: '/stats/devices', icon: Smartphone },
+      { name: 'Bandwidth', href: '/stats/bandwidth', icon: Activity },
+      { name: 'Quality', href: '/stats/quality', icon: Cpu },
     ],
   },
   { name: 'Users', href: '/users', icon: Users },

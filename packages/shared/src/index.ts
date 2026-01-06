@@ -139,6 +139,23 @@ export type {
   EngagementTierBreakdown,
   EngagementStats,
   ShowStatsResponse,
+  // Device compatibility
+  DeviceCompatibilityRow,
+  DeviceCompatibilityResponse,
+  DeviceCompatibilityMatrix,
+  DeviceHealthRow,
+  DeviceHealthResponse,
+  TranscodeHotspotRow,
+  TranscodeHotspotsResponse,
+  // Top transcoding users
+  TopTranscodingUserRow,
+  TopTranscodingUsersResponse,
+  // Bandwidth stats
+  DailyBandwidthRow,
+  DailyBandwidthResponse,
+  BandwidthTopUser,
+  BandwidthTopUsersResponse,
+  BandwidthSummary,
 } from './types.js';
 
 // Schema exports

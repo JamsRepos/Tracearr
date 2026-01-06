@@ -158,6 +158,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
           s.season_number,
           s.episode_number,
           s.year,
+          s.artist_name,
+          s.album_name,
           s.thumb_path,
           s.reference_id,
           s.ip_address,
@@ -224,6 +226,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         season_number: number | null;
         episode_number: number | null;
         year: number | null;
+        artist_name: string | null;
+        album_name: string | null;
         thumb_path: string | null;
         reference_id: string | null;
         ip_address: string | null;
@@ -279,6 +283,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       seasonNumber: row.season_number,
       episodeNumber: row.episode_number,
       year: row.year,
+      artistName: row.artist_name,
+      albumName: row.album_name,
       thumbPath: row.thumb_path,
       startedAt: row.started_at,
       stoppedAt: row.stopped_at,
@@ -586,6 +592,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
           s.season_number,
           s.episode_number,
           s.year,
+          s.artist_name,
+          s.album_name,
           s.thumb_path,
           s.reference_id,
           s.ip_address,
@@ -663,6 +671,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         season_number: number | null;
         episode_number: number | null;
         year: number | null;
+        artist_name: string | null;
+        album_name: string | null;
         thumb_path: string | null;
         reference_id: string | null;
         ip_address: string | null;
@@ -718,6 +728,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       seasonNumber: row.season_number,
       episodeNumber: row.episode_number,
       year: row.year,
+      artistName: row.artist_name,
+      albumName: row.album_name,
       thumbPath: row.thumb_path,
       startedAt: row.started_at,
       stoppedAt: row.stopped_at,
@@ -1048,6 +1060,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         seasonNumber: sessions.seasonNumber,
         episodeNumber: sessions.episodeNumber,
         year: sessions.year,
+        artistName: sessions.artistName,
+        albumName: sessions.albumName,
         thumbPath: sessions.thumbPath,
         startedAt: sessions.startedAt,
         stoppedAt: sessions.stoppedAt,
@@ -1130,6 +1144,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       seasonNumber: row.seasonNumber,
       episodeNumber: row.episodeNumber,
       year: row.year,
+      artistName: row.artistName,
+      albumName: row.albumName,
       thumbPath: row.thumbPath,
       startedAt: row.startedAt,
       stoppedAt: row.stoppedAt,

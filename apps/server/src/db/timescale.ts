@@ -17,8 +17,9 @@ import { PRIMARY_MEDIA_TYPES_SQL_LITERAL } from '../constants/mediaTypes.js';
  * Version history:
  * - 1: Initial version (no media_type filtering)
  * - 2: Added media_type IN ('movie', 'episode') filter to all aggregates
+ * - 3: Added daily_bandwidth_by_user aggregate for bandwidth analytics
  */
-const AGGREGATE_SCHEMA_VERSION = 2;
+const AGGREGATE_SCHEMA_VERSION = 3;
 
 /** Config for a continuous aggregate view */
 interface AggregateDefinition {
@@ -239,6 +240,52 @@ function getAggregateDefinitions(): AggregateDefinition[] {
         scheduleInterval: '15 minutes',
       },
     },
+    {
+      name: 'daily_bandwidth_by_user',
+      toolkitSql: `
+        CREATE MATERIALIZED VIEW IF NOT EXISTS daily_bandwidth_by_user
+        WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+        SELECT
+          time_bucket('1 day', started_at) AS day,
+          server_id,
+          server_user_id,
+          COUNT(*) AS session_count,
+          -- Store the product of bitrate * duration for accurate bandwidth calculation
+          -- Formula: SUM(bitrate * duration_ms) / 8 / 1000 = total megabytes transferred
+          SUM(COALESCE(bitrate, 0)::bigint * COALESCE(duration_ms, 0)::bigint) AS total_bits_ms,
+          AVG(COALESCE(bitrate, 0))::BIGINT AS avg_bitrate,
+          MAX(COALESCE(bitrate, 0)) AS peak_bitrate,
+          SUM(COALESCE(duration_ms, 0)) AS total_duration_ms
+        FROM sessions
+        WHERE started_at IS NOT NULL
+        GROUP BY day, server_id, server_user_id
+        WITH NO DATA
+      `,
+      fallbackSql: `
+        CREATE MATERIALIZED VIEW IF NOT EXISTS daily_bandwidth_by_user
+        WITH (timescaledb.continuous) AS
+        SELECT
+          time_bucket('1 day', started_at) AS day,
+          server_id,
+          server_user_id,
+          COUNT(*) AS session_count,
+          -- Store the product of bitrate * duration for accurate bandwidth calculation
+          -- Formula: SUM(bitrate * duration_ms) / 8 / 1000 = total megabytes transferred
+          SUM(COALESCE(bitrate, 0)::bigint * COALESCE(duration_ms, 0)::bigint) AS total_bits_ms,
+          AVG(COALESCE(bitrate, 0))::BIGINT AS avg_bitrate,
+          MAX(COALESCE(bitrate, 0)) AS peak_bitrate,
+          SUM(COALESCE(duration_ms, 0)) AS total_duration_ms
+        FROM sessions
+        WHERE started_at IS NOT NULL
+        GROUP BY day, server_id, server_user_id
+        WITH NO DATA
+      `,
+      refreshPolicy: {
+        startOffset: '3 days',
+        endOffset: '1 hour',
+        scheduleInterval: '1 hour',
+      },
+    },
   ];
 }
 
@@ -356,6 +403,7 @@ async function dropRegularMaterializedViewIfExists(
     'daily_stats_summary',
     'hourly_concurrent_streams',
     'daily_content_engagement',
+    'daily_bandwidth_by_user',
   ];
 
   if (!allowedViews.includes(viewName)) {
@@ -823,6 +871,7 @@ export async function initTimescaleDB(): Promise<{
     'daily_stats_summary',
     'hourly_concurrent_streams',
     'daily_content_engagement', // Engagement tracking system
+    'daily_bandwidth_by_user', // Bandwidth analytics
   ];
 
   const missingAggregates = expectedAggregates.filter((agg) => !existingAggregates.includes(agg));
