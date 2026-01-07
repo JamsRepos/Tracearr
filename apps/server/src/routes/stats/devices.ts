@@ -442,6 +442,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
         SELECT
           s.server_user_id,
           COALESCE(u.username, 'Unknown') AS username,
+          u.identity_name,
           u.thumb_url AS avatar,
           COUNT(*)::int AS total_sessions,
           COUNT(*) FILTER (WHERE s.video_decision = 'directplay' AND s.audio_decision = 'directplay')::int AS direct_play_count,
@@ -453,7 +454,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
         AND s.source_video_codec IS NOT NULL
         ${period === 'custom' ? sql`AND s.started_at < ${dateRange.end}` : sql``}
         ${serverFilter}
-        GROUP BY s.server_user_id, u.username, u.thumb_url
+        GROUP BY s.server_user_id, u.username, u.identity_name, u.thumb_url
         HAVING COUNT(*) FILTER (WHERE s.video_decision != 'directplay' OR s.audio_decision != 'directplay') > 0
         ORDER BY transcode_count DESC
         LIMIT 10
@@ -462,6 +463,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
       const rows = result.rows as {
         server_user_id: string;
         username: string;
+        identity_name: string | null;
         avatar: string | null;
         total_sessions: number;
         direct_play_count: number;
@@ -476,6 +478,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
         data: rows.map((r) => ({
           serverUserId: r.server_user_id,
           username: r.username,
+          identityName: r.identity_name,
           avatar: r.avatar,
           totalSessions: r.total_sessions,
           directPlayCount: r.direct_play_count,

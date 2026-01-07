@@ -27,9 +27,9 @@ import { cn } from '@/lib/utils';
 
 // Color coding for direct play percentage
 function getDirectPlayColor(pct: number): string {
-  if (pct >= 80) return 'bg-green-500/20 text-green-600 dark:text-green-400';
-  if (pct >= 50) return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400';
-  return 'bg-red-500/20 text-red-600 dark:text-red-400';
+  if (pct >= 80) return 'text-green-600 dark:text-green-400';
+  if (pct >= 50) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-red-600 dark:text-red-400';
 }
 
 function getDirectPlayBg(pct: number): string {
@@ -312,13 +312,22 @@ export function StatsDevices() {
           {/* Legend */}
           <div className="mt-4 flex items-center gap-4 text-sm">
             <span className="text-muted-foreground">Legend:</span>
-            <Badge variant="outline" className={getDirectPlayColor(85)}>
+            <Badge
+              variant="outline"
+              className="border-transparent bg-green-500/20 text-green-600 dark:text-green-400"
+            >
               &ge;80% Direct
             </Badge>
-            <Badge variant="outline" className={getDirectPlayColor(60)}>
+            <Badge
+              variant="outline"
+              className="border-transparent bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+            >
               50-79%
             </Badge>
-            <Badge variant="outline" className={getDirectPlayColor(30)}>
+            <Badge
+              variant="outline"
+              className="border-transparent bg-red-500/20 text-red-600 dark:text-red-400"
+            >
               &lt;50%
             </Badge>
           </div>
@@ -359,18 +368,30 @@ export function StatsDevices() {
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={user.avatar ?? undefined} alt={user.username} />
-                          <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback>
+                            {(user.identityName ?? user.username).slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{user.username}</span>
+                        <span className="font-medium">{user.identityName ?? user.username}</span>
                       </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-right">
                       {user.totalSessions.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={getDirectPlayColor(user.directPlayPct)}>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'border-transparent',
+                          user.directPlayPct >= 80
+                            ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                            : user.directPlayPct >= 50
+                              ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                              : 'bg-red-500/20 text-red-600 dark:text-red-400'
+                        )}
+                      >
                         {user.directPlayPct}%
-                      </span>
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono text-orange-600 dark:text-orange-400">
                       {user.transcodeCount.toLocaleString()}

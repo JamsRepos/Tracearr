@@ -1459,6 +1459,7 @@ export interface TranscodeHotspotsResponse {
 export interface TopTranscodingUserRow {
   serverUserId: string;
   username: string;
+  identityName: string | null;
   avatar: string | null;
   totalSessions: number;
   directPlayCount: number;
