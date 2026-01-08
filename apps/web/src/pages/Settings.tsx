@@ -1907,6 +1907,7 @@ function ImportSettings() {
   const [selectedJellyfinServerId, setSelectedJellyfinServerId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [enrichMedia, setEnrichMedia] = useState(true);
+  const [updateStreamDetails, setUpdateStreamDetails] = useState(false);
   const [jellystatProgress, setJellystatProgress] = useState<JellystatImportProgress | null>(null);
   const [isJellystatImporting, setIsJellystatImporting] = useState(false);
   const [_jellystatActiveJobId, setJellystatActiveJobId] = useState<string | null>(null);
@@ -2177,7 +2178,8 @@ function ImportSettings() {
       const result = await api.import.jellystat.start(
         selectedJellyfinServerId,
         selectedFile,
-        enrichMedia
+        enrichMedia,
+        updateStreamDetails
       );
       if (result.jobId) {
         setJellystatActiveJobId(result.jobId);
@@ -2336,6 +2338,8 @@ function ImportSettings() {
                 handleFileSelect={handleFileSelect}
                 enrichMedia={enrichMedia}
                 setEnrichMedia={setEnrichMedia}
+                updateStreamDetails={updateStreamDetails}
+                setUpdateStreamDetails={setUpdateStreamDetails}
                 isJellystatImporting={isJellystatImporting}
                 handleStartJellystatImport={handleStartJellystatImport}
                 jellystatProgressData={jellystatProgressData}
@@ -2371,6 +2375,8 @@ function ImportSettings() {
             handleFileSelect={handleFileSelect}
             enrichMedia={enrichMedia}
             setEnrichMedia={setEnrichMedia}
+            updateStreamDetails={updateStreamDetails}
+            setUpdateStreamDetails={setUpdateStreamDetails}
             isJellystatImporting={isJellystatImporting}
             handleStartJellystatImport={handleStartJellystatImport}
             jellystatProgressData={jellystatProgressData}
@@ -2649,6 +2655,8 @@ interface JellystatImportSectionProps {
   handleFileSelect: (file: File | null) => void;
   enrichMedia: boolean;
   setEnrichMedia: (enrich: boolean) => void;
+  updateStreamDetails: boolean;
+  setUpdateStreamDetails: (update: boolean) => void;
   isJellystatImporting: boolean;
   handleStartJellystatImport: () => Promise<void>;
   jellystatProgressData: ImportProgressData | null;
@@ -2662,6 +2670,8 @@ function JellystatImportSection({
   handleFileSelect,
   enrichMedia,
   setEnrichMedia,
+  updateStreamDetails,
+  setUpdateStreamDetails,
   isJellystatImporting,
   handleStartJellystatImport,
   jellystatProgressData,
@@ -2752,6 +2762,25 @@ function JellystatImportSection({
               <p className="text-muted-foreground text-xs">
                 Fetches season/episode numbers and artwork from your media server. Slower but
                 provides better data quality.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="updateStreamDetails"
+              checked={updateStreamDetails}
+              onCheckedChange={(checked: boolean | 'indeterminate') =>
+                setUpdateStreamDetails(checked === true)
+              }
+              disabled={isJellystatImporting}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="updateStreamDetails" className="cursor-pointer text-sm font-normal">
+                Update existing records with stream details
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                Updates previously imported sessions with codec, bitrate, and transcode data from
+                the backup. Use when re-importing to backfill new stream fields.
               </p>
             </div>
           </div>

@@ -290,9 +290,15 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
     const serverId = getFieldValue(data.fields.serverId);
     const enrichMediaStr = getFieldValue(data.fields.enrichMedia) ?? 'true';
     const enrichMedia = enrichMediaStr === 'true';
+    const updateStreamDetailsStr = getFieldValue(data.fields.updateStreamDetails) ?? 'false';
+    const updateStreamDetails = updateStreamDetailsStr === 'true';
 
     // Validate server ID
-    const parsed = jellystatImportBodySchema.safeParse({ serverId, enrichMedia });
+    const parsed = jellystatImportBodySchema.safeParse({
+      serverId,
+      enrichMedia,
+      updateStreamDetails,
+    });
     if (!parsed.success) {
       return reply.badRequest('Invalid request: serverId is required');
     }
@@ -333,7 +339,8 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         parsed.data.serverId,
         authUser.userId,
         backupJson,
-        parsed.data.enrichMedia
+        parsed.data.enrichMedia,
+        parsed.data.updateStreamDetails
       );
 
       return {
@@ -357,7 +364,8 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         parsed.data.serverId,
         backupJson,
         enrichMedia,
-        pubSubService ?? undefined
+        pubSubService ?? undefined,
+        { updateStreamDetails: parsed.data.updateStreamDetails }
       )
         .then((result) => {
           console.log(`[Import] Jellystat import completed:`, result);

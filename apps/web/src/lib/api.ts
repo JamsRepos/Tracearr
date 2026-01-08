@@ -920,12 +920,19 @@ class ApiClient {
        * @param serverId - Target Jellyfin/Emby server
        * @param file - Jellystat backup JSON file
        * @param enrichMedia - Whether to enrich with metadata (default: true)
+       * @param updateStreamDetails - Whether to update existing records with stream data (default: false)
        */
-      start: async (serverId: string, file: File, enrichMedia: boolean = true) => {
+      start: async (
+        serverId: string,
+        file: File,
+        enrichMedia: boolean = true,
+        updateStreamDetails: boolean = false
+      ) => {
         const formData = new FormData();
         // Fields must come BEFORE file - @fastify/multipart stops parsing after file
         formData.append('serverId', serverId);
         formData.append('enrichMedia', String(enrichMedia));
+        formData.append('updateStreamDetails', String(updateStreamDetails));
         formData.append('file', file);
 
         return this.request<{ status: string; jobId?: string; message: string }>(
@@ -953,6 +960,7 @@ class ApiClient {
           result?: {
             success: boolean;
             imported: number;
+            updated: number;
             skipped: number;
             errors: number;
             enriched: number;

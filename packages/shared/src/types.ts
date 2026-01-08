@@ -674,6 +674,7 @@ export interface JellystatImportProgress {
 export interface JellystatImportResult {
   success: boolean;
   imported: number;
+  updated: number;
   skipped: number;
   errors: number;
   enriched: number;

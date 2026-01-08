@@ -36,6 +36,7 @@ export interface JellystatImportJobData {
   userId: string; // Audit trail - who initiated the import
   backupJson: string; // Jellystat backup file contents
   enrichMedia: boolean; // Whether to enrich with metadata from Jellyfin/Emby
+  updateStreamDetails?: boolean; // Whether to update existing records with stream/transcode data
 }
 
 export type ImportJobData = TautulliImportJobData | JellystatImportJobData;
@@ -289,7 +290,7 @@ async function processTautulliImportJob(
 async function processJellystatImportJob(
   job: Job<JellystatImportJobData>
 ): Promise<JellystatImportResult> {
-  const { serverId, backupJson, enrichMedia } = job.data;
+  const { serverId, backupJson, enrichMedia, updateStreamDetails } = job.data;
   const pubSubService = getPubSubService();
 
   // Run the actual import
@@ -297,16 +298,18 @@ async function processJellystatImportJob(
     serverId,
     backupJson,
     enrichMedia,
-    pubSubService ?? undefined
+    pubSubService ?? undefined,
+    { updateStreamDetails }
   );
 
   // Publish final result
   if (pubSubService) {
     await pubSubService.publish('import:jellystat:progress', {
       status: result.success ? 'complete' : 'error',
-      totalRecords: result.imported + result.skipped + result.errors,
-      processedRecords: result.imported + result.skipped + result.errors,
+      totalRecords: result.imported + result.updated + result.skipped + result.errors,
+      processedRecords: result.imported + result.updated + result.skipped + result.errors,
       importedRecords: result.imported,
+      updatedRecords: result.updated,
       skippedRecords: result.skipped,
       errorRecords: result.errors,
       enrichedRecords: result.enriched,
@@ -483,7 +486,8 @@ export async function enqueueJellystatImport(
   serverId: string,
   userId: string,
   backupJson: string,
-  enrichMedia: boolean = true
+  enrichMedia: boolean = true,
+  updateStreamDetails: boolean = false
 ): Promise<string> {
   if (!importQueue) {
     throw new Error('Import queue not initialized');
@@ -502,6 +506,7 @@ export async function enqueueJellystatImport(
     userId,
     backupJson,
     enrichMedia,
+    updateStreamDetails,
   });
 
   const jobId = job.id ?? `unknown-${Date.now()}`;

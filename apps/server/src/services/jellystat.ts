@@ -25,8 +25,7 @@ import type {
 } from '@tracearr/shared';
 import { jellystatBackupSchema } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { servers } from '../db/schema.js';
-import type { sessions } from '../db/schema.js';
+import { servers, sessions } from '../db/schema.js';
 import { refreshAggregates } from '../db/timescale.js';
 import { geoipService } from './geoip.js';
 import type { PubSubService } from './cache.js';
@@ -461,12 +460,14 @@ async function fetchMediaEnrichment(
  * @param backupJson - Raw JSON string from Jellystat backup file
  * @param enrichMedia - Whether to fetch metadata from Jellyfin API
  * @param pubSubService - Optional pub/sub service for progress updates
+ * @param options - Additional import options
  */
 export async function importJellystatBackup(
   serverId: string,
   backupJson: string,
   enrichMedia: boolean = true,
-  pubSubService?: PubSubService
+  pubSubService?: PubSubService,
+  options?: { updateStreamDetails?: boolean }
 ): Promise<JellystatImportResult> {
   const progress: JellystatImportProgress = {
     status: 'idle',
@@ -504,6 +505,7 @@ export async function importJellystatBackup(
       return {
         success: true,
         imported: 0,
+        updated: 0,
         skipped: 0,
         errors: 0,
         enriched: 0,
@@ -563,8 +565,10 @@ export async function importJellystatBackup(
 
     const geoCache = new Map<string, ReturnType<typeof geoipService.lookup>>();
     const insertedInThisImport = new Set<string>();
+    const updateStreamDetails = options?.updateStreamDetails ?? false;
 
     let imported = 0;
+    let updated = 0;
     let skipped = 0;
     let errors = 0;
 
@@ -576,9 +580,9 @@ export async function importJellystatBackup(
       const chunkIds = chunk.map((a) => a.Id).filter(Boolean);
       const existingMap =
         chunkIds.length > 0 ? await queryExistingByExternalIds(serverId, chunkIds) : new Map();
-      const existingInChunk = new Set(existingMap.keys());
 
       const insertBatch: (typeof sessions.$inferInsert)[] = [];
+      const updateBatch: Array<{ id: string; data: Partial<typeof sessions.$inferInsert> }> = [];
 
       for (const activity of chunk) {
         progress.processedRecords++;
@@ -592,7 +596,53 @@ export async function importJellystatBackup(
             continue;
           }
 
-          if (existingInChunk.has(activity.Id) || insertedInThisImport.has(activity.Id)) {
+          // Check if this is a duplicate we've already handled in this import
+          if (insertedInThisImport.has(activity.Id)) {
+            skipped++;
+            progress.skippedRecords++;
+            continue;
+          }
+
+          // Check if record exists in database
+          const existingSession = existingMap.get(activity.Id);
+          if (existingSession) {
+            // Record exists - check if we should update stream details
+            if (updateStreamDetails && !existingSession.sourceVideoCodec) {
+              // Extract stream details from this activity
+              const activityAny = activity as Record<string, unknown>;
+              const mediaStreams = activityAny.MediaStreams as JellystatMediaStream[] | null;
+              const transcodingInfoFull =
+                activityAny.TranscodingInfo as JellystatTranscodingInfoFull | null;
+
+              // Only update if backup has stream data
+              if (mediaStreams && mediaStreams.length > 0) {
+                const streamDetails = extractJellystatStreamDetails(
+                  mediaStreams,
+                  transcodingInfoFull
+                );
+
+                // Only queue update if we got meaningful data
+                if (streamDetails.sourceVideoCodec || streamDetails.sourceAudioCodec) {
+                  // Calculate bitrate if available
+                  const bitrate = transcodingInfoFull?.Bitrate
+                    ? Math.floor(transcodingInfoFull.Bitrate / 1000)
+                    : streamDetails.sourceVideoDetails?.bitrate
+                      ? Math.floor(streamDetails.sourceVideoDetails.bitrate / 1000)
+                      : null;
+
+                  updateBatch.push({
+                    id: existingSession.id,
+                    data: {
+                      ...streamDetails,
+                      bitrate,
+                    },
+                  });
+                  updated++;
+                  continue;
+                }
+              }
+            }
+            // No update needed - skip
             skipped++;
             progress.skippedRecords++;
             continue;
@@ -640,6 +690,15 @@ export async function importJellystatBackup(
         await flushInsertBatch(insertBatch, { chunkSize: BATCH_SIZE });
       }
 
+      // Batch update existing records with stream details
+      if (updateBatch.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const update of updateBatch) {
+            await tx.update(sessions).set(update.data).where(eq(sessions.id, update.id));
+          }
+        });
+      }
+
       geoCache.clear();
     }
 
@@ -651,7 +710,7 @@ export async function importJellystatBackup(
       console.warn('[Jellystat] Failed to refresh aggregates after import:', err);
     }
 
-    let message = `Import complete: ${imported} imported, ${skipped} skipped, ${errors} errors`;
+    let message = `Import complete: ${imported} imported, ${updated} updated, ${skipped} skipped, ${errors} errors`;
     if (enrichMedia && enrichmentMap.size > 0) {
       message += `, ${enrichmentMap.size} media items enriched`;
     }
@@ -674,6 +733,7 @@ export async function importJellystatBackup(
     return {
       success: true,
       imported,
+      updated,
       skipped,
       errors,
       enriched: enrichmentMap.size,
@@ -698,6 +758,7 @@ export async function importJellystatBackup(
     return {
       success: false,
       imported: progress.importedRecords,
+      updated: 0,
       skipped: progress.skippedRecords,
       errors: progress.errorRecords,
       enriched: progress.enrichedRecords,

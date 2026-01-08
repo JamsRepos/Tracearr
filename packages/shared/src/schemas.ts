@@ -396,6 +396,7 @@ export const jellystatBackupSchema = z.array(
 export const jellystatImportBodySchema = z.object({
   serverId: uuidSchema, // Which Tracearr server to import into
   enrichMedia: z.coerce.boolean().default(true), // Fetch season/episode from Jellyfin API
+  updateStreamDetails: z.coerce.boolean().default(false), // Update existing records with stream/transcode data
 });
 
 /**
