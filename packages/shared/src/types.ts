@@ -1,6 +1,8 @@
 /**
  * Core type definitions for Tracearr
  */
+import type { webhookFormatSchema } from './schemas.js';
+import { type z } from 'zod';
 
 // User role - combined permission level and account status
 // Can log in: owner, admin, viewer
@@ -583,7 +585,7 @@ export interface ServerResourceStats {
 }
 
 // Webhook format types
-export type WebhookFormat = 'json' | 'ntfy' | 'apprise';
+export type WebhookFormat = z.infer<typeof webhookFormatSchema>;
 
 // Unit system for display preferences (stored in settings)
 export type UnitSystem = 'metric' | 'imperial';
@@ -593,11 +595,14 @@ export interface Settings {
   allowGuestAccess: boolean;
   // Display preferences
   unitSystem: UnitSystem;
+  // Notifications settings
   discordWebhookUrl: string | null;
   customWebhookUrl: string | null;
   webhookFormat: WebhookFormat | null;
   ntfyTopic: string | null;
   ntfyAuthToken: string | null;
+  pushoverApiToken: string | null;
+  pushoverUserKey: string | null;
   // Poller settings
   pollerEnabled: boolean;
   pollerIntervalMs: number;

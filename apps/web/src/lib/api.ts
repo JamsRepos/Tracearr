@@ -38,6 +38,7 @@ import type {
   EngagementStats,
   ShowStatsResponse,
   MediaType,
+  WebhookFormat,
   // New analytics types
   DeviceCompatibilityResponse,
   DeviceCompatibilityMatrix,
@@ -847,9 +848,11 @@ class ApiClient {
     testWebhook: (data: {
       type: 'discord' | 'custom';
       url?: string;
-      format?: 'json' | 'ntfy' | 'apprise';
+      format?: WebhookFormat;
       ntfyTopic?: string;
       ntfyAuthToken?: string;
+      pushoverUserKey?: string;
+      pushoverApiToken?: string;
     }) =>
       this.request<{ success: boolean; error?: string }>('/settings/test-webhook', {
         method: 'POST',

@@ -77,6 +77,7 @@ import type {
   JellystatImportProgress,
   MobileSession,
   MobileQRPayload,
+  WebhookFormat,
 } from '@tracearr/shared';
 import {
   useSettings,
@@ -1047,8 +1048,16 @@ function NotificationSettings() {
   const webhookFormatField = useDebouncedSave('webhookFormat', settings?.webhookFormat);
   const ntfyTopicField = useDebouncedSave('ntfyTopic', settings?.ntfyTopic);
   const ntfyAuthTokenField = useDebouncedSave('ntfyAuthToken', settings?.ntfyAuthToken);
+  const pushoverUserKeyField = useDebouncedSave('pushoverUserKey', settings?.pushoverUserKey);
+  const pushoverApiTokenField = useDebouncedSave('pushoverApiToken', settings?.pushoverApiToken);
 
   const webhookFormat = (webhookFormatField.value as string) ?? 'json';
+
+  useEffect(() => {
+    if (webhookFormat === 'pushover') {
+      customWebhookField.setValue('https://api.pushover.net/1/messages.json');
+    }
+  }, [webhookFormat, customWebhookField]);
 
   const handleTestDiscord = async () => {
     setTestingDiscord(true);
@@ -1073,9 +1082,11 @@ function NotificationSettings() {
     try {
       const result = await api.settings.testWebhook({
         type: 'custom',
-        format: webhookFormat as 'json' | 'ntfy' | 'apprise',
+        format: webhookFormat as WebhookFormat,
         ntfyTopic: (ntfyTopicField.value as string) || undefined,
         ntfyAuthToken: (ntfyAuthTokenField.value as string) || undefined,
+        pushoverUserKey: (pushoverUserKeyField.value as string) || undefined,
+        pushoverApiToken: (pushoverApiTokenField.value as string) || undefined,
       });
       if (result.success) {
         toast.success('Test Successful', { description: 'Custom webhook is working correctly' });
@@ -1179,7 +1190,9 @@ function NotificationSettings() {
                   ? 'https://ntfy.sh/'
                   : webhookFormat === 'apprise'
                     ? 'http://apprise:8000/notify/myconfig'
-                    : 'https://your-service.com/webhook'
+                    : webhookFormat === 'pushover'
+                      ? 'https://api.pushover.net/1/messages.json'
+                      : 'https://your-service.com/webhook'
               }
               value={(customWebhookField.value as string) ?? ''}
               onChange={(v) => customWebhookField.setValue(v)}
@@ -1195,11 +1208,12 @@ function NotificationSettings() {
               label="Webhook Format"
               description="Choose the payload format for your webhook endpoint"
               value={webhookFormat}
-              onChange={(v) => webhookFormatField.setValue(v as 'json' | 'ntfy' | 'apprise')}
+              onChange={(v) => webhookFormatField.setValue(v as WebhookFormat)}
               options={[
                 { value: 'json', label: 'Raw JSON (default)' },
                 { value: 'ntfy', label: 'Ntfy' },
                 { value: 'apprise', label: 'Apprise' },
+                { value: 'pushover', label: 'Pushover' },
               ]}
               status={webhookFormatField.status}
               errorMessage={webhookFormatField.errorMessage}
@@ -1235,6 +1249,37 @@ function NotificationSettings() {
                   errorMessage={ntfyAuthTokenField.errorMessage}
                   onRetry={ntfyAuthTokenField.retry}
                   onReset={ntfyAuthTokenField.reset}
+                />
+              </>
+            )}
+
+            {/* Pushover-specific fields */}
+            {webhookFormat === 'pushover' && (
+              <>
+                <AutosaveTextField
+                  id="pushoverUserKey"
+                  label="Pushover User Key"
+                  description="Your Pushover user key"
+                  placeholder="Enter user key"
+                  value={(pushoverUserKeyField.value as string) ?? ''}
+                  onChange={(v) => pushoverUserKeyField.setValue(v)}
+                  status={pushoverUserKeyField.status}
+                  errorMessage={pushoverUserKeyField.errorMessage}
+                  onRetry={pushoverUserKeyField.retry}
+                  onReset={pushoverUserKeyField.reset}
+                />
+                <AutosaveSecretField
+                  id="pushoverApiToken"
+                  label="Pushover API Token"
+                  description="Your Pushover application API token"
+                  placeholder="Enter API token"
+                  value={(pushoverApiTokenField.value as string) ?? ''}
+                  onChange={(v) => pushoverApiTokenField.setValue(v)}
+                  isMasked={!!settings?.pushoverApiToken && !pushoverApiTokenField.value}
+                  status={pushoverApiTokenField.status}
+                  errorMessage={pushoverApiTokenField.errorMessage}
+                  onRetry={pushoverApiTokenField.retry}
+                  onReset={pushoverApiTokenField.reset}
                 />
               </>
             )}

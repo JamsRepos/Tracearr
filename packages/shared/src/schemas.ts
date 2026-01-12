@@ -344,7 +344,7 @@ export const locationStatsQuerySchema = z
 // ============================================================================
 
 // Webhook format enum
-export const webhookFormatSchema = z.enum(['json', 'ntfy', 'apprise']);
+export const webhookFormatSchema = z.enum(['json', 'ntfy', 'apprise', 'pushover']);
 
 // Unit system enum for display preferences
 export const unitSystemSchema = z.enum(['metric', 'imperial']);
@@ -369,6 +369,8 @@ export const updateSettingsSchema = z.object({
   webhookFormat: webhookFormatSchema.nullable().optional(),
   ntfyTopic: z.string().max(200).nullable().optional(),
   ntfyAuthToken: nullableStringSchema(500).optional(),
+  pushoverUserKey: nullableStringSchema(200).optional(),
+  pushoverApiToken: nullableStringSchema(200).optional(),
   // Poller settings
   pollerEnabled: z.boolean().optional(),
   pollerIntervalMs: z.number().int().min(5000).max(300000).optional(),
