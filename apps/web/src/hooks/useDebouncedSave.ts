@@ -12,8 +12,8 @@ interface UseDebouncedSaveOptions {
 
 /**
  * Hook for debounced auto-saving of settings fields.
- * Saves automatically after the specified delay (default 1s) of inactivity.
- * Shows toast notifications for saved/error states.
+ * Saves automatically after the specified delay (default 500ms) of inactivity.
+ * Preserves user input on error - does not reset to server value.
  */
 export function useDebouncedSave<K extends keyof Settings>(
   key: K,
@@ -24,21 +24,56 @@ export function useDebouncedSave<K extends keyof Settings>(
 
   const [value, setValue] = useState<Settings[K] | undefined>(serverValue);
   const [status, setStatus] = useState<SaveStatus>('idle');
-  const updateSettings = useUpdateSettings();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const updateSettings = useUpdateSettings({ silent: true });
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<Settings[K] | undefined>(serverValue);
+  const hasErrorRef = useRef(false);
+  const userHasEditedRef = useRef(false);
+
+  const performSave = useCallback(
+    (valueToSave: Settings[K] | undefined) => {
+      setStatus('saving');
+      updateSettings.mutate({ [key]: valueToSave ?? null } as Partial<Settings>, {
+        onSuccess: () => {
+          lastSavedRef.current = valueToSave;
+          hasErrorRef.current = false;
+          setErrorMessage(null);
+          setStatus('saved');
+          onSaved?.();
+          if (statusTimeoutRef.current) {
+            clearTimeout(statusTimeoutRef.current);
+          }
+          statusTimeoutRef.current = setTimeout(() => setStatus('idle'), 2000);
+        },
+        onError: (err) => {
+          hasErrorRef.current = true;
+          setErrorMessage(err.message || 'Failed to save');
+          setStatus('error');
+          onError?.(err);
+        },
+      });
+    },
+    [key, updateSettings, onSaved, onError]
+  );
 
   // Sync with server value when it changes externally
   useEffect(() => {
-    setValue(serverValue);
-    lastSavedRef.current = serverValue;
-  }, [serverValue]);
+    if (!hasErrorRef.current && status !== 'saving') {
+      setValue(serverValue);
+      lastSavedRef.current = serverValue;
+    }
+  }, [serverValue, status]);
 
-  // Cleanup timeout on unmount
+  // Cleanup all timeouts on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+      }
+      if (statusTimeoutRef.current) {
+        clearTimeout(statusTimeoutRef.current);
       }
     };
   }, []);
@@ -50,26 +85,29 @@ export function useDebouncedSave<K extends keyof Settings>(
       return;
     }
 
+    if (!userHasEditedRef.current) {
+      lastSavedRef.current = value;
+      return;
+    }
+
+    if (status === 'saving') {
+      return;
+    }
+
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
+    if (hasErrorRef.current) {
+      hasErrorRef.current = false;
+      setErrorMessage(null);
+    }
+
     setStatus('saving');
 
     timeoutRef.current = setTimeout(() => {
-      updateSettings.mutate({ [key]: value ?? null } as Partial<Settings>, {
-        onSuccess: () => {
-          lastSavedRef.current = value;
-          setStatus('saved');
-          onSaved?.();
-          setTimeout(() => setStatus('idle'), 2000);
-        },
-        onError: (err) => {
-          setStatus('error');
-          onError?.(err);
-        },
-      });
+      performSave(value);
     }, delay);
 
     return () => {
@@ -77,35 +115,49 @@ export function useDebouncedSave<K extends keyof Settings>(
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [value, key, delay, updateSettings, onSaved, onError]);
+  }, [value, delay, performSave, status]);
+
+  const setValueWithTracking = useCallback((newValue: Settings[K] | undefined) => {
+    userHasEditedRef.current = true;
+    setValue(newValue);
+  }, []);
 
   // Force immediate save (useful for programmatic changes like "Detect" button)
   const saveNow = useCallback(() => {
+    // Prevent concurrent saves
+    if (status === 'saving') {
+      return;
+    }
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
+    userHasEditedRef.current = true;
     if (value !== lastSavedRef.current) {
-      setStatus('saving');
-      updateSettings.mutate({ [key]: value ?? null } as Partial<Settings>, {
-        onSuccess: () => {
-          lastSavedRef.current = value;
-          setStatus('saved');
-          onSaved?.();
-          setTimeout(() => setStatus('idle'), 2000);
-        },
-        onError: (err) => {
-          setStatus('error');
-          onError?.(err);
-        },
-      });
+      performSave(value);
     }
-  }, [value, key, updateSettings, onSaved, onError]);
+  }, [value, performSave, status]);
+
+  const reset = useCallback(() => {
+    hasErrorRef.current = false;
+    setErrorMessage(null);
+    setValue(serverValue);
+    setStatus('idle');
+  }, [serverValue]);
+
+  const retry = useCallback(() => {
+    saveNow();
+  }, [saveNow]);
 
   return {
     value: value ?? ('' as Settings[K]),
-    setValue,
+    setValue: setValueWithTracking,
     status,
+    errorMessage,
     saveNow,
+    reset,
+    retry,
     isDirty: value !== lastSavedRef.current,
+    hasError: hasErrorRef.current,
   };
 }

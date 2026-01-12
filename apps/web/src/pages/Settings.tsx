@@ -5,9 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Field, FieldGroup, FieldLabel, FieldDescription, FieldError } from '@/components/ui/field';
+import {
+  AutosaveTextField,
+  AutosaveSecretField,
+  AutosaveNumberField,
+  AutosaveSelectField,
+  AutosaveSwitchField,
+  SaveStatusIndicator,
+} from '@/components/ui/autosave-field';
 import {
   Dialog,
   DialogContent,
@@ -65,7 +73,6 @@ import { ImportProgressCard, FileDropzone, type ImportProgressData } from '@/com
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import type {
   Server,
-  Settings as SettingsType,
   TautulliImportProgress,
   JellystatImportProgress,
   MobileSession,
@@ -123,22 +130,17 @@ function SettingsNav() {
 
 function GeneralSettings() {
   const { data: settings, isLoading } = useSettings();
-  const updateSettings = useUpdateSettings();
 
+  const unitSystemField = useDebouncedSave('unitSystem', settings?.unitSystem);
+  const pollerEnabledField = useDebouncedSave('pollerEnabled', settings?.pollerEnabled);
   const pollerIntervalField = useDebouncedSave('pollerIntervalMs', settings?.pollerIntervalMs);
+  const usePlexGeoipField = useDebouncedSave('usePlexGeoip', settings?.usePlexGeoip);
+
   const intervalSeconds = Math.round((pollerIntervalField.value ?? 15000) / 1000);
 
   const handleIntervalChange = (seconds: number) => {
     const clamped = Math.max(5, Math.min(300, seconds));
     pollerIntervalField.setValue(clamped * 1000);
-  };
-
-  const handleTogglePoller = (enabled: boolean) => {
-    updateSettings.mutate({ pollerEnabled: enabled });
-  };
-
-  const handleUnitSystemChange = (value: 'metric' | 'imperial') => {
-    updateSettings.mutate({ unitSystem: value });
   };
 
   if (isLoading) {
@@ -162,81 +164,75 @@ function GeneralSettings() {
         <CardTitle>General Settings</CardTitle>
         <CardDescription>Configure basic application settings</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label className="text-base">Unit System</Label>
-          <p className="text-muted-foreground text-sm">
-            Choose how distances and speeds are displayed
-          </p>
-          <Select value={settings?.unitSystem ?? 'metric'} onValueChange={handleUnitSystemChange}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="metric">Metric (km, km/h)</SelectItem>
-              <SelectItem value="imperial">Imperial (mi, mph)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-base">Session Sync</Label>
-            <p className="text-muted-foreground text-sm">
-              Enable session tracking for your media servers
-            </p>
-          </div>
-          <Switch checked={settings?.pollerEnabled ?? true} onCheckedChange={handleTogglePoller} />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-base">Sync Interval</Label>
-            <p className="text-muted-foreground text-sm">
-              Polling frequency for Jellyfin/Emby (5-300 seconds)
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={5}
-              max={300}
-              className="w-20"
-              value={intervalSeconds}
-              onChange={(e) => handleIntervalChange(parseInt(e.target.value, 10) || 15)}
-              disabled={!settings?.pollerEnabled}
-            />
-            <span className="text-muted-foreground text-sm">sec</span>
-          </div>
-        </div>
-
-        <div className="bg-muted/50 space-y-2 rounded-lg p-4">
-          <p className="text-muted-foreground text-sm">
-            <strong>Plex:</strong> Uses real-time updates via SSE. Polling is only used as a
-            fallback if the connection fails.
-          </p>
-          <p className="text-muted-foreground text-sm">
-            <strong>Jellyfin/Emby:</strong> Uses the sync interval above for session detection.
-            Lower values provide faster updates but increase server load.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-base">Enhanced GeoIP Lookup</Label>
-            <p className="text-muted-foreground text-sm">
-              Use Plex&apos;s GeoIP service for more accurate location data
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              When enabled, IP addresses are sent to plex.tv for lookup. Local MaxMind database is
-              used as fallback.
-            </p>
-          </div>
-          <Switch
-            checked={settings?.usePlexGeoip ?? false}
-            onCheckedChange={(checked) => updateSettings.mutate({ usePlexGeoip: checked })}
+      <CardContent>
+        <FieldGroup>
+          <AutosaveSelectField
+            id="unitSystem"
+            label="Unit System"
+            description="Choose how distances and speeds are displayed"
+            value={(unitSystemField.value as string) ?? 'metric'}
+            onChange={(v) => unitSystemField.setValue(v as 'metric' | 'imperial')}
+            options={[
+              { value: 'metric', label: 'Metric (km, km/h)' },
+              { value: 'imperial', label: 'Imperial (mi, mph)' },
+            ]}
+            status={unitSystemField.status}
+            errorMessage={unitSystemField.errorMessage}
+            onRetry={unitSystemField.retry}
+            onReset={unitSystemField.reset}
           />
-        </div>
+
+          <AutosaveSwitchField
+            id="pollerEnabled"
+            label="Session Sync"
+            description="Enable session tracking for your media servers"
+            checked={pollerEnabledField.value ?? true}
+            onChange={(v) => pollerEnabledField.setValue(v)}
+            status={pollerEnabledField.status}
+            errorMessage={pollerEnabledField.errorMessage}
+            onRetry={pollerEnabledField.retry}
+            onReset={pollerEnabledField.reset}
+          />
+
+          <AutosaveNumberField
+            id="pollerIntervalMs"
+            label="Sync Interval"
+            description="Polling frequency for Jellyfin/Emby (5-300 seconds)"
+            value={intervalSeconds}
+            onChange={handleIntervalChange}
+            min={5}
+            max={300}
+            suffix="sec"
+            disabled={!(pollerEnabledField.value ?? true)}
+            status={pollerIntervalField.status}
+            errorMessage={pollerIntervalField.errorMessage}
+            onRetry={pollerIntervalField.retry}
+            onReset={pollerIntervalField.reset}
+          />
+
+          <div className="bg-muted/50 space-y-2 rounded-lg p-4">
+            <p className="text-muted-foreground text-sm">
+              <strong>Plex:</strong> Uses real-time updates via SSE. Polling is only used as a
+              fallback if the connection fails.
+            </p>
+            <p className="text-muted-foreground text-sm">
+              <strong>Jellyfin/Emby:</strong> Uses the sync interval above for session detection.
+              Lower values provide faster updates but increase server load.
+            </p>
+          </div>
+
+          <AutosaveSwitchField
+            id="usePlexGeoip"
+            label="Enhanced GeoIP Lookup"
+            description="Use Plex's GeoIP service for more accurate location data. When enabled, IP addresses are sent to plex.tv for lookup. Local MaxMind database is used as fallback."
+            checked={usePlexGeoipField.value ?? false}
+            onChange={(v) => usePlexGeoipField.setValue(v)}
+            status={usePlexGeoipField.status}
+            errorMessage={usePlexGeoipField.errorMessage}
+            onRetry={usePlexGeoipField.retry}
+            onReset={usePlexGeoipField.reset}
+          />
+        </FieldGroup>
       </CardContent>
     </Card>
   );
@@ -1042,23 +1038,17 @@ function ServerCard({
 
 function NotificationSettings() {
   const { data: settings, isLoading } = useSettings();
-  const updateSettings = useUpdateSettings();
-  const [webhookFormat, setWebhookFormat] = useState<string>('json');
   const [testingDiscord, setTestingDiscord] = useState(false);
   const [testingCustom, setTestingCustom] = useState(false);
 
-  // Debounced save for text fields
+  // Debounced save for all fields
   const discordWebhookField = useDebouncedSave('discordWebhookUrl', settings?.discordWebhookUrl);
   const customWebhookField = useDebouncedSave('customWebhookUrl', settings?.customWebhookUrl);
+  const webhookFormatField = useDebouncedSave('webhookFormat', settings?.webhookFormat);
   const ntfyTopicField = useDebouncedSave('ntfyTopic', settings?.ntfyTopic);
   const ntfyAuthTokenField = useDebouncedSave('ntfyAuthToken', settings?.ntfyAuthToken);
 
-  // Sync webhook format with settings
-  useEffect(() => {
-    if (settings) {
-      setWebhookFormat(settings.webhookFormat ?? 'json');
-    }
-  }, [settings]);
+  const webhookFormat = (webhookFormatField.value as string) ?? 'json';
 
   const handleTestDiscord = async () => {
     setTestingDiscord(true);
@@ -1084,8 +1074,8 @@ function NotificationSettings() {
       const result = await api.settings.testWebhook({
         type: 'custom',
         format: webhookFormat as 'json' | 'ntfy' | 'apprise',
-        ntfyTopic: ntfyTopicField.value || undefined,
-        ntfyAuthToken: ntfyAuthTokenField.value || undefined,
+        ntfyTopic: (ntfyTopicField.value as string) || undefined,
+        ntfyAuthToken: (ntfyAuthTokenField.value as string) || undefined,
       });
       if (result.success) {
         toast.success('Test Successful', { description: 'Custom webhook is working correctly' });
@@ -1099,11 +1089,6 @@ function NotificationSettings() {
     } finally {
       setTestingCustom(false);
     }
-  };
-
-  const handleWebhookFormatChange = (value: string) => {
-    setWebhookFormat(value);
-    updateSettings.mutate({ webhookFormat: value as 'json' | 'ntfy' | 'apprise' });
   };
 
   if (isLoading) {
@@ -1147,117 +1132,132 @@ function NotificationSettings() {
           <CardTitle>Webhook Configuration</CardTitle>
           <CardDescription>Configure webhook URLs for notifications</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="discordWebhook">Discord Webhook URL</Label>
-            <div className="flex gap-2">
-              <Input
-                id="discordWebhook"
+        <CardContent>
+          <FieldGroup>
+            {/* Discord Webhook - with Test button */}
+            <div className="space-y-2">
+              <AutosaveTextField
+                id="discordWebhookUrl"
+                label="Discord Webhook URL"
+                description="Paste your Discord webhook URL to receive notifications in a Discord channel"
+                type="url"
                 placeholder="https://discord.com/api/webhooks/..."
-                value={discordWebhookField.value ?? ''}
-                onChange={(e) => discordWebhookField.setValue(e.target.value)}
+                value={(discordWebhookField.value as string) ?? ''}
+                onChange={(v) => discordWebhookField.setValue(v)}
+                status={discordWebhookField.status}
+                errorMessage={discordWebhookField.errorMessage}
+                onRetry={discordWebhookField.retry}
+                onReset={discordWebhookField.reset}
               />
-              <Button
-                variant="outline"
-                onClick={handleTestDiscord}
-                disabled={!discordWebhookField.value || testingDiscord}
-              >
-                {testingDiscord ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test'}
-              </Button>
+              {discordWebhookField.value && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestDiscord}
+                  disabled={testingDiscord}
+                >
+                  {testingDiscord ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {testingDiscord ? 'Testing...' : 'Test Discord'}
+                </Button>
+              )}
             </div>
-            <p className="text-muted-foreground text-xs">
-              Paste your Discord webhook URL to receive notifications in a Discord channel
-            </p>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customWebhook">Custom Webhook URL</Label>
-            <Input
-              id="customWebhook"
+            {/* Custom Webhook URL */}
+            <AutosaveTextField
+              id="customWebhookUrl"
+              label="Custom Webhook URL"
+              description={
+                webhookFormat === 'ntfy'
+                  ? 'Post to your ntfy server root URL (topic is specified separately below)'
+                  : webhookFormat === 'apprise'
+                    ? 'Post to your Apprise API endpoint with notification configuration'
+                    : 'Send notifications to a custom endpoint via POST request'
+              }
+              type="url"
               placeholder={
                 webhookFormat === 'ntfy'
-                  ? 'https://ntfy.sh/ (or your self-hosted ntfy server)'
+                  ? 'https://ntfy.sh/'
                   : webhookFormat === 'apprise'
                     ? 'http://apprise:8000/notify/myconfig'
                     : 'https://your-service.com/webhook'
               }
-              value={customWebhookField.value ?? ''}
-              onChange={(e) => customWebhookField.setValue(e.target.value)}
+              value={(customWebhookField.value as string) ?? ''}
+              onChange={(v) => customWebhookField.setValue(v)}
+              status={customWebhookField.status}
+              errorMessage={customWebhookField.errorMessage}
+              onRetry={customWebhookField.retry}
+              onReset={customWebhookField.reset}
             />
-            <p className="text-muted-foreground text-xs">
-              {webhookFormat === 'ntfy'
-                ? 'Post to your ntfy server root URL (topic is specified separately below)'
-                : webhookFormat === 'apprise'
-                  ? 'Post to your Apprise API endpoint with notification configuration'
-                  : 'Send notifications to a custom endpoint via POST request'}
-            </p>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="webhookFormat">Webhook Format</Label>
-            <Select value={webhookFormat} onValueChange={handleWebhookFormatChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="json">Raw JSON (default)</SelectItem>
-                <SelectItem value="ntfy">Ntfy</SelectItem>
-                <SelectItem value="apprise">Apprise</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">
-              Choose the payload format for your webhook endpoint
-            </p>
-          </div>
+            {/* Webhook Format */}
+            <AutosaveSelectField
+              id="webhookFormat"
+              label="Webhook Format"
+              description="Choose the payload format for your webhook endpoint"
+              value={webhookFormat}
+              onChange={(v) => webhookFormatField.setValue(v as 'json' | 'ntfy' | 'apprise')}
+              options={[
+                { value: 'json', label: 'Raw JSON (default)' },
+                { value: 'ntfy', label: 'Ntfy' },
+                { value: 'apprise', label: 'Apprise' },
+              ]}
+              status={webhookFormatField.status}
+              errorMessage={webhookFormatField.errorMessage}
+              onRetry={webhookFormatField.retry}
+              onReset={webhookFormatField.reset}
+            />
 
-          {webhookFormat === 'ntfy' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="ntfyTopic">Ntfy Topic</Label>
-                <Input
+            {/* Ntfy-specific fields */}
+            {webhookFormat === 'ntfy' && (
+              <>
+                <AutosaveTextField
                   id="ntfyTopic"
+                  label="Ntfy Topic"
+                  description="The ntfy topic to publish notifications to"
                   placeholder="tracearr"
-                  value={ntfyTopicField.value ?? ''}
-                  onChange={(e) => ntfyTopicField.setValue(e.target.value)}
+                  value={(ntfyTopicField.value as string) ?? ''}
+                  onChange={(v) => ntfyTopicField.setValue(v)}
+                  status={ntfyTopicField.status}
+                  errorMessage={ntfyTopicField.errorMessage}
+                  onRetry={ntfyTopicField.retry}
+                  onReset={ntfyTopicField.reset}
                 />
-                <p className="text-muted-foreground text-xs">
-                  The ntfy topic to publish notifications to
-                </p>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ntfyAuthToken">Ntfy Auth Token (Optional)</Label>
-                <Input
+                <AutosaveSecretField
                   id="ntfyAuthToken"
-                  type="password"
-                  placeholder={settings?.ntfyAuthToken ? '••••••••' : 'Enter auth token'}
-                  value={ntfyAuthTokenField.value ?? ''}
-                  onChange={(e) => ntfyAuthTokenField.setValue(e.target.value)}
+                  label="Ntfy Auth Token (Optional)"
+                  description="Required if your ntfy server uses access control. Leave empty for public topics."
+                  placeholder="Enter auth token"
+                  value={(ntfyAuthTokenField.value as string) ?? ''}
+                  onChange={(v) => ntfyAuthTokenField.setValue(v)}
+                  isMasked={!!settings?.ntfyAuthToken && !ntfyAuthTokenField.value}
+                  status={ntfyAuthTokenField.status}
+                  errorMessage={ntfyAuthTokenField.errorMessage}
+                  onRetry={ntfyAuthTokenField.retry}
+                  onReset={ntfyAuthTokenField.reset}
                 />
-                <p className="text-muted-foreground text-xs">
-                  Required if your ntfy server uses access control. Leave empty for public topics.
-                </p>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {customWebhookField.value && (
-            <Button
-              variant="outline"
-              onClick={handleTestCustom}
-              disabled={testingCustom}
-              className="w-full"
-            >
-              {testingCustom ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                'Test Custom Webhook'
-              )}
-            </Button>
-          )}
+            {/* Test Custom Webhook button */}
+            {customWebhookField.value && (
+              <Button
+                variant="outline"
+                onClick={handleTestCustom}
+                disabled={testingCustom}
+                className="w-full"
+              >
+                {testingCustom ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  'Test Custom Webhook'
+                )}
+              </Button>
+            )}
+          </FieldGroup>
         </CardContent>
       </Card>
     </div>
@@ -1265,12 +1265,22 @@ function NotificationSettings() {
 }
 
 function AccessSettings() {
-  const { data: settings, isLoading } = useSettings();
-  const updateSettings = useUpdateSettings();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
+  const { data: serversData, isLoading: serversLoading } = useServers();
+  const { user } = useAuth();
 
-  const handleToggle = (key: keyof SettingsType, value: boolean) => {
-    updateSettings.mutate({ [key]: value });
-  };
+  const allowGuestAccessField = useDebouncedSave('allowGuestAccess', settings?.allowGuestAccess);
+  const primaryAuthMethodField = useDebouncedSave('primaryAuthMethod', settings?.primaryAuthMethod);
+
+  const isLoading = settingsLoading || serversLoading;
+  // Handle both array and wrapped response formats
+  const servers = Array.isArray(serversData)
+    ? serversData
+    : ((serversData as unknown as { data?: Server[] })?.data ?? []);
+  const hasJellyfinServer = servers.some((s) => s.type === 'jellyfin');
+  const hasLocalCredentials = user?.hasPassword ?? false;
+
+  const showAuthMethodSelector = hasLocalCredentials && hasJellyfinServer;
 
   if (isLoading) {
     return (
@@ -1295,51 +1305,84 @@ function AccessSettings() {
         <CardDescription>Configure who can access Tracearr</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-base">Allow Guest Access</Label>
-            <p className="text-muted-foreground text-sm">
-              When disabled, only the server owner can log in to Tracearr
-            </p>
-          </div>
-          <Switch
-            checked={settings?.allowGuestAccess ?? false}
-            onCheckedChange={(checked) => {
-              handleToggle('allowGuestAccess', checked);
-            }}
+        <FieldGroup>
+          <AutosaveSwitchField
+            id="allowGuestAccess"
+            label="Allow Guest Access"
+            description="When disabled, only the server owner can log in to Tracearr"
+            checked={allowGuestAccessField.value ?? false}
+            onChange={allowGuestAccessField.setValue}
+            status={allowGuestAccessField.status}
+            errorMessage={allowGuestAccessField.errorMessage}
+            onRetry={allowGuestAccessField.retry}
+            onReset={allowGuestAccessField.reset}
           />
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-base">Primary Authentication Method</Label>
-          <p className="text-muted-foreground text-sm">
-            Choose which authentication method is shown by default on the login page
-          </p>
-          <Select
-            value={settings?.primaryAuthMethod ?? 'local'}
-            onValueChange={(value: 'jellyfin' | 'local') => {
-              updateSettings.mutate({ primaryAuthMethod: value });
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="local">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4" />
-                  <span>Local Account</span>
+          {showAuthMethodSelector && (
+            <Field>
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="primaryAuthMethod">Primary Authentication Method</FieldLabel>
+                <SaveStatusIndicator status={primaryAuthMethodField.status} />
+              </div>
+              <Select
+                value={primaryAuthMethodField.value ?? 'local'}
+                onValueChange={(value: 'jellyfin' | 'local') => {
+                  primaryAuthMethodField.setValue(value);
+                }}
+              >
+                <SelectTrigger
+                  id="primaryAuthMethod"
+                  className="w-full"
+                  aria-invalid={primaryAuthMethodField.status === 'error'}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4" />
+                      <span>Local Account</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="jellyfin">
+                    <div className="flex items-center gap-2">
+                      <MediaServerIcon type="jellyfin" className="h-4 w-4" />
+                      <span>Jellyfin Admin</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Choose which authentication method is shown by default on the login page
+              </FieldDescription>
+              {primaryAuthMethodField.status === 'error' && primaryAuthMethodField.errorMessage && (
+                <div className="flex items-center justify-between">
+                  <FieldError>{primaryAuthMethodField.errorMessage}</FieldError>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={primaryAuthMethodField.retry}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Retry
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={primaryAuthMethodField.reset}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Reset
+                    </Button>
+                  </div>
                 </div>
-              </SelectItem>
-              <SelectItem value="jellyfin">
-                <div className="flex items-center gap-2">
-                  <MediaServerIcon type="jellyfin" className="h-4 w-4" />
-                  <span>Jellyfin Admin</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+              )}
+            </Field>
+          )}
+        </FieldGroup>
 
         <div className="bg-muted/50 rounded-lg p-4">
           <p className="text-muted-foreground text-sm">
@@ -1354,14 +1397,9 @@ function AccessSettings() {
 
 function NetworkSettings() {
   const { data: settings, isLoading } = useSettings();
-  const updateSettings = useUpdateSettings();
 
   const externalUrlField = useDebouncedSave('externalUrl', settings?.externalUrl);
   const basePathField = useDebouncedSave('basePath', settings?.basePath);
-
-  const handleToggleTrustProxy = (enabled: boolean) => {
-    updateSettings.mutate({ trustProxy: enabled });
-  };
 
   const handleDetectUrl = () => {
     let detectedUrl = window.location.origin;
@@ -1403,96 +1441,89 @@ function NetworkSettings() {
             Configure how external devices (like mobile apps) connect to your server
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="externalUrl">External URL</Label>
-            <div className="flex gap-2">
-              <Input
-                id="externalUrl"
-                placeholder="https://tracearr.example.com"
-                value={externalUrlField.value ?? ''}
-                onChange={(e) => externalUrlField.setValue(e.target.value)}
-              />
-              <Button variant="outline" onClick={handleDetectUrl}>
-                Detect
-              </Button>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              The URL that external devices should use to reach this server. Used for QR codes and
-              mobile app pairing.
-            </p>
-            {isLocalhost && (
-              <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 p-3 text-sm text-yellow-600">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>
-                  Localhost URLs only work when your phone is on the same machine. Use your local IP
-                  (e.g., http://192.168.1.x:3000) for LAN access, or set up a domain for remote
-                  access.
-                </span>
+        <CardContent>
+          <FieldGroup>
+            <Field>
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="externalUrl">External URL</FieldLabel>
+                <SaveStatusIndicator status={externalUrlField.status} />
               </div>
-            )}
-            {isHttp && (
-              <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 p-3 text-sm text-yellow-600">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>
-                  iOS requires HTTPS for non-local connections. HTTP will work on local networks but
-                  may fail for Tailscale or remote access. Consider using HTTPS with a reverse
-                  proxy.
-                </span>
+              <div className="flex gap-2">
+                <Input
+                  id="externalUrl"
+                  placeholder="https://tracearr.example.com"
+                  value={externalUrlField.value ?? ''}
+                  onChange={(e) => externalUrlField.setValue(e.target.value)}
+                  aria-invalid={externalUrlField.status === 'error'}
+                />
+                <Button variant="outline" onClick={handleDetectUrl}>
+                  Detect
+                </Button>
               </div>
-            )}
-          </div>
+              <FieldDescription>
+                The URL that external devices should use to reach this server. Used for QR codes and
+                mobile app pairing.
+              </FieldDescription>
+              {externalUrlField.status === 'error' && externalUrlField.errorMessage && (
+                <div className="flex items-center justify-between">
+                  <FieldError>{externalUrlField.errorMessage}</FieldError>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={externalUrlField.retry}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Retry
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={externalUrlField.reset}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {isLocalhost && (
+                <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 p-3 text-sm text-yellow-600">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    Localhost URLs only work when your phone is on the same machine. Use your local
+                    IP (e.g., http://192.168.1.x:3000) for LAN access, or set up a domain for remote
+                    access.
+                  </span>
+                </div>
+              )}
+              {isHttp && (
+                <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 p-3 text-sm text-yellow-600">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    iOS requires HTTPS for non-local connections. HTTP will work on local networks
+                    but may fail for Tailscale or remote access. Consider using HTTPS with a reverse
+                    proxy.
+                  </span>
+                </div>
+              )}
+            </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="basePath">Base Path</Label>
-            <Input
+            <AutosaveTextField
               id="basePath"
+              label="Base Path"
+              description="Only needed if running behind a reverse proxy with a path prefix (e.g., example.com/tracearr). Leave empty for root-level deployments."
               placeholder="/tracearr"
               value={basePathField.value ?? ''}
-              onChange={(e) => basePathField.setValue(e.target.value)}
+              onChange={basePathField.setValue}
+              status={basePathField.status}
+              errorMessage={basePathField.errorMessage}
+              onRetry={basePathField.retry}
+              onReset={basePathField.reset}
             />
-            <p className="text-muted-foreground text-xs">
-              Only needed if running behind a reverse proxy with a path prefix (e.g.,
-              example.com/tracearr). Leave empty for root-level deployments.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Reverse Proxy</CardTitle>
-          <CardDescription>
-            Settings for deployments behind nginx, Caddy, Traefik, or Cloudflare Tunnel
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-base">Trust Proxy Headers</Label>
-              <p className="text-muted-foreground text-sm">
-                Trust X-Forwarded-For and X-Forwarded-Proto headers from your reverse proxy
-              </p>
-            </div>
-            <Switch
-              checked={settings?.trustProxy ?? false}
-              onCheckedChange={handleToggleTrustProxy}
-            />
-          </div>
-
-          <div className="bg-muted/50 space-y-2 rounded-lg p-4">
-            <p className="text-muted-foreground text-sm">
-              <strong>When to enable:</strong> If you're running Tracearr behind a reverse proxy
-              (nginx, Caddy, Traefik, Cloudflare Tunnel), enable this so the server knows the real
-              client IP and protocol.
-            </p>
-            {settings?.trustProxy && (
-              <p className="text-sm text-yellow-600">
-                <strong>Note:</strong> After changing this setting, you need to set the
-                TRUST_PROXY=true environment variable and restart the server for it to take effect.
-              </p>
-            )}
-          </div>
+          </FieldGroup>
         </CardContent>
       </Card>
 
@@ -1677,6 +1708,21 @@ function MobileSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {!settings?.externalUrl && (
+            <div className="flex items-start gap-2 rounded-lg bg-blue-500/10 p-3 text-sm text-blue-600 dark:text-blue-400">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Using a reverse proxy or accessing remotely? Set your{' '}
+                <NavLink
+                  to="/settings/network"
+                  className="font-medium underline underline-offset-2"
+                >
+                  External URL
+                </NavLink>{' '}
+                so the mobile app can connect to your server.
+              </span>
+            </div>
+          )}
           {!config?.isEnabled ? (
             <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8">
               <div className="bg-muted rounded-full p-4">
