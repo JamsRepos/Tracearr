@@ -122,7 +122,8 @@ body:
       Paste any relevant error messages or logs. Set `LOG_LEVEL=debug` for more detail.
 
       **Standard Docker:** `docker logs tracearr`
-      **Supervised Docker:** `docker exec tracearr cat /var/log/supervisor/tracearr-error.log`
+      **Supervised Docker:** View logs in the web UI at `/debug` (Log Explorer section), or via CLI:
+      `docker exec tracearr cat /var/log/supervisor/tracearr-error.log`
       (Also available: tracearr.log, postgres.log, postgres-error.log, redis.log, supervisord.log)
     render: shell
 

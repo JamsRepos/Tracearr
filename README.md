@@ -103,6 +103,26 @@ docker pull ghcr.io/connorgallopo/tracearr:latest
 docker pull ghcr.io/connorgallopo/tracearr:nightly
 ```
 
+### Viewing Logs
+
+**Standard Docker** — Each service runs in its own container:
+
+```bash
+docker logs tracearr          # Application logs
+docker logs tracearr-postgres # Database logs
+docker logs tracearr-redis    # Cache logs
+```
+
+**Supervised Docker** — All services run in one container. View logs in the web UI at `/debug` (Log Explorer section), or via CLI:
+
+```bash
+docker exec tracearr cat /var/log/supervisor/tracearr-error.log
+```
+
+Available log files: `tracearr.log`, `tracearr-error.log`, `postgres.log`, `postgres-error.log`, `redis.log`, `redis-error.log`, `supervisord.log`
+
+Set `LOG_LEVEL=debug` for verbose output.
+
 ### Development Setup
 
 ```bash
