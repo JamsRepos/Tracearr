@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Activity, Users, Gauge, Clock, HardDrive } from 'lucide-react';
+import { Activity, Users, Gauge, Clock, HardDrive, ArrowDown, ArrowUp } from 'lucide-react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -274,6 +274,18 @@ export function StatsBandwidth() {
 
   const summaryData = summary.data;
   const users = topUsers.data?.data ?? [];
+  const [dataSortDir, setDataSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const rankByUserId = useMemo(() => {
+    return new Map(users.map((user, index) => [user.serverUserId, index + 1]));
+  }, [users]);
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const diff = a.totalBytes - b.totalBytes;
+      return dataSortDir === 'asc' ? diff : -diff;
+    });
+  }, [users, dataSortDir]);
 
   return (
     <div className="space-y-6">
@@ -352,22 +364,39 @@ export function StatsBandwidth() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : users.length > 0 ? (
+          ) : sortedUsers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">#</TableHead>
+                  <TableHead className="w-12">Rank</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead className="text-right">Sessions</TableHead>
-                  <TableHead className="text-right">Data</TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="hover:text-foreground inline-flex w-full items-center justify-end gap-1 transition-colors"
+                      onClick={() =>
+                        setDataSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+                      }
+                    >
+                      Data
+                      {dataSortDir === 'asc' ? (
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead className="text-right">Watch Time</TableHead>
                   <TableHead className="text-right">Avg Bitrate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user, idx) => (
+                {sortedUsers.map((user, idx) => (
                   <TableRow key={user.serverUserId}>
-                    <TableCell className="text-muted-foreground font-medium">{idx + 1}</TableCell>
+                    <TableCell className="text-muted-foreground font-medium">
+                      {rankByUserId.get(user.serverUserId) ?? idx + 1}
+                    </TableCell>
                     <TableCell>
                       <Link
                         to={`/users/${user.serverUserId}`}
