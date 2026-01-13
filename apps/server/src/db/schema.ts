@@ -199,6 +199,9 @@ export const serverUsers = pgTable(
     // When user joined/was added to media server (Plex provides this, Jellyfin/Emby don't)
     joinedAt: timestamp('joined_at', { withTimezone: true }),
 
+    // Last activity timestamp
+    lastActivityAt: timestamp('last_activity_at', { withTimezone: true }),
+
     // Server-specific permissions
     isServerAdmin: boolean('is_server_admin').notNull().default(false),
 

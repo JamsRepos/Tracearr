@@ -65,6 +65,18 @@ const userColumns: ColumnDef<ServerUserWithIdentity>[] = [
       </div>
     ),
   },
+  {
+    accessorKey: 'lastActivityAt',
+    header: 'Last Activity',
+    cell: ({ row }) => (
+      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+        <Clock className="h-4 w-4" />
+        {row.original.lastActivityAt
+          ? formatDistanceToNow(new Date(row.original.lastActivityAt), { addSuffix: true })
+          : 'Never'}
+      </div>
+    ),
+  },
 ];
 
 export function Users() {

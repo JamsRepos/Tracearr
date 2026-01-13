@@ -83,6 +83,7 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
         trustScore: serverUsers.trustScore,
         sessionCount: serverUsers.sessionCount,
         joinedAt: serverUsers.joinedAt,
+        lastActivityAt: serverUsers.lastActivityAt,
         updatedAt: serverUsers.updatedAt,
         // Include identity info
         identityName: users.name,
@@ -139,6 +140,7 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
         trustScore: serverUsers.trustScore,
         sessionCount: serverUsers.sessionCount,
         joinedAt: serverUsers.joinedAt,
+        lastActivityAt: serverUsers.lastActivityAt,
         updatedAt: serverUsers.updatedAt,
         // Include identity info
         identityName: users.name,
@@ -248,6 +250,7 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
         trustScore: serverUsers.trustScore,
         sessionCount: serverUsers.sessionCount,
         joinedAt: serverUsers.joinedAt,
+        lastActivityAt: serverUsers.lastActivityAt,
         updatedAt: serverUsers.updatedAt,
       });
 

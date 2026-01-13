@@ -9,7 +9,7 @@ import { eq, and, desc, isNull, gte } from 'drizzle-orm';
 import { TIME_MS, type ActiveSession, type StreamDetailFields } from '@tracearr/shared';
 import { pickStreamDetailFields } from './sessionMapper.js';
 import { db } from '../../db/client.js';
-import { sessions } from '../../db/schema.js';
+import { serverUsers, sessions } from '../../db/schema.js';
 import type { GeoLocation } from '../../services/geoip.js';
 import { ruleEngine } from '../../services/rules.js';
 import {
@@ -454,6 +454,13 @@ export async function createSessionWithRulesAtomic(
         if (!inserted) {
           throw new Error('Failed to insert session');
         }
+
+        await tx
+          .update(serverUsers)
+          .set({
+            lastActivityAt: sql`GREATEST(COALESCE(${serverUsers.lastActivityAt}, ${inserted.startedAt}), ${inserted.startedAt})`,
+          })
+          .where(eq(serverUsers.id, serverUser.id));
 
         // Build session object for rule evaluation
         const session = {

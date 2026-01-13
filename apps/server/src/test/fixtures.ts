@@ -479,6 +479,7 @@ export function createMockServerUser(overrides: Partial<ServerUser> = {}): Serve
     trustScore: overrides.trustScore ?? 100,
     sessionCount: overrides.sessionCount ?? 0,
     joinedAt: overrides.joinedAt ?? null,
+    lastActivityAt: overrides.lastActivityAt ?? null,
     createdAt: overrides.createdAt ?? new Date(),
     updatedAt: overrides.updatedAt ?? new Date(),
   };

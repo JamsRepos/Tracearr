@@ -421,6 +421,7 @@ export async function updateServerUser(
     email: string | null;
     thumbUrl: string | null;
     isServerAdmin: boolean;
+    lastActivityAt: Date | null;
   }>
 ): Promise<ServerUser> {
   const rows = await db
@@ -526,18 +527,20 @@ export async function syncUserFromMediaServer(
     }
 
     if (existing) {
+      const updateData: Partial<typeof serverUsers.$inferInsert> = {
+        username: mediaUser.username,
+        email: mediaUser.email ?? null,
+        thumbUrl: mediaUser.thumb ?? null,
+        isServerAdmin: mediaUser.isAdmin,
+        plexAccountId: mediaUser.id, // Set plex.tv ID
+        joinedAt: mediaUser.joinedAt ?? existing.joinedAt,
+        updatedAt: new Date(),
+      };
+
       // Update existing server user and set plexAccountId
       const updated = await db
         .update(serverUsers)
-        .set({
-          username: mediaUser.username,
-          email: mediaUser.email ?? null,
-          thumbUrl: mediaUser.thumb ?? null,
-          isServerAdmin: mediaUser.isAdmin,
-          plexAccountId: mediaUser.id, // Set plex.tv ID
-          joinedAt: mediaUser.joinedAt ?? existing.joinedAt,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(serverUsers.id, existing.id))
         .returning();
 
@@ -603,13 +606,15 @@ export async function syncUserFromMediaServer(
   const existing = await getServerUserByExternalId(serverId, mediaUser.id);
 
   if (existing) {
-    // Update existing server user
-    const updated = await updateServerUser(existing.id, {
+    const updatePayload: Parameters<typeof updateServerUser>[1] = {
       username: mediaUser.username,
       email: mediaUser.email ?? null,
       thumbUrl: mediaUser.thumb ?? null,
       isServerAdmin: mediaUser.isAdmin,
-    });
+    };
+
+    // Update existing server user
+    const updated = await updateServerUser(existing.id, updatePayload);
 
     const user = await requireUserById(existing.userId);
     return { serverUser: updated, user, created: false };

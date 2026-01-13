@@ -67,6 +67,8 @@ export const fullRoutes: FastifyPluginAsync = async (app) => {
           isServerAdmin: serverUsers.isServerAdmin,
           trustScore: serverUsers.trustScore,
           sessionCount: serverUsers.sessionCount,
+          joinedAt: serverUsers.joinedAt,
+          lastActivityAt: serverUsers.lastActivityAt,
           createdAt: serverUsers.createdAt,
           updatedAt: serverUsers.updatedAt,
           identityName: users.name,

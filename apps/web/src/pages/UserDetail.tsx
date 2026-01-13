@@ -392,29 +392,47 @@ export function UserDetail() {
                   );
                 })()}
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-semibold">{user.identityName ?? user.username}</h2>
-                  {isOwner && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setIsEditNameOpen(true)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {user.role === 'owner' && (
-                    <span title="Server Owner">
-                      <Crown className="h-5 w-5 text-yellow-500" />
-                    </span>
-                  )}
+              <div className="flex flex-1 items-start justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">{user.identityName ?? user.username}</h2>
+                    {isOwner && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setIsEditNameOpen(true)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {user.role === 'owner' && (
+                      <span title="Server Owner">
+                        <Crown className="h-5 w-5 text-yellow-500" />
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-sm">@{user.username}</p>
+                  {user.email && <p className="text-muted-foreground text-sm">{user.email}</p>}
+                  <div className="flex items-center gap-4 pt-2">
+                    <TrustScoreBadge score={user.trustScore} showLabel />
+                  </div>
                 </div>
-                <p className="text-muted-foreground text-sm">@{user.username}</p>
-                {user.email && <p className="text-muted-foreground text-sm">{user.email}</p>}
-                <div className="flex items-center gap-4 pt-2">
-                  <TrustScoreBadge score={user.trustScore} showLabel />
+                <div className="text-muted-foreground flex flex-col gap-2 text-right text-sm">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-foreground font-medium">Joined</span>
+                    <span>{format(new Date(user.joinedAt ?? user.createdAt), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-foreground font-medium">Last Activity</span>
+                    <span>
+                      {user.lastActivityAt
+                        ? format(new Date(user.lastActivityAt), 'MMM d, yyyy')
+                        : '—'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -441,15 +459,6 @@ export function UserDetail() {
                   <span className="text-muted-foreground text-sm">Violations</span>
                 </div>
                 <p className="mt-1 text-2xl font-bold">{violationsTotal}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="text-muted-foreground h-4 w-4" />
-                  <span className="text-muted-foreground text-sm">Joined</span>
-                </div>
-                <p className="mt-1 text-sm font-medium">
-                  {format(new Date(user.createdAt), 'MMM d, yyyy')}
-                </p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2">

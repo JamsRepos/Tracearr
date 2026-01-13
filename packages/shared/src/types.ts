@@ -70,6 +70,7 @@ export interface ServerUser {
   trustScore: number;
   sessionCount: number;
   joinedAt: Date | null;
+  lastActivityAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
