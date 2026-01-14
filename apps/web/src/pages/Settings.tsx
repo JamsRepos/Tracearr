@@ -61,6 +61,7 @@ import {
   Palette,
   Settings as SettingsIcon,
   Link,
+  GripVertical,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MediaServerIcon } from '@/components/icons/MediaServerIcon';
@@ -93,6 +94,7 @@ import {
   useSyncServer,
   useUpdateServerUrl,
   usePlexServerConnections,
+  useReorderServers,
   useMobileConfig,
   useEnableMobile,
   useDisableMobile,
@@ -100,6 +102,23 @@ import {
   useRevokeSession,
   useRevokeMobileSessions,
 } from '@/hooks/queries';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 function SettingsNav() {
   const links = [
@@ -494,6 +513,7 @@ function ServerSettings() {
   const deleteServer = useDeleteServer();
   const syncServer = useSyncServer();
   const updateServerUrl = useUpdateServerUrl();
+  const reorderServers = useReorderServers();
   const { refetch: refetchUser, user } = useAuth();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -504,6 +524,14 @@ function ServerSettings() {
   const [apiKey, setApiKey] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Plex server discovery state
   const [plexDialogStep, setPlexDialogStep] = useState<
@@ -550,6 +578,32 @@ function ServerSettings() {
 
   const handleSync = (id: string) => {
     syncServer.mutate(id);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = servers.findIndex((s) => s.id === active.id);
+    const newIndex = servers.findIndex((s) => s.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    // Reorder locally for immediate feedback (optimistic update)
+    const reorderedServers = arrayMove(servers, oldIndex, newIndex);
+
+    // Send new order to backend
+    const updates = reorderedServers.map((server, index) => ({
+      id: server.id,
+      displayOrder: index,
+    }));
+
+    reorderServers.mutate(updates);
   };
 
   // Default server type based on user role
@@ -750,24 +804,36 @@ function ServerSettings() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {servers.map((server) => (
-                <ServerCard
-                  key={server.id}
-                  server={server}
-                  onSync={() => {
-                    handleSync(server.id);
-                  }}
-                  onDelete={() => {
-                    setDeleteId(server.id);
-                  }}
-                  onEditUrl={() => {
-                    setEditServer(server);
-                  }}
-                  isSyncing={syncServer.isPending}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={servers.map((s) => s.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {servers.map((server) => (
+                    <SortableServerCard
+                      key={server.id}
+                      server={server}
+                      onSync={() => {
+                        handleSync(server.id);
+                      }}
+                      onDelete={() => {
+                        setDeleteId(server.id);
+                      }}
+                      onEditUrl={() => {
+                        setEditServer(server);
+                      }}
+                      isSyncing={syncServer.isPending}
+                      isDraggable={user?.role === 'owner'}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>
@@ -1238,56 +1304,85 @@ function EditServerUrlDialog({
   );
 }
 
-function ServerCard({
+function SortableServerCard({
   server,
   onSync,
   onDelete,
   onEditUrl,
   isSyncing,
+  isDraggable,
 }: {
   server: Server;
   onSync: () => void;
   onDelete: () => void;
   onEditUrl: () => void;
   isSyncing?: boolean;
+  isDraggable?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: server.id,
+    disabled: !isDraggable,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
-      <div className="flex items-center gap-4">
-        <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-          <MediaServerIcon type={server.type} className="h-6 w-6" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold">{server.name}</h3>
-          </div>
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <span>{server.url}</span>
-            <button onClick={onEditUrl} className="hover:text-primary" title="Edit URL">
-              <Pencil className="h-3 w-3" />
-            </button>
-            <a
-              href={server.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary"
+    <div ref={setNodeRef} style={style} className="touch-none">
+      <div
+        className={cn(
+          'flex items-center justify-between rounded-lg border p-4',
+          isDragging && 'ring-primary ring-2'
+        )}
+      >
+        <div className="flex items-center gap-4">
+          {isDraggable && (
+            <button
+              className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+              {...attributes}
+              {...listeners}
             >
-              <ExternalLink className="h-3 w-3" />
-            </a>
+              <GripVertical className="h-5 w-5" />
+            </button>
+          )}
+          <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
+            <MediaServerIcon type={server.type} className="h-6 w-6" />
           </div>
-          <p className="text-muted-foreground text-xs">
-            Added {format(new Date(server.createdAt), 'MMM d, yyyy')}
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{server.name}</h3>
+            </div>
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <span>{server.url}</span>
+              <button onClick={onEditUrl} className="hover:text-primary" title="Edit URL">
+                <Pencil className="h-3 w-3" />
+              </button>
+              <a
+                href={server.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Added {format(new Date(server.createdAt), 'MMM d, yyyy')}
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onSync} disabled={isSyncing}>
-          <RefreshCw className={cn('mr-1 h-4 w-4', isSyncing && 'animate-spin')} />
-          Sync
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onDelete}>
-          <Trash2 className="text-destructive h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onSync} disabled={isSyncing}>
+            <RefreshCw className={cn('mr-1 h-4 w-4', isSyncing && 'animate-spin')} />
+            Sync
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            <Trash2 className="text-destructive h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

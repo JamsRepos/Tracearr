@@ -83,10 +83,14 @@ export const servers = pgTable(
     machineIdentifier: varchar('machine_identifier', { length: 100 }), // Plex clientIdentifier for dedup
     // For Plex servers: which linked Plex account this server was added from (nullable for Jellyfin/Emby and legacy)
     plexAccountId: uuid('plex_account_id'),
+    displayOrder: integer('display_order').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('servers_plex_account_idx').on(table.plexAccountId)]
+  (table) => [
+    index('servers_plex_account_idx').on(table.plexAccountId),
+    index('servers_display_order_idx').on(table.displayOrder),
+  ]
 );
 
 /**

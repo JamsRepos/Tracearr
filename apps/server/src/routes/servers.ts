@@ -3,8 +3,13 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { eq, inArray, and } from 'drizzle-orm';
-import { createServerSchema, serverIdParamSchema, SERVER_STATS_CONFIG } from '@tracearr/shared';
+import { eq, inArray, and, asc } from 'drizzle-orm';
+import {
+  createServerSchema,
+  serverIdParamSchema,
+  reorderServersSchema,
+  SERVER_STATS_CONFIG,
+} from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { servers, plexAccounts } from '../db/schema.js';
 // Token encryption removed - tokens now stored in plain text (DB is localhost-only)
@@ -27,6 +32,7 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
         name: servers.name,
         type: servers.type,
         url: servers.url,
+        displayOrder: servers.displayOrder,
         createdAt: servers.createdAt,
         updatedAt: servers.updatedAt,
       })
@@ -37,7 +43,8 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
           : authUser.serverIds.length > 0
             ? inArray(servers.id, authUser.serverIds)
             : undefined // No serverIds = no access (will return empty)
-      );
+      )
+      .orderBy(asc(servers.displayOrder));
 
     return { data: serverList };
   });
@@ -279,6 +286,65 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
     app.log.info({ serverId: id, oldUrl: server.url, newUrl }, 'Server URL updated');
 
     return result;
+  });
+
+  /**
+   * PATCH /servers/reorder - Update server display order
+   * Accepts array of { id, displayOrder } and updates all servers in a transaction
+   */
+  app.patch('/reorder', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const body = reorderServersSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.badRequest('Invalid request body');
+    }
+
+    const { servers: serverUpdates } = body.data;
+    const authUser = request.user;
+
+    // Only owners can reorder servers (guests can't manage server settings)
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can reorder servers');
+    }
+
+    // Validate that all server IDs belong to accessible servers
+    const serverIds = serverUpdates.map((s: { id: string; displayOrder: number }) => s.id);
+    const existingServers = await db
+      .select({ id: servers.id })
+      .from(servers)
+      .where(
+        authUser.role === 'owner'
+          ? inArray(servers.id, serverIds)
+          : and(
+              inArray(servers.id, serverIds),
+              inArray(servers.id, authUser.serverIds.length > 0 ? authUser.serverIds : [''])
+            )
+      );
+
+    if (existingServers.length !== serverIds.length) {
+      return reply.badRequest('One or more server IDs are invalid or inaccessible');
+    }
+
+    // Perform batch update in a transaction
+    try {
+      await db.transaction(async (tx) => {
+        for (const update of serverUpdates) {
+          await tx
+            .update(servers)
+            .set({ displayOrder: update.displayOrder, updatedAt: new Date() })
+            .where(eq(servers.id, update.id));
+        }
+      });
+
+      app.log.info(
+        { serverCount: serverUpdates.length },
+        'Server display order updated successfully'
+      );
+
+      return { success: true };
+    } catch (error) {
+      app.log.error({ error }, 'Failed to update server display order');
+      return reply.internalServerError('Failed to update server order');
+    }
   });
 
   /**

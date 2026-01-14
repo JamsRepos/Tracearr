@@ -70,6 +70,7 @@ export {
   useUpdateServerUrl,
   useServerStatistics,
   usePlexServerConnections,
+  useReorderServers,
 } from './useServers';
 
 // Settings hooks

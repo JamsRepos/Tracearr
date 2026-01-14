@@ -457,6 +457,11 @@ class ApiClient {
         errors: string[];
         syncedAt: string;
       }>(`/servers/${id}/sync`, { method: 'POST', body: JSON.stringify({}) }),
+    reorder: (servers: { id: string; displayOrder: number }[]) =>
+      this.request<{ success: boolean }>('/servers/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ servers }),
+      }),
     statistics: (id: string) =>
       this.request<{
         serverId: string;

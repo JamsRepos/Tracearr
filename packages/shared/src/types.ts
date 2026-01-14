@@ -39,6 +39,7 @@ export interface Server {
   name: string;
   type: ServerType;
   url: string;
+  displayOrder?: number;
   createdAt: Date;
   updatedAt: Date;
 }

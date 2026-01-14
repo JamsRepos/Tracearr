@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SERVER_STATS_CONFIG, type ServerResourceDataPoint } from '@tracearr/shared';
+import { SERVER_STATS_CONFIG, type Server, type ServerResourceDataPoint } from '@tracearr/shared';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useRef, useCallback } from 'react';
@@ -117,6 +117,65 @@ export function useSyncServer() {
       toast.error('Sync Failed', { description: error.message });
     },
   });
+}
+
+export function useReorderServers() {
+  const queryClient = useQueryClient();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (servers: { id: string; displayOrder: number }[]) => api.servers.reorder(servers),
+    onMutate: async (newOrder) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['servers', 'list'] });
+
+      // Snapshot the previous value
+      const previousServers = queryClient.getQueryData<Server[]>(['servers', 'list']);
+
+      // Optimistically update to the new value
+      if (previousServers) {
+        const reordered = [...previousServers].sort((a, b) => {
+          const aOrder = newOrder.find((s) => s.id === a.id)?.displayOrder ?? 0;
+          const bOrder = newOrder.find((s) => s.id === b.id)?.displayOrder ?? 0;
+          return aOrder - bOrder;
+        });
+        queryClient.setQueryData(['servers', 'list'], reordered);
+      }
+
+      // Return context with the previous servers
+      return { previousServers };
+    },
+    onError: (error: Error, _newOrder, context) => {
+      // Rollback on error
+      if (context?.previousServers) {
+        queryClient.setQueryData(['servers', 'list'], context.previousServers);
+      }
+      toast.error('Failed to Reorder Servers', { description: error.message });
+    },
+    onSuccess: () => {
+      // Invalidate to ensure we have the latest data
+      void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
+    },
+  });
+
+  // Debounced mutation function to avoid excessive API calls during drag
+  const debouncedMutate = useCallback(
+    (servers: { id: string; displayOrder: number }[]) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(() => {
+        mutation.mutate(servers);
+      }, 500);
+    },
+    [mutation]
+  );
+
+  return {
+    ...mutation,
+    mutate: debouncedMutate,
+  };
 }
 
 /**
