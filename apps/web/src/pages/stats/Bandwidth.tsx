@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useBandwidthDaily, useBandwidthTopUsers, useBandwidthSummary } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
 import { useTimeRange } from '@/hooks/useTimeRange';
+import { getAvatarUrl } from '@/components/users/utils';
 import type { DailyBandwidthRow } from '@tracearr/shared';
 
 // Format bytes for display
@@ -403,7 +404,10 @@ export function StatsBandwidth() {
                         className="flex items-center gap-3 hover:underline"
                       >
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.thumbUrl ?? undefined} alt={user.username} />
+                          <AvatarImage
+                            src={getAvatarUrl(selectedServerId, user.thumbUrl, 32) ?? undefined}
+                            alt={user.username}
+                          />
                           <AvatarFallback>
                             {(user.identityName ?? user.username).slice(0, 2).toUpperCase()}
                           </AvatarFallback>
