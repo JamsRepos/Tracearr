@@ -441,8 +441,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       artistName: row.artist_name,
       albumName: row.album_name,
       thumbPath: row.thumb_path,
-      startedAt: row.started_at,
-      stoppedAt: row.stopped_at,
+      startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
+      stoppedAt: row.stopped_at ? new Date(row.stopped_at).toISOString() : null,
       durationMs: row.duration_ms ? Number(row.duration_ms) : null,
       pausedDurationMs: row.paused_duration_ms ? Number(row.paused_duration_ms) : null,
       progressMs: row.progress_ms,
@@ -750,8 +750,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       artistName: row.artist_name,
       albumName: row.album_name,
       thumbPath: row.thumb_path,
-      startedAt: row.started_at,
-      stoppedAt: row.stopped_at,
+      startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
+      stoppedAt: row.stopped_at ? new Date(row.stopped_at).toISOString() : null,
       durationMs: row.duration_ms ? Number(row.duration_ms) : null,
       pausedDurationMs: row.paused_duration_ms ? Number(row.paused_duration_ms) : null,
       progressMs: row.progress_ms,
@@ -794,12 +794,13 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
     // Generate next cursor
     const lastSession = sessionData[sessionData.length - 1];
     const nextCursor =
-      hasMore && lastSession
+      hasMore && lastSession?.startedAt
         ? `${new Date(lastSession.startedAt).getTime()}_${lastSession.id}`
         : undefined;
 
     const response: HistorySessionResponse = {
-      data: sessionData as HistorySessionResponse['data'],
+      // Cast through unknown since we're serializing dates to ISO strings for the wire format
+      data: sessionData as unknown as HistorySessionResponse['data'],
       nextCursor,
       hasMore,
     };
