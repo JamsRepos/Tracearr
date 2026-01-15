@@ -322,7 +322,7 @@ export const fullRoutes: FastifyPluginAsync = async (app) => {
         })
         .from(violations)
         .innerJoin(rules, eq(violations.ruleId, rules.id))
-        .innerJoin(sessions, eq(violations.sessionId, sessions.id))
+        .leftJoin(sessions, eq(violations.sessionId, sessions.id))
         .where(eq(violations.serverUserId, id))
         .orderBy(desc(violations.createdAt))
         .limit(violationsLimit);

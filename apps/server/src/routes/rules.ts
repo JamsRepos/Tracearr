@@ -8,6 +8,7 @@ import { createRuleSchema, updateRuleSchema, ruleIdParamSchema } from '@tracearr
 import { db } from '../db/client.js';
 import { rules, serverUsers, violations, servers } from '../db/schema.js';
 import { hasServerAccess } from '../utils/serverFiltering.js';
+import { scheduleInactivityChecks } from '../jobs/inactivityCheckQueue.js';
 
 export const ruleRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -109,6 +110,11 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
     const rule = inserted[0];
     if (!rule) {
       return reply.internalServerError('Failed to create rule');
+    }
+
+    // Reschedule inactivity checks if this is an inactivity rule
+    if (type === 'account_inactivity') {
+      void scheduleInactivityChecks();
     }
 
     return reply.status(201).send(rule);
@@ -246,6 +252,12 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       return reply.internalServerError('Failed to update rule');
     }
 
+    // Reschedule inactivity checks if this is an inactivity rule
+    // (interval or active status may have changed)
+    if (updatedRule.type === 'account_inactivity') {
+      void scheduleInactivityChecks();
+    }
+
     return updatedRule;
   });
 
@@ -270,6 +282,7 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
     const ruleRows = await db
       .select({
         id: rules.id,
+        type: rules.type,
         serverUserId: rules.serverUserId,
         serverId: serverUsers.serverId,
       })
@@ -292,8 +305,15 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('You do not have access to this rule');
     }
 
+    const wasInactivityRule = existingRule.type === 'account_inactivity';
+
     // Delete rule (cascade will handle violations)
     await db.delete(rules).where(eq(rules.id, id));
+
+    // Reschedule inactivity checks if this was an inactivity rule
+    if (wasInactivityRule) {
+      void scheduleInactivityChecks();
+    }
 
     return { success: true };
   });

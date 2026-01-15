@@ -28,6 +28,13 @@ export const RULE_DEFAULTS = {
     countries: [],
     excludePrivateIps: false,
   },
+  account_inactivity: {
+    inactivityValue: 30,
+    inactivityUnit: 'days',
+    checkIntervalHours: 24,
+    notificationMode: 'once',
+    reminderIntervalDays: 7,
+  },
 } as const;
 
 // Rule type display names
@@ -37,6 +44,7 @@ export const RULE_DISPLAY_NAMES = {
   device_velocity: 'Device Velocity',
   concurrent_streams: 'Concurrent Streams',
   geo_restriction: 'Geo Restriction',
+  account_inactivity: 'Account Inactivity',
 } as const;
 
 // Severity levels

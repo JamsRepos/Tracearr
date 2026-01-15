@@ -130,17 +130,22 @@ function createViewerUser(): AuthUser {
 }
 
 /**
- * Helper to create the mock chain for violation queries with 5 innerJoins
- * (rules, serverUsers, users, servers, sessions)
+ * Helper to create the mock chain for violation queries
+ * (rules: innerJoin, serverUsers: innerJoin, users: leftJoin, servers: innerJoin, sessions: leftJoin)
  */
 function createViolationSelectMock(resolvedValue: unknown) {
   return {
     from: vi.fn().mockReturnValue({
       innerJoin: vi.fn().mockReturnValue({
+        // rules
         innerJoin: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
+          // serverUsers
+          leftJoin: vi.fn().mockReturnValue({
+            // users (leftJoin for inactivity violations without identity)
             innerJoin: vi.fn().mockReturnValue({
-              innerJoin: vi.fn().mockReturnValue({
+              // servers
+              leftJoin: vi.fn().mockReturnValue({
+                // sessions (leftJoin for inactivity violations without session)
                 where: vi.fn().mockReturnValue({
                   orderBy: vi.fn().mockReturnValue({
                     limit: vi.fn().mockReturnValue({
@@ -159,16 +164,21 @@ function createViolationSelectMock(resolvedValue: unknown) {
 
 /**
  * Helper to create the mock chain for single violation queries (GET /:id)
- * with 5 innerJoins (rules, serverUsers, users, servers, sessions)
+ * (rules: innerJoin, serverUsers: innerJoin, users: leftJoin, servers: innerJoin, sessions: leftJoin)
  */
 function createSingleViolationSelectMock(resolvedValue: unknown) {
   return {
     from: vi.fn().mockReturnValue({
       innerJoin: vi.fn().mockReturnValue({
+        // rules
         innerJoin: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
+          // serverUsers
+          leftJoin: vi.fn().mockReturnValue({
+            // users (leftJoin for inactivity violations without identity)
             innerJoin: vi.fn().mockReturnValue({
-              innerJoin: vi.fn().mockReturnValue({
+              // servers
+              leftJoin: vi.fn().mockReturnValue({
+                // sessions (leftJoin for inactivity violations without session)
                 where: vi.fn().mockReturnValue({
                   limit: vi.fn().mockResolvedValue(resolvedValue),
                 }),

@@ -60,6 +60,20 @@ export function getViolationDescription(
       }
       return 'Streaming from restricted location';
     }
+    case 'account_inactivity': {
+      const inactiveDays = data.inactiveDays as number | undefined;
+      const neverActive = data.neverActive as boolean | undefined;
+      if (neverActive) {
+        return 'Account has never had any activity';
+      }
+      if (inactiveDays !== undefined) {
+        if (inactiveDays === 1) {
+          return 'Account has been inactive for 1 day';
+        }
+        return `Account has been inactive for ${inactiveDays} days`;
+      }
+      return 'Account has been inactive';
+    }
     default:
       return 'Rule violation detected';
   }
@@ -162,6 +176,21 @@ export function getViolationDetails(
       if (data.country) details['Country'] = data.country;
       if (data.blockedCountry) details['Blocked Country'] = data.blockedCountry;
       if (data.ipAddress) details['IP Address'] = data.ipAddress;
+      break;
+    }
+    case 'account_inactivity': {
+      if (typeof data.inactiveDays === 'number') {
+        details['Days Inactive'] = data.inactiveDays;
+      }
+      if (typeof data.thresholdDays === 'number') {
+        details['Threshold'] = `${data.thresholdDays} days`;
+      }
+      if (data.lastActivityAt) {
+        details['Last Activity'] = new Date(data.lastActivityAt as string).toLocaleDateString();
+      }
+      if (data.neverActive) {
+        details['Status'] = 'Never active';
+      }
       break;
     }
   }

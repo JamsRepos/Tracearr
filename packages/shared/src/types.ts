@@ -99,7 +99,7 @@ export interface ViolationSummary {
     type: string;
   };
   serverUserId: string;
-  sessionId: string;
+  sessionId: string | null;
   mediaTitle: string | null;
   severity: string;
   data: Record<string, unknown>;
@@ -332,7 +332,8 @@ export type RuleType =
   | 'simultaneous_locations'
   | 'device_velocity'
   | 'concurrent_streams'
-  | 'geo_restriction';
+  | 'geo_restriction'
+  | 'account_inactivity';
 
 export interface ImpossibleTravelParams {
   maxSpeedKmh: number;
@@ -371,12 +372,32 @@ export interface GeoRestrictionParams {
   excludePrivateIps?: boolean;
 }
 
+/** Notification mode for account inactivity rules */
+export type AccountInactivityNotificationMode = 'once' | 'repeated' | 'reminder';
+
+/** Time unit for inactivity threshold */
+export type AccountInactivityUnit = 'days' | 'weeks' | 'months';
+
+export interface AccountInactivityParams {
+  /** Inactivity threshold value (e.g., 30, 7, 3) */
+  inactivityValue: number;
+  /** Time unit for the inactivity threshold */
+  inactivityUnit: AccountInactivityUnit;
+  /** How often to check for inactivity (in hours, default: 24) */
+  checkIntervalHours: number;
+  /** How to handle notifications for ongoing inactivity */
+  notificationMode: AccountInactivityNotificationMode;
+  /** For 'reminder' mode: how many days between reminders (default: 7) */
+  reminderIntervalDays?: number;
+}
+
 export type RuleParams =
   | ImpossibleTravelParams
   | SimultaneousLocationsParams
   | DeviceVelocityParams
   | ConcurrentStreamsParams
-  | GeoRestrictionParams;
+  | GeoRestrictionParams
+  | AccountInactivityParams;
 
 export interface Rule {
   id: string;
@@ -396,7 +417,7 @@ export interface Violation {
   id: string;
   ruleId: string;
   serverUserId: string;
-  sessionId: string;
+  sessionId: string | null;
   severity: ViolationSeverity;
   data: Record<string, unknown>;
   createdAt: Date;

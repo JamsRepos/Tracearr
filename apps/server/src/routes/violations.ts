@@ -167,9 +167,9 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
       .from(violations)
       .innerJoin(rules, eq(violations.ruleId, rules.id))
       .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
-      .innerJoin(users, eq(serverUsers.userId, users.id))
+      .leftJoin(users, eq(serverUsers.userId, users.id))
       .innerJoin(servers, eq(serverUsers.serverId, servers.id))
-      .innerJoin(sessions, eq(violations.sessionId, sessions.id))
+      .leftJoin(sessions, eq(violations.sessionId, sessions.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(getViolationOrderBy(orderBy, orderDir))
       .limit(pageSize)
@@ -684,9 +684,9 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
       .from(violations)
       .innerJoin(rules, eq(violations.ruleId, rules.id))
       .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
-      .innerJoin(users, eq(serverUsers.userId, users.id))
+      .leftJoin(users, eq(serverUsers.userId, users.id))
       .innerJoin(servers, eq(serverUsers.serverId, servers.id))
-      .innerJoin(sessions, eq(violations.sessionId, sessions.id))
+      .leftJoin(sessions, eq(violations.sessionId, sessions.id))
       .where(eq(violations.id, id))
       .limit(1);
 

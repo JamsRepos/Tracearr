@@ -274,6 +274,13 @@
       "when": 1768325988279,
       "tag": "0038_index_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1768505644478,
+      "tag": "0039_oval_kingpin",
+      "breakpoints": true
     }
   ]
 }

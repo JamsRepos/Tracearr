@@ -11,6 +11,9 @@ import type {
   DeviceVelocityParams,
   ConcurrentStreamsParams,
   GeoRestrictionParams,
+  AccountInactivityParams,
+  AccountInactivityUnit,
+  ServerUser,
 } from '@tracearr/shared';
 import { GEOIP_CONFIG, TIME_MS } from '@tracearr/shared';
 import { geoipService } from './geoip.js';
@@ -459,6 +462,104 @@ export class RuleEngine {
           countryCode: sessionCountryCode,
           mode,
           countries: ruleCountries,
+        },
+      };
+    }
+
+    return { violated: false, severity: 'low', data: {} };
+  }
+
+  // ============================================================================
+  // Account Inactivity Evaluation
+  // ============================================================================
+
+  /**
+   * Convert inactivity threshold to milliseconds
+   */
+  private calculateInactivityThresholdMs(value: number, unit: AccountInactivityUnit): number {
+    switch (unit) {
+      case 'days':
+        return value * TIME_MS.DAY;
+      case 'weeks':
+        return value * TIME_MS.WEEK;
+      case 'months':
+        // Approximate: 30 days per month
+        return value * 30 * TIME_MS.DAY;
+      default:
+        return value * TIME_MS.DAY;
+    }
+  }
+
+  /**
+   * Convert inactivity threshold to days for display
+   */
+  private convertToThresholdDays(params: AccountInactivityParams): number {
+    switch (params.inactivityUnit) {
+      case 'days':
+        return params.inactivityValue;
+      case 'weeks':
+        return params.inactivityValue * 7;
+      case 'months':
+        return params.inactivityValue * 30;
+      default:
+        return params.inactivityValue;
+    }
+  }
+
+  /**
+   * Evaluate account inactivity for a server user.
+   * This method is called by the scheduled inactivity check job, not during session evaluation.
+   *
+   * @param serverUser The server user to check for inactivity
+   * @param params The account inactivity rule parameters
+   * @returns RuleEvaluationResult indicating whether the account is inactive
+   */
+  evaluateAccountInactivity(
+    serverUser: Pick<ServerUser, 'id' | 'username' | 'lastActivityAt'>,
+    params: AccountInactivityParams
+  ): RuleEvaluationResult {
+    // Calculate inactivity threshold in milliseconds
+    const thresholdMs = this.calculateInactivityThresholdMs(
+      params.inactivityValue,
+      params.inactivityUnit
+    );
+
+    const now = Date.now();
+
+    // Check if account has never had activity
+    if (!serverUser.lastActivityAt) {
+      // User has never watched anything - this is a special case
+      // We'll consider them inactive but provide a clear message
+      return {
+        violated: true,
+        severity: 'low',
+        data: {
+          lastActivityAt: null,
+          inactiveDays: null,
+          thresholdDays: this.convertToThresholdDays(params),
+          username: serverUser.username,
+          neverActive: true,
+        },
+      };
+    }
+
+    // Calculate how long the user has been inactive
+    const lastActivityTime = serverUser.lastActivityAt.getTime();
+    const inactiveDurationMs = now - lastActivityTime;
+
+    // Check if inactive duration exceeds threshold
+    if (inactiveDurationMs >= thresholdMs) {
+      const inactiveDays = Math.floor(inactiveDurationMs / TIME_MS.DAY);
+
+      return {
+        violated: true,
+        severity: 'low', // Inactivity is informational, not a security concern
+        data: {
+          lastActivityAt: serverUser.lastActivityAt.toISOString(),
+          inactiveDays,
+          thresholdDays: this.convertToThresholdDays(params),
+          username: serverUser.username,
+          neverActive: false,
         },
       };
     }

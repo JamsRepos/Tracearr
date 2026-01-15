@@ -11,7 +11,8 @@ export type RuleType =
   | 'simultaneous_locations'
   | 'device_velocity'
   | 'concurrent_streams'
-  | 'geo_restriction';
+  | 'geo_restriction'
+  | 'account_inactivity';
 
 export interface ImpossibleTravelParams {
   max_speed_kmh: number;
@@ -34,12 +35,21 @@ export interface GeoRestrictionParams {
   blocked_countries: string[];
 }
 
+export interface AccountInactivityParams {
+  inactivity_value: number;
+  inactivity_unit: 'days' | 'weeks' | 'months';
+  check_interval_hours: number;
+  notification_mode: 'once' | 'repeated' | 'reminder';
+  reminder_interval_days?: number;
+}
+
 export type RuleParams =
   | ImpossibleTravelParams
   | SimultaneousLocationsParams
   | DeviceVelocityParams
   | ConcurrentStreamsParams
-  | GeoRestrictionParams;
+  | GeoRestrictionParams
+  | AccountInactivityParams;
 
 export interface RuleData {
   id?: string;
@@ -72,6 +82,13 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   device_velocity: { max_ips: 5, window_hours: 24 },
   concurrent_streams: { max_streams: 3 },
   geo_restriction: { blocked_countries: [] },
+  account_inactivity: {
+    inactivity_value: 30,
+    inactivity_unit: 'days',
+    check_interval_hours: 24,
+    notification_mode: 'once',
+    reminder_interval_days: 7,
+  },
 };
 
 /**
@@ -181,6 +198,20 @@ export async function createGeoRestrictionRule(
   return createTestRule({
     type: 'geo_restriction',
     params: { ...DEFAULT_PARAMS.geo_restriction, ...params } as GeoRestrictionParams,
+    ...overrides,
+  });
+}
+
+/**
+ * Create an account inactivity rule
+ */
+export async function createAccountInactivityRule(
+  params: Partial<AccountInactivityParams> = {},
+  overrides: Partial<Omit<RuleData, 'type' | 'params'>> = {}
+): Promise<CreatedRule> {
+  return createTestRule({
+    type: 'account_inactivity',
+    params: { ...DEFAULT_PARAMS.account_inactivity, ...params } as AccountInactivityParams,
     ...overrides,
   });
 }

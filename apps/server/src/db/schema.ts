@@ -43,6 +43,7 @@ export const ruleTypeEnum = [
   'device_velocity',
   'concurrent_streams',
   'geo_restriction',
+  'account_inactivity',
 ] as const;
 
 // Violation severity enum
@@ -224,6 +225,8 @@ export const serverUsers = pgTable(
     index('server_users_username_idx').on(table.username),
     // For Plex sync matching by plex.tv account ID
     index('server_users_plex_account_idx').on(table.serverId, table.plexAccountId),
+    // For account inactivity rule queries
+    index('server_users_last_activity_idx').on(table.lastActivityAt),
   ]
 );
 
@@ -386,9 +389,8 @@ export const violations = pgTable(
     serverUserId: uuid('server_user_id')
       .notNull()
       .references(() => serverUsers.id, { onDelete: 'cascade' }),
-    sessionId: uuid('session_id')
-      .notNull()
-      .references(() => sessions.id, { onDelete: 'cascade' }),
+    // Nullable: null for account_inactivity rules (no associated session)
+    sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
     severity: varchar('severity', { length: 20 })
       .notNull()
       .$type<(typeof violationSeverityEnum)[number]>(),
@@ -406,11 +408,19 @@ export const violations = pgTable(
     // Composite index for deduplication queries:
     // SELECT ... WHERE serverUserId = ? AND acknowledgedAt IS NULL AND createdAt >= ?
     index('violations_dedup_idx').on(table.serverUserId, table.acknowledgedAt, table.createdAt),
-    // Partial unique index to prevent duplicate unacknowledged violations
+    // Partial unique index to prevent duplicate unacknowledged session-based violations
     // Defense-in-depth: catches race conditions that bypass application-level dedup
+    // Only applies to violations with a session (session-based rules)
     uniqueIndex('violations_unique_active_user_session_type')
       .on(table.serverUserId, table.sessionId, table.ruleType)
-      .where(sql`${table.acknowledgedAt} IS NULL`),
+      .where(sql`${table.acknowledgedAt} IS NULL AND ${table.sessionId} IS NOT NULL`),
+    // Index for inactivity rule deduplication queries
+    // SELECT ... WHERE serverUserId = ? AND ruleId = ? AND acknowledgedAt IS NULL
+    index('violations_inactivity_dedup_idx').on(
+      table.serverUserId,
+      table.ruleId,
+      table.acknowledgedAt
+    ),
   ]
 );
 

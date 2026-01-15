@@ -38,6 +38,7 @@ const ruleIcons: Record<string, React.ReactNode> = {
   device_velocity: <Zap className="h-4 w-4" />,
   concurrent_streams: <Shield className="h-4 w-4" />,
   geo_restriction: <Globe className="h-4 w-4" />,
+  account_inactivity: <Clock className="h-4 w-4" />,
 };
 
 interface ViolationDetailDialogProps {
@@ -214,8 +215,66 @@ export function ViolationDetailDialog({
             <p className="text-sm">{description}</p>
           </div>
 
-          {/* Stream Comparison - Side by side analysis */}
-          {allSessions.length > 0 && (
+          {/* Account Inactivity Details */}
+          {violation.rule.type === 'account_inactivity' && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <h4 className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                  <Clock className="h-4 w-4" />
+                  Inactivity Details
+                </h4>
+                <div className="rounded-lg border p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Days Inactive */}
+                    <div>
+                      <p className="text-muted-foreground mb-1 text-xs">Days Inactive</p>
+                      <p className="text-2xl font-bold">
+                        {(violation.data.inactiveDays as number) ?? 'N/A'}
+                      </p>
+                    </div>
+                    {/* Threshold */}
+                    <div>
+                      <p className="text-muted-foreground mb-1 text-xs">Threshold</p>
+                      <p className="text-2xl font-bold">
+                        {(violation.data.thresholdDays as number) ?? 'N/A'}{' '}
+                        <span className="text-muted-foreground text-sm font-normal">days</span>
+                      </p>
+                    </div>
+                    {/* Last Activity */}
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground mb-1 text-xs">Last Activity</p>
+                      {violation.data.neverActive ? (
+                        <p className="font-medium text-yellow-600">
+                          <AlertCircle className="mr-1 inline h-4 w-4" />
+                          Never active - no recorded activity
+                        </p>
+                      ) : violation.data.lastActivityAt ? (
+                        <p className="font-medium">
+                          {format(new Date(violation.data.lastActivityAt as string), 'PPpp')}
+                          <span className="text-muted-foreground ml-2 text-sm">
+                            (
+                            {formatDistanceToNow(
+                              new Date(violation.data.lastActivityAt as string),
+                              {
+                                addSuffix: true,
+                              }
+                            )}
+                            )
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">Unknown</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Stream Comparison - Side by side analysis (not for inactivity violations) */}
+          {allSessions.length > 0 && violation.rule.type !== 'account_inactivity' && (
             <>
               <Separator />
               <div className="space-y-4">

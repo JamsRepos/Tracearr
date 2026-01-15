@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Shield, MapPin, Zap, Users, Globe } from 'lucide-react';
+import { Plus, Pencil, Trash2, Shield, MapPin, Zap, Users, Globe, Clock } from 'lucide-react';
 import { CountryMultiSelect } from '@/components/ui/country-multi-select';
 import { getCountryName } from '@/lib/utils';
 import type { Rule, RuleType, RuleParams, UnitSystem } from '@tracearr/shared';
@@ -73,6 +73,12 @@ const RULE_TYPES: { value: RuleType; label: string; icon: React.ReactNode; descr
       icon: <Globe className="h-4 w-4" />,
       description: 'Block streaming from specific countries',
     },
+    {
+      value: 'account_inactivity',
+      label: 'Account Inactivity',
+      icon: <Clock className="h-4 w-4" />,
+      description: 'Get notified when users have not watched anything for a specified period',
+    },
   ];
 
 const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
@@ -81,6 +87,13 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   device_velocity: { maxIps: 5, windowHours: 24, excludePrivateIps: false, groupByDevice: false },
   concurrent_streams: { maxStreams: 3, excludePrivateIps: false },
   geo_restriction: { mode: 'blocklist', countries: [], excludePrivateIps: false },
+  account_inactivity: {
+    inactivityValue: 30,
+    inactivityUnit: 'days',
+    checkIntervalHours: 24,
+    notificationMode: 'once',
+    reminderIntervalDays: 7,
+  },
 };
 
 interface RuleFormData {
@@ -336,6 +349,112 @@ function RuleParamsForm({
           onChange={onChange}
         />
       );
+    case 'account_inactivity': {
+      const inactivityParams = params as {
+        inactivityValue: number;
+        inactivityUnit: 'days' | 'weeks' | 'months';
+        checkIntervalHours: number;
+        notificationMode: 'once' | 'repeated' | 'reminder';
+        reminderIntervalDays?: number;
+      };
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="inactivityValue">Inactivity Period</Label>
+              <Input
+                id="inactivityValue"
+                type="number"
+                min={1}
+                value={inactivityParams.inactivityValue}
+                onChange={(e) => {
+                  onChange({ ...params, inactivityValue: parseInt(e.target.value) || 1 });
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inactivityUnit">Unit</Label>
+              <Select
+                value={inactivityParams.inactivityUnit}
+                onValueChange={(v) => {
+                  onChange({ ...params, inactivityUnit: v as 'days' | 'weeks' | 'months' });
+                }}
+              >
+                <SelectTrigger id="inactivityUnit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">Days</SelectItem>
+                  <SelectItem value="weeks">Weeks</SelectItem>
+                  <SelectItem value="months">Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Notify when a user has not watched anything for this period
+          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="checkIntervalHours">Check Interval (hours)</Label>
+            <Input
+              id="checkIntervalHours"
+              type="number"
+              min={1}
+              max={720}
+              value={inactivityParams.checkIntervalHours}
+              onChange={(e) => {
+                onChange({ ...params, checkIntervalHours: parseInt(e.target.value) || 24 });
+              }}
+            />
+            <p className="text-muted-foreground text-xs">
+              How often to check for inactive accounts. Default: 24 hours
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notificationMode">Notification Mode</Label>
+            <Select
+              value={inactivityParams.notificationMode}
+              onValueChange={(v) => {
+                onChange({
+                  ...params,
+                  notificationMode: v as 'once' | 'repeated' | 'reminder',
+                });
+              }}
+            >
+              <SelectTrigger id="notificationMode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="once">Once (when first becomes inactive)</SelectItem>
+                <SelectItem value="repeated">Every check period</SelectItem>
+                <SelectItem value="reminder">Periodic reminders</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {inactivityParams.notificationMode === 'reminder' && (
+            <div className="space-y-2">
+              <Label htmlFor="reminderIntervalDays">Reminder Interval (days)</Label>
+              <Input
+                id="reminderIntervalDays"
+                type="number"
+                min={1}
+                max={365}
+                value={inactivityParams.reminderIntervalDays ?? 7}
+                onChange={(e) => {
+                  onChange({ ...params, reminderIntervalDays: parseInt(e.target.value) || 7 });
+                }}
+              />
+              <p className="text-muted-foreground text-xs">
+                How many days between reminder notifications
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -533,6 +652,19 @@ function RuleCard({
                       <span>
                         {mode === 'allowlist' ? 'Allowed' : 'Blocked'}:{' '}
                         {countryNames.join(', ') || 'None'}
+                      </span>
+                    );
+                  })()}
+                {rule.type === 'account_inactivity' &&
+                  (() => {
+                    const p = rule.params as {
+                      inactivityValue: number;
+                      inactivityUnit: string;
+                      notificationMode: string;
+                    };
+                    return (
+                      <span>
+                        Inactive for {p.inactivityValue} {p.inactivityUnit} ({p.notificationMode})
                       </span>
                     );
                   })()}

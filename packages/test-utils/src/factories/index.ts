@@ -69,6 +69,7 @@ export {
   createDeviceVelocityRule,
   createConcurrentStreamsRule,
   createGeoRestrictionRule,
+  createAccountInactivityRule,
   resetRuleCounter,
   type RuleData,
   type CreatedRule,
@@ -79,6 +80,7 @@ export {
   type DeviceVelocityParams,
   type ConcurrentStreamsParams,
   type GeoRestrictionParams,
+  type AccountInactivityParams,
 } from './rule.js';
 
 export {

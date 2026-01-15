@@ -83,6 +83,12 @@ import {
   scheduleVersionChecks,
   shutdownVersionCheckQueue,
 } from './jobs/versionCheckQueue.js';
+import {
+  initInactivityCheckQueue,
+  startInactivityCheckWorker,
+  scheduleInactivityChecks,
+  shutdownInactivityCheckQueue,
+} from './jobs/inactivityCheckQueue.js';
 import { initPushRateLimiter } from './services/pushRateLimiter.js';
 import { processPushReceipts } from './services/pushNotification.js';
 import { db, runMigrations } from './db/client.js';
@@ -285,6 +291,17 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     // Don't throw - version checks are non-critical
   }
 
+  // Initialize inactivity check queue (monitors inactive accounts)
+  try {
+    initInactivityCheckQueue(redisUrl, app.redis, pubSubService.publish.bind(pubSubService));
+    startInactivityCheckWorker();
+    void scheduleInactivityChecks();
+    app.log.info('Inactivity check queue initialized');
+  } catch (err) {
+    app.log.error({ err }, 'Failed to initialize inactivity check queue');
+    // Don't throw - inactivity checks are non-critical
+  }
+
   // Initialize poller with cache services
   initializePoller(cacheService, pubSubService);
 
@@ -311,6 +328,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     await shutdownImportQueue();
     await shutdownMaintenanceQueue();
     await shutdownVersionCheckQueue();
+    await shutdownInactivityCheckQueue();
   });
 
   // Health check endpoint
@@ -418,6 +436,7 @@ async function start() {
         void shutdownNotificationQueue();
         void shutdownImportQueue();
         void shutdownVersionCheckQueue();
+        void shutdownInactivityCheckQueue();
         void app.close().then(() => process.exit(0));
       });
     }
