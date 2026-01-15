@@ -69,6 +69,12 @@ export const terminationsRoutes: FastifyPluginAsync = async (app) => {
         // Session info
         mediaTitle: sessions.mediaTitle,
         mediaType: sessions.mediaType,
+        grandparentTitle: sessions.grandparentTitle,
+        seasonNumber: sessions.seasonNumber,
+        episodeNumber: sessions.episodeNumber,
+        year: sessions.year,
+        artistName: sessions.artistName,
+        albumName: sessions.albumName,
       })
       .from(terminationLogs)
       .leftJoin(users, eq(terminationLogs.triggeredByUserId, users.id))
