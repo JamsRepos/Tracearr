@@ -6,7 +6,9 @@ version: "3.8"
 services:
   timescale-test:
     image: timescale/timescaledb:latest-pg15
-    shm_size: 256mb  # Required for PostgreSQL shared memory
+    shm_size: 512mb  # Required for PostgreSQL shared memory (increase for large imports)
+    # Increase lock table size for large imports (Tautulli imports with many TimescaleDB chunks)
+    command: postgres -c max_locks_per_transaction=256
     ports:
       - "5433:5432"  # Different port to avoid conflicts with dev
     environment:

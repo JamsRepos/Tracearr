@@ -76,6 +76,9 @@ log_timezone = 'UTC'
 timezone = 'UTC'
 # Allow unlimited tuple decompression for migrations on compressed hypertables
 timescaledb.max_tuples_decompressed_per_dml_transaction = 0
+# Increase lock table size for large imports (Tautulli imports with many chunks)
+# Default is 64, which is insufficient for TimescaleDB hypertables with many chunks
+max_locks_per_transaction = 256
 EOF
 
     # Allow local connections
@@ -241,6 +244,22 @@ if [ -f /data/postgres/postgresql.conf ]; then
         echo "" >> /data/postgres/postgresql.conf
         echo "# Allow unlimited tuple decompression for migrations on compressed hypertables" >> /data/postgres/postgresql.conf
         echo "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" >> /data/postgres/postgresql.conf
+    fi
+fi
+
+# =============================================================================
+# Ensure max_locks_per_transaction is set (for existing databases)
+# =============================================================================
+# This setting increases the lock table size for large imports.
+# TimescaleDB hypertables with many chunks require more locks than the default (64).
+# Without it, Tautulli imports with large histories will fail with
+# "out of shared memory" or "max_locks_per_transaction exceeded" errors.
+if [ -f /data/postgres/postgresql.conf ]; then
+    if ! grep -q "max_locks_per_transaction" /data/postgres/postgresql.conf; then
+        log "Adding max_locks_per_transaction setting for large imports..."
+        echo "" >> /data/postgres/postgresql.conf
+        echo "# Increase lock table size for large imports (Tautulli imports with many chunks)" >> /data/postgres/postgresql.conf
+        echo "max_locks_per_transaction = 256" >> /data/postgres/postgresql.conf
     fi
 fi
 

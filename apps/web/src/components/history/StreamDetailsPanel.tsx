@@ -2,10 +2,11 @@
  * Stream Details Panel - displays source vs stream codec information
  */
 
-import { ArrowRight, Video, AudioLines, Subtitles, Cpu, ChevronDown } from 'lucide-react';
+import { ArrowRight, Video, AudioLines, Subtitles, Cpu, ChevronDown, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type {
   SourceVideoDetails,
@@ -14,6 +15,7 @@ import type {
   StreamAudioDetails,
   TranscodeInfo,
   SubtitleInfo,
+  ServerType,
 } from '@tracearr/shared';
 import { useState } from 'react';
 
@@ -37,6 +39,8 @@ interface StreamDetailsPanelProps {
   videoDecision: string | null;
   audioDecision: string | null;
   bitrate: number | null;
+  // Server type for conditional tooltip
+  serverType: ServerType;
 }
 
 // Format bitrate for display
@@ -48,6 +52,26 @@ function formatBitrate(bitrate: number | null | undefined): string {
     return `${formatted} Mbps`;
   }
   return `${bitrate} kbps`;
+}
+
+// Component for showing "N/A" with tooltip when stream bitrate is unavailable (Jellyfin/Emby only)
+function UnavailableBitrate() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="text-muted-foreground inline-flex cursor-help items-center gap-1">
+          N/A
+          <Info className="h-3 w-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[250px]">
+        <p className="text-xs">
+          Jellyfin and Emby do not expose individual video/audio bitrates during transcoding—only
+          the total stream bitrate is available.
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 // Format resolution using width-first logic to correctly classify
@@ -173,15 +197,19 @@ function ComparisonRow({
 }: {
   label: string;
   sourceValue: string;
-  streamValue?: string;
+  streamValue?: React.ReactNode;
   showArrow?: boolean;
   sourceClassName?: string;
   streamClassName?: string;
   labelClassName?: string;
   labelNoTruncate?: boolean;
 }) {
+  // Only compare for highlighting when both values are strings
   const isDifferent =
-    streamValue && sourceValue !== streamValue && sourceValue !== '—' && streamValue !== '—';
+    typeof streamValue === 'string' &&
+    streamValue !== sourceValue &&
+    sourceValue !== '—' &&
+    streamValue !== '—';
   const sourceClasses = cn(sourceClassName ?? 'truncate font-medium');
   const streamClasses = cn(
     streamClassName ?? 'truncate',
@@ -265,6 +293,7 @@ export function StreamDetailsPanel({
   videoDecision,
   audioDecision,
   bitrate,
+  serverType,
 }: StreamDetailsPanelProps) {
   const [transcodeOpen, setTranscodeOpen] = useState(false);
 
@@ -340,9 +369,16 @@ export function StreamDetailsPanel({
               <ComparisonRow
                 label="Bitrate"
                 sourceValue={formatBitrate(sourceVideoDetails?.bitrate)}
-                streamValue={formatBitrate(
-                  streamVideoDetails?.bitrate ?? sourceVideoDetails?.bitrate
-                )}
+                streamValue={
+                  // Show N/A with tooltip for Jellyfin/Emby transcodes without stream bitrate
+                  videoDecision === 'transcode' &&
+                  !streamVideoDetails?.bitrate &&
+                  serverType !== 'plex' ? (
+                    <UnavailableBitrate />
+                  ) : (
+                    formatBitrate(streamVideoDetails?.bitrate ?? sourceVideoDetails?.bitrate)
+                  )
+                }
               />
               {/* Extended video details - only show if we have them */}
               {sourceVideoDetails?.framerate && (
@@ -416,9 +452,16 @@ export function StreamDetailsPanel({
             <ComparisonRow
               label="Bitrate"
               sourceValue={formatBitrate(sourceAudioDetails?.bitrate)}
-              streamValue={formatBitrate(
-                streamAudioDetails?.bitrate ?? sourceAudioDetails?.bitrate
-              )}
+              streamValue={
+                // Show N/A with tooltip for Jellyfin/Emby transcodes without stream bitrate
+                audioDecision === 'transcode' &&
+                !streamAudioDetails?.bitrate &&
+                serverType !== 'plex' ? (
+                  <UnavailableBitrate />
+                ) : (
+                  formatBitrate(streamAudioDetails?.bitrate ?? sourceAudioDetails?.bitrate)
+                )
+              }
             />
             {sourceAudioDetails?.language && (
               <ComparisonRow

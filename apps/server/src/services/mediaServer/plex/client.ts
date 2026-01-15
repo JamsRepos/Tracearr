@@ -25,8 +25,11 @@ import {
   parseXmlUsersResponse,
   parseSharedServersXml,
   parseStatisticsResourcesResponse,
+  parseMediaMetadataResponse,
+  getTranscodingSessionRatingKeys,
   type PlexServerResource,
   type PlexStatisticsDataPoint,
+  type PlexOriginalMedia,
 } from './parser.js';
 
 const PLEX_TV_BASE = 'https://plex.tv';
@@ -62,6 +65,10 @@ export class PlexClient implements IMediaServerClient, IMediaServerClientWithHis
 
   /**
    * Get all active playback sessions
+   *
+   * For transcoding sessions, this fetches original media metadata from
+   * /library/metadata/{ratingKey} to get accurate source bitrates and details,
+   * since Plex's session data shows transcoded output during transcodes.
    */
   async getSessions(): Promise<MediaSession[]> {
     const data = await fetchJson<unknown>(`${this.baseUrl}/status/sessions`, {
@@ -70,7 +77,51 @@ export class PlexClient implements IMediaServerClient, IMediaServerClientWithHis
       timeout: 10000, // 10s timeout to prevent polling hangs
     });
 
-    return parseSessionsResponse(data);
+    // Identify transcoding sessions that need original media metadata
+    const transcodingRatingKeys = getTranscodingSessionRatingKeys(data);
+
+    // Fetch original media metadata for transcoding sessions in parallel
+    let originalMediaMap: Map<string, PlexOriginalMedia> | undefined;
+    if (transcodingRatingKeys.length > 0) {
+      const metadataResults = await Promise.allSettled(
+        transcodingRatingKeys.map((ratingKey) => this.getMediaMetadata(ratingKey))
+      );
+
+      originalMediaMap = new Map();
+      metadataResults.forEach((result, index) => {
+        const ratingKey = transcodingRatingKeys[index];
+        if (result.status === 'fulfilled' && result.value && ratingKey) {
+          originalMediaMap!.set(ratingKey, result.value);
+        }
+        // Silently skip failed fetches - parser will use session data as fallback
+      });
+    }
+
+    return parseSessionsResponse(data, originalMediaMap);
+  }
+
+  /**
+   * Get original media metadata for a specific item
+   *
+   * Used to get true source file information (bitrate, resolution, codec)
+   * which is needed because Plex's session data shows transcoded output
+   * during transcodes.
+   *
+   * @param ratingKey - The media item's ratingKey
+   * @returns Original media metadata or null if unavailable
+   */
+  async getMediaMetadata(ratingKey: string): Promise<PlexOriginalMedia | null> {
+    try {
+      const data = await fetchJson<unknown>(`${this.baseUrl}/library/metadata/${ratingKey}`, {
+        headers: this.buildHeaders(),
+        service: 'plex',
+        timeout: 5000, // Short timeout since this is supplementary data
+      });
+      return parseMediaMetadataResponse(data);
+    } catch {
+      // Return null if metadata fetch fails - caller will use fallback
+      return null;
+    }
   }
 
   /**

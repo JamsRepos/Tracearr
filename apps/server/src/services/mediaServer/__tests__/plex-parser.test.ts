@@ -22,6 +22,9 @@ import {
   parseXmlUsersResponse,
   parseSharedServersXml,
   parsePlexTvUser,
+  parseMediaMetadataResponse,
+  getTranscodingSessionRatingKeys,
+  type PlexOriginalMedia,
 } from '../plex/parser.js';
 
 // ============================================================================
@@ -860,5 +863,376 @@ describe('Plex Parser Edge Cases', () => {
       User: {},
     });
     expect(session3.playback.progressPercent).toBe(100);
+  });
+});
+
+// ============================================================================
+// Original Media Metadata Parsing Tests (Issue #200 fix)
+// ============================================================================
+
+describe('Plex Original Media Metadata Parser', () => {
+  describe('parseMediaMetadataResponse', () => {
+    it('should parse complete media metadata response', () => {
+      const rawResponse = {
+        MediaContainer: {
+          Metadata: [
+            {
+              Media: [
+                {
+                  bitrate: 24725,
+                  width: 3832,
+                  height: 1600,
+                  container: 'mkv',
+                  Part: [
+                    {
+                      Stream: [
+                        {
+                          streamType: 1, // Video
+                          bitrate: 23957,
+                          width: 3832,
+                          height: 1600,
+                          codec: 'hevc',
+                          frameRate: '24.0',
+                          bitDepth: 10,
+                          colorSpace: 'bt2020nc',
+                          profile: 'main 10',
+                          level: '150',
+                        },
+                        {
+                          streamType: 2, // Audio
+                          bitrate: 768,
+                          channels: 6,
+                          codec: 'eac3',
+                          audioChannelLayout: '5.1(side)',
+                          language: 'English',
+                          samplingRate: 48000,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const result = parseMediaMetadataResponse(rawResponse);
+
+      expect(result).not.toBeNull();
+      expect(result!.videoBitrate).toBe(23957);
+      expect(result!.audioBitrate).toBe(768);
+      expect(result!.videoWidth).toBe(3832);
+      expect(result!.videoHeight).toBe(1600);
+      expect(result!.bitrate).toBe(24725);
+      expect(result!.videoCodec).toBe('HEVC');
+      expect(result!.audioCodec).toBe('EAC3');
+      expect(result!.audioChannels).toBe(6);
+      expect(result!.container).toBe('MKV');
+
+      // Source video details
+      expect(result!.sourceVideoDetails).toBeDefined();
+      expect(result!.sourceVideoDetails!.bitrate).toBe(23957);
+      expect(result!.sourceVideoDetails!.framerate).toBe('24.0');
+      expect(result!.sourceVideoDetails!.colorDepth).toBe(10);
+      expect(result!.sourceVideoDetails!.colorSpace).toBe('bt2020nc');
+      expect(result!.sourceVideoDetails!.profile).toBe('main 10');
+      expect(result!.sourceVideoDetails!.level).toBe('150');
+
+      // Source audio details
+      expect(result!.sourceAudioDetails).toBeDefined();
+      expect(result!.sourceAudioDetails!.bitrate).toBe(768);
+      expect(result!.sourceAudioDetails!.channelLayout).toBe('5.1(side)');
+      expect(result!.sourceAudioDetails!.language).toBe('English');
+      expect(result!.sourceAudioDetails!.sampleRate).toBe(48000);
+    });
+
+    it('should return null for empty response', () => {
+      expect(parseMediaMetadataResponse({})).toBeNull();
+      expect(parseMediaMetadataResponse({ MediaContainer: {} })).toBeNull();
+      expect(parseMediaMetadataResponse({ MediaContainer: { Metadata: [] } })).toBeNull();
+    });
+
+    it('should return null when no Media array', () => {
+      const response = {
+        MediaContainer: {
+          Metadata: [{ title: 'No Media' }],
+        },
+      };
+      expect(parseMediaMetadataResponse(response)).toBeNull();
+    });
+
+    it('should select the selected Media version when multiple exist', () => {
+      const rawResponse = {
+        MediaContainer: {
+          Metadata: [
+            {
+              Media: [
+                {
+                  bitrate: 50000, // 4K version
+                  Part: [{ Stream: [{ streamType: 1, bitrate: 49000, codec: 'hevc' }] }],
+                },
+                {
+                  bitrate: 10000, // 1080p version - SELECTED
+                  selected: '1',
+                  Part: [{ Stream: [{ streamType: 1, bitrate: 9500, codec: 'h264' }] }],
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const result = parseMediaMetadataResponse(rawResponse);
+
+      expect(result).not.toBeNull();
+      expect(result!.bitrate).toBe(10000);
+      expect(result!.videoBitrate).toBe(9500);
+      expect(result!.videoCodec).toBe('H264');
+    });
+  });
+
+  describe('getTranscodingSessionRatingKeys', () => {
+    it('should return ratingKeys for transcoding sessions', () => {
+      const sessionsResponse = {
+        MediaContainer: {
+          Metadata: [
+            {
+              ratingKey: '123',
+              TranscodeSession: { videoDecision: 'transcode', audioDecision: 'copy' },
+            },
+            {
+              ratingKey: '456',
+              TranscodeSession: { videoDecision: 'directplay', audioDecision: 'directplay' },
+            },
+            {
+              ratingKey: '789',
+              TranscodeSession: { videoDecision: 'copy', audioDecision: 'transcode' },
+            },
+          ],
+        },
+      };
+
+      const keys = getTranscodingSessionRatingKeys(sessionsResponse);
+
+      expect(keys).toContain('123'); // Video transcoding
+      expect(keys).not.toContain('456'); // Direct play
+      expect(keys).toContain('789'); // Audio transcoding
+      expect(keys).toHaveLength(2);
+    });
+
+    it('should return empty array when no transcoding sessions', () => {
+      const sessionsResponse = {
+        MediaContainer: {
+          Metadata: [
+            { ratingKey: '123', TranscodeSession: { videoDecision: 'directplay' } },
+            { ratingKey: '456' }, // No TranscodeSession at all
+          ],
+        },
+      };
+
+      const keys = getTranscodingSessionRatingKeys(sessionsResponse);
+
+      expect(keys).toHaveLength(0);
+    });
+
+    it('should handle empty or invalid response', () => {
+      expect(getTranscodingSessionRatingKeys({})).toEqual([]);
+      expect(getTranscodingSessionRatingKeys({ MediaContainer: {} })).toEqual([]);
+      expect(getTranscodingSessionRatingKeys(null)).toEqual([]);
+    });
+  });
+
+  describe('parseSession with originalMedia (transcoding fix)', () => {
+    it('should use originalMedia for source info when transcoding', () => {
+      // Session data shows transcoded output (720p, 2.8 Mbps)
+      const rawSession = {
+        sessionKey: 'transcode-session',
+        ratingKey: '12345',
+        title: 'Predator: Badlands',
+        type: 'movie',
+        duration: 6444791,
+        viewOffset: 268000,
+        User: { id: '1', title: 'John' },
+        Player: { title: 'Chrome', machineIdentifier: 'browser-1', state: 'playing' },
+        Media: [
+          {
+            bitrate: 2849, // Transcoded bitrate
+            width: 1278,
+            height: 534,
+            container: 'mp4',
+            Part: [
+              {
+                Stream: [
+                  {
+                    streamType: 1,
+                    bitrate: 2687, // Transcoded video bitrate
+                    width: 1278,
+                    height: 534,
+                    codec: 'hevc',
+                  },
+                  {
+                    streamType: 2,
+                    bitrate: 162, // Transcoded audio bitrate
+                    channels: 2,
+                    codec: 'aac',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        TranscodeSession: {
+          videoDecision: 'transcode',
+          audioDecision: 'transcode',
+          sourceVideoCodec: 'hevc',
+          sourceAudioCodec: 'eac3',
+          videoCodec: 'hevc',
+          audioCodec: 'aac',
+        },
+      };
+
+      // Original media from /library/metadata (4K source, ~24 Mbps)
+      const originalMedia: PlexOriginalMedia = {
+        videoBitrate: 23957,
+        audioBitrate: 768,
+        videoWidth: 3832,
+        videoHeight: 1600,
+        bitrate: 24725,
+        videoCodec: 'HEVC',
+        audioCodec: 'EAC3',
+        audioChannels: 6,
+        container: 'MKV',
+        sourceVideoDetails: {
+          bitrate: 23957,
+          framerate: '24.0',
+          dynamicRange: 'HDR10',
+          colorDepth: 10,
+          colorSpace: 'bt2020nc',
+        },
+        sourceAudioDetails: {
+          bitrate: 768,
+          channelLayout: '5.1(side)',
+          language: 'English',
+          sampleRate: 48000,
+        },
+      };
+
+      const session = parseSession(rawSession, originalMedia);
+
+      // Source info should come from originalMedia (4K source)
+      expect(session.quality.videoWidth).toBe(3832);
+      expect(session.quality.videoHeight).toBe(1600);
+      expect(session.quality.sourceVideoDetails?.bitrate).toBe(23957);
+      expect(session.quality.sourceAudioDetails?.bitrate).toBe(768);
+      expect(session.quality.sourceVideoDetails?.dynamicRange).toBe('HDR10');
+      expect(session.quality.sourceAudioDetails?.channelLayout).toBe('5.1(side)');
+
+      // Stream info should come from session (transcoded 720p)
+      expect(session.quality.streamVideoDetails?.width).toBe(1278);
+      expect(session.quality.streamVideoDetails?.height).toBe(534);
+      expect(session.quality.streamVideoDetails?.bitrate).toBe(2687);
+      expect(session.quality.streamAudioDetails?.bitrate).toBe(162);
+
+      // Codecs should be correct
+      expect(session.quality.sourceVideoCodec).toBe('HEVC');
+      expect(session.quality.sourceAudioCodec).toBe('EAC3');
+      expect(session.quality.streamVideoCodec).toBe('HEVC');
+      expect(session.quality.streamAudioCodec).toBe('AAC');
+
+      // Transcode info should include source container
+      expect(session.quality.transcodeInfo?.sourceContainer).toBe('MKV');
+    });
+
+    it('should use session data as source when not transcoding', () => {
+      const rawSession = {
+        sessionKey: 'direct-play',
+        ratingKey: '67890',
+        title: 'Direct Play Movie',
+        type: 'movie',
+        duration: 3600000,
+        viewOffset: 0,
+        User: { id: '1', title: 'John' },
+        Player: { title: 'TV', machineIdentifier: 'tv-1', state: 'playing' },
+        Media: [
+          {
+            bitrate: 10000,
+            width: 1920,
+            height: 1080,
+            Part: [
+              {
+                Stream: [
+                  { streamType: 1, bitrate: 9500, width: 1920, height: 1080, codec: 'h264' },
+                  { streamType: 2, bitrate: 500, channels: 6, codec: 'dts' },
+                ],
+              },
+            ],
+          },
+        ],
+        TranscodeSession: { videoDecision: 'directplay', audioDecision: 'directplay' },
+      };
+
+      // Even with originalMedia provided, direct play should use session data
+      const originalMedia: PlexOriginalMedia = {
+        videoBitrate: 9500,
+        audioBitrate: 500,
+        videoWidth: 1920,
+        videoHeight: 1080,
+        bitrate: 10000,
+      };
+
+      const session = parseSession(rawSession, originalMedia);
+
+      // For direct play, session data IS the source
+      expect(session.quality.videoWidth).toBe(1920);
+      expect(session.quality.videoHeight).toBe(1080);
+      expect(session.quality.sourceVideoDetails?.bitrate).toBe(9500);
+      expect(session.quality.sourceAudioDetails?.bitrate).toBe(500);
+      expect(session.quality.isTranscode).toBe(false);
+    });
+
+    it('should fall back to session data when originalMedia not provided for transcode', () => {
+      const rawSession = {
+        sessionKey: 'transcode-no-metadata',
+        ratingKey: '99999',
+        title: 'Transcode Without Metadata',
+        type: 'movie',
+        duration: 3600000,
+        viewOffset: 0,
+        User: { id: '1', title: 'John' },
+        Player: { title: 'Phone', machineIdentifier: 'phone-1', state: 'playing' },
+        Media: [
+          {
+            bitrate: 3000,
+            width: 1280,
+            height: 720,
+            Part: [
+              {
+                Stream: [
+                  { streamType: 1, bitrate: 2800, width: 1280, height: 720, codec: 'h264' },
+                  { streamType: 2, bitrate: 200, channels: 2, codec: 'aac' },
+                ],
+              },
+            ],
+          },
+        ],
+        TranscodeSession: {
+          videoDecision: 'transcode',
+          audioDecision: 'transcode',
+          sourceVideoCodec: 'hevc',
+          sourceAudioCodec: 'truehd',
+        },
+      };
+
+      // No originalMedia provided
+      const session = parseSession(rawSession);
+
+      // Should still work, using session data (which shows transcoded output)
+      expect(session.quality.videoWidth).toBe(1280);
+      expect(session.quality.videoHeight).toBe(720);
+      expect(session.quality.sourceVideoCodec).toBe('HEVC'); // From TranscodeSession
+      expect(session.quality.sourceAudioCodec).toBe('TRUEHD'); // From TranscodeSession
+      expect(session.quality.isTranscode).toBe(true);
+    });
   });
 });

@@ -57,9 +57,10 @@ services:
     # Note: ~1.5GB image size (includes Patroni, backup tools, many extensions)
     image: timescale/timescaledb-ha:pg18
     container_name: tracearr-db
-    shm_size: 256mb  # Required for PostgreSQL shared memory
+    shm_size: 512mb  # Required for PostgreSQL shared memory (increase for large imports)
     # Allow unlimited tuple decompression for migrations on compressed hypertables
-    command: postgres -c timescaledb.max_tuples_decompressed_per_dml_transaction=0
+    # Increase lock table size for large imports (Tautulli imports with many TimescaleDB chunks)
+    command: postgres -c timescaledb.max_tuples_decompressed_per_dml_transaction=0 -c max_locks_per_transaction=256
     environment:
       - POSTGRES_USER=tracearr
       - POSTGRES_PASSWORD=${DB_PASSWORD:-tracearr}
