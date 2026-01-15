@@ -7,7 +7,7 @@
 
 import { Queue, Worker, type Job, type ConnectionOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
-import { eq, and, isNull, sql, lte } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import type {
   Rule,
   AccountInactivityParams,
@@ -39,8 +39,8 @@ let connectionOptions: ConnectionOptions | null = null;
 let inactivityQueue: Queue<InactivityCheckJobData> | null = null;
 let inactivityWorker: Worker<InactivityCheckJobData> | null = null;
 
-// Redis client for caching
-let redisClient: Redis | null = null;
+// Redis client reference (kept for potential future use with caching)
+let _redisClient: Redis | null = null;
 
 // Pub/sub service for broadcasting violations
 let pubSubPublish: ((event: string, data: unknown) => Promise<void>) | null = null;
@@ -59,7 +59,7 @@ export function initInactivityCheckQueue(
   }
 
   connectionOptions = { url: redisUrl };
-  redisClient = redis;
+  _redisClient = redis;
   pubSubPublish = publishFn;
 
   // Create the inactivity check queue
@@ -455,7 +455,7 @@ export async function shutdownInactivityCheckQueue(): Promise<void> {
     inactivityQueue = null;
   }
 
-  redisClient = null;
+  _redisClient = null;
   pubSubPublish = null;
 
   console.log('[Inactivity] Queue shutdown complete');
