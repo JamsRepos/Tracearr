@@ -23,6 +23,7 @@ config({ path: resolve(PROJECT_ROOT, '.env') });
 
 // GeoIP database path (in project root/data)
 const GEOIP_DB_PATH = resolve(PROJECT_ROOT, 'data/GeoLite2-City.mmdb');
+const GEOASN_DB_PATH = resolve(PROJECT_ROOT, 'data/GeoLite2-ASN.mmdb');
 
 // Migrations path (relative to compiled output in production, source in dev)
 const MIGRATIONS_PATH = resolve(__dirname, '../src/db/migrations');
@@ -57,6 +58,7 @@ import { maintenanceRoutes } from './routes/maintenance.js';
 import { getPollerSettings, getNetworkSettings } from './routes/settings.js';
 import { initializeEncryption, migrateToken, looksEncrypted } from './utils/crypto.js';
 import { geoipService } from './services/geoip.js';
+import { geoasnService } from './services/geoasn.js';
 import { createCacheService, createPubSubService } from './services/cache.js';
 import { initializePoller, startPoller, stopPoller } from './jobs/poller/index.js';
 import { sseManager } from './services/sseManager.js';
@@ -196,6 +198,14 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     app.log.info('GeoIP database loaded');
   } else {
     app.log.warn('GeoIP database not available - location features disabled');
+  }
+
+  // Initialize GeoASN service (optional - graceful degradation)
+  await geoasnService.initialize(GEOASN_DB_PATH);
+  if (geoasnService.hasDatabase()) {
+    app.log.info('GeoASN database loaded');
+  } else {
+    app.log.warn('GeoASN database not available - ASN data disabled');
   }
 
   // Security plugins - relaxed for HTTP-only deployments

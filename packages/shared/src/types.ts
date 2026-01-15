@@ -288,8 +288,12 @@ export interface Session extends StreamDetailFields {
   geoCity: string | null;
   geoRegion: string | null; // State/province/subdivision
   geoCountry: string | null;
+  geoContinent: string | null;
+  geoPostal: string | null;
   geoLat: number | null;
   geoLon: number | null;
+  geoAsnNumber: number | null;
+  geoAsnOrganization: string | null;
   playerName: string | null; // Friendly device name
   deviceId: string | null; // Unique device identifier (machineIdentifier)
   product: string | null; // Product/app name (e.g., "Plex for iOS")
@@ -417,6 +421,8 @@ export interface ViolationSessionInfo {
   geoCity: string | null;
   geoRegion: string | null;
   geoCountry: string | null;
+  geoContinent: string | null;
+  geoPostal: string | null;
   geoLat: number | null;
   geoLon: number | null;
   playerName: string | null;

@@ -10,8 +10,12 @@ export interface GeoLocation {
   region: string | null; // State/province/subdivision
   country: string | null;
   countryCode: string | null;
+  continent: string | null;
+  postal: string | null;
   lat: number | null;
   lon: number | null;
+  asnNumber: number | null;
+  asnOrganization: string | null;
 }
 
 const NULL_LOCATION: GeoLocation = {
@@ -19,8 +23,12 @@ const NULL_LOCATION: GeoLocation = {
   region: null,
   country: null,
   countryCode: null,
+  continent: null,
+  postal: null,
   lat: null,
   lon: null,
+  asnNumber: null,
+  asnOrganization: null,
 };
 
 const LOCAL_LOCATION: GeoLocation = {
@@ -28,8 +36,12 @@ const LOCAL_LOCATION: GeoLocation = {
   region: null,
   country: 'Local Network',
   countryCode: null,
+  continent: null,
+  postal: null,
   lat: null,
   lon: null,
+  asnNumber: null,
+  asnOrganization: null,
 };
 
 export class GeoIPService {
@@ -87,8 +99,12 @@ export class GeoIPService {
         region,
         country: result.country?.names?.en ?? null,
         countryCode: result.country?.iso_code ?? null,
+        continent: result.continent?.names?.en ?? null,
+        postal: result.postal?.code ?? null,
         lat: result.location?.latitude ?? null,
         lon: result.location?.longitude ?? null,
+        asnNumber: null,
+        asnOrganization: null,
       };
     } catch {
       return NULL_LOCATION;

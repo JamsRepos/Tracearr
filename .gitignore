@@ -33,6 +33,7 @@ pnpm-debug.log*
 # Database (keep GeoLite2 database committed)
 data/*.mmdb
 !data/GeoLite2-City.mmdb
+!data/GeoLite2-ASN.mmdb
 
 # Local server data
 apps/server/data/

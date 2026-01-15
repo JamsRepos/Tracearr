@@ -9,6 +9,7 @@ import { db } from '../db/client.js';
 import { settings, sessions, serverUsers, users } from '../db/schema.js';
 import { refreshAggregates } from '../db/timescale.js';
 import { geoipService } from './geoip.js';
+import { geoasnService } from './geoasn.js';
 import type { PubSubService } from './cache.js';
 import {
   queryExistingByExternalIds,
@@ -850,7 +851,13 @@ export class TautulliService {
           const ipForLookup = record.ip_address ?? '0.0.0.0';
           let geo = geoCache.get(ipForLookup);
           if (!geo) {
-            geo = geoipService.lookup(ipForLookup);
+            const baseGeo = geoipService.lookup(ipForLookup);
+            const asn = geoasnService.lookup(ipForLookup);
+            geo = {
+              ...baseGeo,
+              asnNumber: asn.number,
+              asnOrganization: asn.organization,
+            };
             geoCache.set(ipForLookup, geo);
           }
 
@@ -917,8 +924,12 @@ export class TautulliService {
             geoCity: geo.city,
             geoRegion: geo.region,
             geoCountry: geo.countryCode ?? geo.country,
+            geoContinent: geo.continent,
+            geoPostal: geo.postal,
             geoLat: geo.lat,
             geoLon: geo.lon,
+            geoAsnNumber: geo.asnNumber,
+            geoAsnOrganization: geo.asnOrganization,
             playerName: record.player || record.product,
             deviceId: record.machine_id || null,
             product: record.product || null,

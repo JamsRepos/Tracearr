@@ -482,8 +482,12 @@ describe('transformActivityToSession', () => {
     region: 'New Jersey',
     country: 'US',
     countryCode: 'US',
+    continent: 'North America',
+    postal: '07302',
     lat: 40.7282,
     lon: -74.0776,
+    asnNumber: 7922,
+    asnOrganization: 'Comcast Cable Communications, LLC',
   };
 
   const serverId = 'server-uuid-1234';
@@ -690,8 +694,12 @@ describe('transformActivityToSession', () => {
         region: null,
         country: null,
         countryCode: null,
+        continent: null,
+        postal: null,
         lat: null,
         lon: null,
+        asnNumber: null,
+        asnOrganization: null,
       };
       const session = transformActivityToSession(MOVIE_ACTIVITY, serverId, serverUserId, nullGeo);
 
@@ -1335,8 +1343,21 @@ vi.mock('../geoip.js', () => ({
       region: ip === '73.160.197.140' ? 'New Jersey' : null,
       country: ip === '73.160.197.140' ? 'US' : null,
       countryCode: ip === '73.160.197.140' ? 'US' : null,
+      continent: ip === '73.160.197.140' ? 'North America' : null,
+      postal: ip === '73.160.197.140' ? '07302' : null,
       lat: ip === '73.160.197.140' ? 40.7282 : null,
       lon: ip === '73.160.197.140' ? -74.0776 : null,
+      asnNumber: null,
+      asnOrganization: null,
+    })),
+  },
+}));
+
+vi.mock('../geoasn.js', () => ({
+  geoasnService: {
+    lookup: vi.fn((ip: string) => ({
+      number: ip === '73.160.197.140' ? 7922 : null,
+      organization: ip === '73.160.197.140' ? 'Comcast Cable Communications, LLC' : null,
     })),
   },
 }));

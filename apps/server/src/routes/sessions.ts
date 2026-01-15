@@ -321,8 +321,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
           s.geo_city,
           s.geo_region,
           s.geo_country,
+          s.geo_continent,
+          s.geo_postal,
           s.geo_lat,
           s.geo_lon,
+          s.geo_asn_number,
+          s.geo_asn_organization,
           s.player_name,
           s.device_id,
           s.product,
@@ -389,8 +393,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         geo_city: string | null;
         geo_region: string | null;
         geo_country: string | null;
+        geo_continent: string | null;
+        geo_postal: string | null;
         geo_lat: number | null;
         geo_lon: number | null;
+        geo_asn_number: number | null;
+        geo_asn_organization: string | null;
         player_name: string | null;
         device_id: string | null;
         product: string | null;
@@ -454,8 +462,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       geoCity: row.geo_city,
       geoRegion: row.geo_region,
       geoCountry: row.geo_country,
+      geoContinent: row.geo_continent,
+      geoPostal: row.geo_postal,
       geoLat: row.geo_lat,
       geoLon: row.geo_lon,
+      geoAsnNumber: row.geo_asn_number,
+      geoAsnOrganization: row.geo_asn_organization,
       playerName: row.player_name,
       deviceId: row.device_id,
       product: row.product,
@@ -619,8 +631,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
           s.geo_city,
           s.geo_region,
           s.geo_country,
+          s.geo_continent,
+          s.geo_postal,
           s.geo_lat,
           s.geo_lon,
+          s.geo_asn_number,
+          s.geo_asn_organization,
           s.player_name,
           s.device_id,
           s.product,
@@ -698,8 +714,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         geo_city: string | null;
         geo_region: string | null;
         geo_country: string | null;
+        geo_continent: string | null;
+        geo_postal: string | null;
         geo_lat: number | null;
         geo_lon: number | null;
+        geo_asn_number: number | null;
+        geo_asn_organization: string | null;
         player_name: string | null;
         device_id: string | null;
         product: string | null;
@@ -763,8 +783,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       geoCity: row.geo_city,
       geoRegion: row.geo_region,
       geoCountry: row.geo_country,
+      geoContinent: row.geo_continent,
+      geoPostal: row.geo_postal,
       geoLat: row.geo_lat,
       geoLon: row.geo_lon,
+      geoAsnNumber: row.geo_asn_number,
+      geoAsnOrganization: row.geo_asn_organization,
       playerName: row.player_name,
       deviceId: row.device_id,
       product: row.product,
@@ -1137,6 +1161,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         geoCountry: sessions.geoCountry,
         geoLat: sessions.geoLat,
         geoLon: sessions.geoLon,
+        geoAsnNumber: sessions.geoAsnNumber,
+        geoAsnOrganization: sessions.geoAsnOrganization,
         playerName: sessions.playerName,
         deviceId: sessions.deviceId,
         product: sessions.product,
@@ -1221,6 +1247,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       geoCountry: row.geoCountry,
       geoLat: row.geoLat,
       geoLon: row.geoLon,
+      geoAsnNumber: row.geoAsnNumber,
+      geoAsnOrganization: row.geoAsnOrganization,
       playerName: row.playerName,
       deviceId: row.deviceId,
       product: row.product,

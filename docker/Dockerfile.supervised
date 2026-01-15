@@ -99,6 +99,7 @@ COPY --from=builder /app/apps/server/src/db/migrations ./apps/server/src/db/migr
 
 # GeoIP database (bundled for geolocation features)
 COPY data/GeoLite2-City.mmdb ./data/GeoLite2-City.mmdb
+COPY data/GeoLite2-ASN.mmdb ./data/GeoLite2-ASN.mmdb
 
 # Install production dependencies (ignore-scripts prevents prepare/husky from running)
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts

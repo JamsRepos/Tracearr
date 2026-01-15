@@ -278,8 +278,12 @@ export const sessions = pgTable(
     geoCity: varchar('geo_city', { length: 255 }),
     geoRegion: varchar('geo_region', { length: 255 }), // State/province/subdivision
     geoCountry: varchar('geo_country', { length: 100 }),
+    geoContinent: varchar('geo_continent', { length: 100 }),
+    geoPostal: varchar('geo_postal', { length: 20 }),
     geoLat: real('geo_lat'),
     geoLon: real('geo_lon'),
+    geoAsnNumber: integer('geo_asn_number'),
+    geoAsnOrganization: varchar('geo_asn_organization', { length: 255 }),
     playerName: varchar('player_name', { length: 255 }), // Player title/friendly name
     deviceId: varchar('device_id', { length: 255 }), // Machine identifier (unique device UUID)
     product: varchar('product', { length: 255 }), // Product name (e.g., "Plex for iOS")

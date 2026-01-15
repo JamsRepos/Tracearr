@@ -28,6 +28,7 @@ import { db } from '../db/client.js';
 import { servers, sessions } from '../db/schema.js';
 import { refreshAggregates } from '../db/timescale.js';
 import { geoipService } from './geoip.js';
+import { geoasnService } from './geoasn.js';
 import type { PubSubService } from './cache.js';
 import { JellyfinClient } from './mediaServer/jellyfin/client.js';
 import { EmbyClient } from './mediaServer/emby/client.js';
@@ -388,8 +389,12 @@ export function transformActivityToSession(
     geoCity: geo.city,
     geoRegion: geo.region,
     geoCountry: geo.countryCode ?? geo.country,
+    geoContinent: geo.continent,
+    geoPostal: geo.postal,
     geoLat: geo.lat,
     geoLon: geo.lon,
+    geoAsnNumber: geo.asnNumber,
+    geoAsnOrganization: geo.asnOrganization,
     // Normalize client info for consistency with live sessions
     // normalizeClient handles "AndroidTv" → "Android TV", "Emby for Kodi Next Gen" → "Kodi", etc.
     ...(() => {
@@ -685,7 +690,13 @@ export async function importJellystatBackup(
           const ipAddress = activity.RemoteEndPoint ?? '0.0.0.0';
           let geo = geoCache.get(ipAddress);
           if (!geo) {
-            geo = geoipService.lookup(ipAddress);
+            const baseGeo = geoipService.lookup(ipAddress);
+            const asn = geoasnService.lookup(ipAddress);
+            geo = {
+              ...baseGeo,
+              asnNumber: asn.number,
+              asnOrganization: asn.organization,
+            };
             geoCache.set(ipAddress, geo);
           }
 

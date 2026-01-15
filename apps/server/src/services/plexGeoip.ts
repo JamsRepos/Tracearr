@@ -7,6 +7,7 @@
  */
 
 import { geoipService, type GeoLocation } from './geoip.js';
+import { geoasnService } from './geoasn.js';
 
 const PLEX_GEOIP_URL = 'https://plex.tv/api/v2/geoip';
 const PLEX_GEOIP_TIMEOUT = 5000; // 5 second timeout
@@ -68,8 +69,12 @@ async function lookupPlex(ip: string): Promise<GeoLocation | null> {
       region,
       country,
       countryCode,
+      continent: null,
+      postal: null,
       lat: coords?.lat ?? null,
       lon: coords?.lon ?? null,
+      asnNumber: null,
+      asnOrganization: null,
     };
   } catch {
     // Network error, timeout, or parse error
@@ -81,9 +86,25 @@ async function lookupPlex(ip: string): Promise<GeoLocation | null> {
  * Count non-null fields in a GeoLocation
  */
 function countFields(loc: GeoLocation): number {
-  return [loc.city, loc.region, loc.country, loc.countryCode, loc.lat, loc.lon].filter(
-    (v) => v !== null
-  ).length;
+  return [
+    loc.city,
+    loc.region,
+    loc.country,
+    loc.countryCode,
+    loc.continent,
+    loc.postal,
+    loc.lat,
+    loc.lon,
+  ].filter((v) => v !== null).length;
+}
+
+function attachAsn(ip: string, location: GeoLocation): GeoLocation {
+  const asn = geoasnService.lookup(ip);
+  return {
+    ...location,
+    asnNumber: asn.number,
+    asnOrganization: asn.organization,
+  };
 }
 
 /**
@@ -99,12 +120,12 @@ function countFields(loc: GeoLocation): number {
 export async function lookupGeoIP(ip: string, usePlexGeoip: boolean): Promise<GeoLocation> {
   // Always delegate private IP check to geoipService (returns LOCAL_LOCATION)
   if (geoipService.isPrivateIP(ip)) {
-    return geoipService.lookup(ip);
+    return attachAsn(ip, geoipService.lookup(ip));
   }
 
   // If Plex GeoIP is disabled, use MaxMind only
   if (!usePlexGeoip) {
-    return geoipService.lookup(ip);
+    return attachAsn(ip, geoipService.lookup(ip));
   }
 
   // Try Plex first
@@ -112,7 +133,7 @@ export async function lookupGeoIP(ip: string, usePlexGeoip: boolean): Promise<Ge
 
   // If Plex failed completely, use MaxMind
   if (!plexResult) {
-    return geoipService.lookup(ip);
+    return attachAsn(ip, geoipService.lookup(ip));
   }
 
   // If Plex returned data but missing city, also try MaxMind and compare
@@ -123,9 +144,9 @@ export async function lookupGeoIP(ip: string, usePlexGeoip: boolean): Promise<Ge
     const plexFields = countFields(plexResult);
     const maxmindFields = countFields(maxmindResult);
 
-    return maxmindFields > plexFields ? maxmindResult : plexResult;
+    return attachAsn(ip, maxmindFields > plexFields ? maxmindResult : plexResult);
   }
 
   // Plex succeeded with city data - use it
-  return plexResult;
+  return attachAsn(ip, plexResult);
 }

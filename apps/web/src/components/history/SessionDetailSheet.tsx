@@ -3,6 +3,7 @@
  * Uses condensed info sections matching the app's design patterns.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Separator } from '@/components/ui/separator';
 import {
   Film,
   Tv,
@@ -31,6 +34,7 @@ import {
   Gauge,
   Clock,
   ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
 import { cn, getCountryName, getMediaDisplay } from '@/lib/utils';
 import { getAvatarUrl } from '@/components/users/utils';
@@ -196,6 +200,8 @@ function Section({
 }
 
 export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
+  const [locationOpen, setLocationOpen] = useState(false);
+
   if (!session) return null;
 
   const serverConfig = SERVER_CONFIG[session.server.type];
@@ -204,7 +210,13 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
   const MediaIcon = mediaConfig.icon;
   const { title: primary, subtitle: secondary } = getMediaDisplay(session);
   const progress = getProgress(session);
-  const hasLocation = session.geoLat && session.geoLon;
+  const hasLocation = session.geoLat !== null && session.geoLon !== null;
+  const geoCountryName = getCountryName(session.geoCountry);
+  const geoCoordinates =
+    session.geoLat !== null && session.geoLon !== null
+      ? `${session.geoLat.toFixed(4)}, ${session.geoLon.toFixed(4)}`
+      : null;
+  const geoAsnNumber = session.geoAsnNumber ? `AS${session.geoAsnNumber}` : null;
 
   // Get poster URL if available
   const posterUrl = session.thumbPath
@@ -212,11 +224,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
     : null;
 
   // Build location string
-  const locationParts = [
-    session.geoCity,
-    session.geoRegion,
-    getCountryName(session.geoCountry),
-  ].filter(Boolean);
+  const locationParts = [session.geoCity, session.geoRegion, geoCountryName].filter(Boolean);
   const locationString = locationParts.join(', ');
   const transcodeReasons = session.transcodeInfo?.reasons ?? [];
   const hasTranscodeReason = transcodeReasons.length > 0;
@@ -366,19 +374,71 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
 
           {/* Location & Network */}
           <Section icon={MapPin} title="Location">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">IP Address</span>
-                <span className="font-mono text-xs">{session.ipAddress || '—'}</span>
-              </div>
+            <Collapsible open={locationOpen} onOpenChange={setLocationOpen} className="space-y-2">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="hover:text-foreground flex w-full items-center justify-between text-sm transition-colors"
+                >
+                  <span className="text-muted-foreground">IP Address</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs">{session.ipAddress || '—'}</span>
+                    <ChevronDown
+                      className={cn(
+                        'text-muted-foreground h-3.5 w-3.5 transition-transform',
+                        locationOpen && 'rotate-180'
+                      )}
+                    />
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              {hasLocation && <MiniMap lat={session.geoLat!} lon={session.geoLon!} />}
               {locationString && (
                 <div className="flex items-center gap-1.5 text-sm">
                   <Globe className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
                   <span>{locationString}</span>
                 </div>
               )}
-              {hasLocation && <MiniMap lat={session.geoLat!} lon={session.geoLon!} />}
-            </div>
+              <CollapsibleContent className="space-y-2">
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Continent</span>
+                    <span>{session.geoContinent ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Country</span>
+                    <span>{geoCountryName ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Region</span>
+                    <span>{session.geoRegion ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">City</span>
+                    <span>{session.geoCity ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Postal Code</span>
+                    <span>{session.geoPostal ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Coordinates</span>
+                    <span className="font-mono text-xs">{geoCoordinates ?? '—'}</span>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">ASN</span>
+                    <span>{geoAsnNumber ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">ASN Org</span>
+                    <span className="max-w-[180px] truncate text-right">
+                      {session.geoAsnOrganization ?? '—'}
+                    </span>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </Section>
 
           {/* Device */}
