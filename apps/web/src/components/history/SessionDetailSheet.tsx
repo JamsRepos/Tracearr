@@ -32,7 +32,7 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { cn, getCountryName } from '@/lib/utils';
+import { cn, getCountryName, getMediaDisplay } from '@/lib/utils';
 import { getAvatarUrl } from '@/components/users/utils';
 import { useTheme } from '@/components/theme-provider';
 import { StreamDetailsPanel } from './StreamDetailsPanel';
@@ -128,37 +128,6 @@ function getProgress(session: SessionWithDetails): number {
   return Math.min(100, Math.round((progress / session.totalDurationMs) * 100));
 }
 
-// Get media title formatted
-function getMediaTitle(session: SessionWithDetails | ActiveSession): {
-  primary: string;
-  secondary?: string;
-} {
-  if (session.mediaType === 'episode' && session.grandparentTitle) {
-    const epNum =
-      session.seasonNumber && session.episodeNumber
-        ? `S${session.seasonNumber.toString().padStart(2, '0')} E${session.episodeNumber.toString().padStart(2, '0')}`
-        : '';
-    return {
-      primary: session.grandparentTitle,
-      secondary: `${epNum}${epNum ? ' · ' : ''}${session.mediaTitle}`,
-    };
-  }
-  if (session.mediaType === 'track') {
-    // Music track - show track name, artist/album as secondary
-    const parts: string[] = [];
-    if (session.artistName) parts.push(session.artistName);
-    if (session.albumName) parts.push(session.albumName);
-    return {
-      primary: session.mediaTitle,
-      secondary: parts.length > 0 ? parts.join(' · ') : undefined,
-    };
-  }
-  return {
-    primary: session.mediaTitle,
-    secondary: session.year ? `(${session.year})` : undefined,
-  };
-}
-
 // Mini map component for session location
 function MiniMap({ lat, lon }: { lat: number; lon: number }) {
   const { theme } = useTheme();
@@ -233,7 +202,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
   const stateConfig = STATE_CONFIG[session.state];
   const mediaConfig = MEDIA_CONFIG[session.mediaType];
   const MediaIcon = mediaConfig.icon;
-  const title = getMediaTitle(session);
+  const { title: primary, subtitle: secondary } = getMediaDisplay(session);
   const progress = getProgress(session);
   const hasLocation = session.geoLat && session.geoLon;
 
@@ -281,7 +250,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
             {posterUrl && (
               <img
                 src={posterUrl}
-                alt={title.primary}
+                alt={primary}
                 className="h-20 w-14 flex-shrink-0 rounded object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -295,13 +264,11 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
                 {session.year && <span>· {session.year}</span>}
               </div>
               <div className="flex items-center gap-1.5 leading-tight font-medium">
-                <span className="truncate">{title.primary}</span>
+                <span className="truncate">{primary}</span>
                 {session.watched && <Eye className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />}
               </div>
-              {title.secondary && (
-                <div className="text-muted-foreground mt-0.5 truncate text-sm">
-                  {title.secondary}
-                </div>
+              {secondary && (
+                <div className="text-muted-foreground mt-0.5 truncate text-sm">{secondary}</div>
               )}
               {/* Progress inline */}
               <div className="mt-2 flex items-center gap-2">
@@ -513,6 +480,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
               videoDecision={session.videoDecision ?? null}
               audioDecision={session.audioDecision ?? null}
               bitrate={session.bitrate ?? null}
+              serverType={session.server.type}
             />
           </Section>
         </div>

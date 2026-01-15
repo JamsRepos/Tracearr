@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { cn, getCountryName } from '@/lib/utils';
+import { cn, getCountryName, getMediaDisplay } from '@/lib/utils';
 import { useEstimatedProgress } from '@/hooks/useEstimatedProgress';
 import { useAuth } from '@/hooks/useAuth';
 import { TerminateSessionDialog } from './TerminateSessionDialog';
@@ -55,36 +55,6 @@ function formatDuration(ms: number | null): string {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Get display title for media
-function getMediaDisplay(session: ActiveSession): { title: string; subtitle: string | null } {
-  if (session.mediaType === 'episode' && session.grandparentTitle) {
-    // TV Show episode
-    const episodeInfo =
-      session.seasonNumber && session.episodeNumber
-        ? `S${session.seasonNumber.toString().padStart(2, '0')} E${session.episodeNumber.toString().padStart(2, '0')}`
-        : '';
-    return {
-      title: session.grandparentTitle,
-      subtitle: episodeInfo ? `${episodeInfo} · ${session.mediaTitle}` : session.mediaTitle,
-    };
-  }
-  if (session.mediaType === 'track') {
-    // Music track - show track name as title, artist/album as subtitle
-    const parts: string[] = [];
-    if (session.artistName) parts.push(session.artistName);
-    if (session.albumName) parts.push(session.albumName);
-    return {
-      title: session.mediaTitle,
-      subtitle: parts.length > 0 ? parts.join(' · ') : null,
-    };
-  }
-  // Movie
-  return {
-    title: session.mediaTitle,
-    subtitle: session.year ? `${session.year}` : null,
-  };
 }
 
 export function NowPlayingCard({ session, onClick }: NowPlayingCardProps) {

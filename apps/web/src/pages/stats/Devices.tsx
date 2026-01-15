@@ -24,6 +24,7 @@ import {
 import { useServer } from '@/hooks/useServer';
 import { useTimeRange } from '@/hooks/useTimeRange';
 import { cn } from '@/lib/utils';
+import { getAvatarUrl } from '@/components/users/utils';
 
 // Color coding for direct play percentage
 function getDirectPlayColor(pct: number): string {
@@ -367,7 +368,10 @@ export function StatsDevices() {
                         className="flex items-center gap-3 hover:underline"
                       >
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatar ?? undefined} alt={user.username} />
+                          <AvatarImage
+                            src={getAvatarUrl(selectedServerId, user.avatar, 32) ?? undefined}
+                            alt={user.username}
+                          />
                           <AvatarFallback>
                             {(user.identityName ?? user.username).slice(0, 2).toUpperCase()}
                           </AvatarFallback>

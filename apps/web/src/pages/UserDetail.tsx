@@ -9,7 +9,7 @@ import { EditUserNameDialog } from '@/components/users/EditUserNameDialog';
 import { SeverityBadge } from '@/components/violations/SeverityBadge';
 import { ActiveSessionBadge } from '@/components/sessions/ActiveSessionBadge';
 import { getAvatarUrl } from '@/components/users/utils';
-import { getCountryName } from '@/lib/utils';
+import { getCountryName, getMediaDisplay } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -57,12 +57,19 @@ const sessionColumns: ColumnDef<Session>[] = [
   {
     accessorKey: 'mediaTitle',
     header: 'Media',
-    cell: ({ row }) => (
-      <div className="max-w-[200px]">
-        <p className="truncate font-medium">{row.original.mediaTitle}</p>
-        <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const { title, subtitle } = getMediaDisplay(row.original);
+      return (
+        <div className="max-w-[200px]">
+          <p className="truncate font-medium">{title}</p>
+          {subtitle ? (
+            <p className="text-muted-foreground text-xs">{subtitle}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: 'state',
@@ -190,14 +197,21 @@ const terminationColumns: ColumnDef<TerminationLogWithDetails>[] = [
   {
     accessorKey: 'mediaTitle',
     header: 'Media',
-    cell: ({ row }) => (
-      <div className="max-w-[200px]">
-        <p className="truncate font-medium">{row.original.mediaTitle ?? '—'}</p>
-        <p className="text-muted-foreground text-xs capitalize">
-          {row.original.mediaType ?? 'unknown'}
-        </p>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const { title, subtitle } = getMediaDisplay(row.original);
+      return (
+        <div className="max-w-[200px]">
+          <p className="truncate font-medium">{title || '—'}</p>
+          {subtitle ? (
+            <p className="text-muted-foreground text-xs">{subtitle}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs capitalize">
+              {row.original.mediaType ?? 'unknown'}
+            </p>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: 'createdAt',

@@ -1130,6 +1130,12 @@ export interface TerminationLogWithDetails {
   // Session info for context
   mediaTitle: string | null;
   mediaType: MediaType | null;
+  grandparentTitle: string | null; // Show name (for episodes)
+  seasonNumber: number | null; // Season number (for episodes)
+  episodeNumber: number | null; // Episode number (for episodes)
+  year: number | null; // Release year
+  artistName: string | null; // Artist name (for music tracks)
+  albumName: string | null; // Album name (for music tracks)
 }
 
 // =============================================================================

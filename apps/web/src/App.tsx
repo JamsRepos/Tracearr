@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router';
 import { Toaster } from '@/components/ui/sonner';
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Login } from '@/pages/Login';
 import { PlexCallback } from '@/pages/PlexCallback';
 import { Setup } from '@/pages/Setup';
@@ -24,6 +25,9 @@ import { Debug } from '@/pages/Debug';
 import { NotFound } from '@/pages/NotFound';
 
 export function App() {
+  // Automatically update document title based on current route
+  useDocumentTitle();
+
   return (
     <>
       <Routes>

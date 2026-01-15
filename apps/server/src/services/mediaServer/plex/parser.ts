@@ -31,6 +31,35 @@ import { extractPlexLiveTvMetadata, extractPlexMusicMetadata } from './plexUtils
 // Raw Plex API Response Types (for internal use)
 // ============================================================================
 
+/**
+ * Original media metadata from /library/metadata/{ratingKey}
+ * Used to get true source info when session data shows transcoded output
+ */
+export interface PlexOriginalMedia {
+  /** Video bitrate in kbps */
+  videoBitrate?: number;
+  /** Audio bitrate in kbps */
+  audioBitrate?: number;
+  /** Video width in pixels */
+  videoWidth?: number;
+  /** Video height in pixels */
+  videoHeight?: number;
+  /** Overall media bitrate in kbps */
+  bitrate?: number;
+  /** Video codec (e.g., 'hevc', 'h264') */
+  videoCodec?: string;
+  /** Audio codec (e.g., 'eac3', 'truehd') */
+  audioCodec?: string;
+  /** Audio channel count */
+  audioChannels?: number;
+  /** Container format (e.g., 'mkv', 'mp4') */
+  container?: string;
+  /** Additional source video details */
+  sourceVideoDetails?: SourceVideoDetails;
+  /** Additional source audio details */
+  sourceAudioDetails?: SourceAudioDetails;
+}
+
 /** Raw session metadata from Plex API */
 export interface PlexRawSession {
   sessionKey?: unknown;
@@ -454,6 +483,96 @@ function extractStreamDetails(
 }
 
 // ============================================================================
+// Original Media Metadata Parsing
+// ============================================================================
+
+/**
+ * Parse original media metadata from /library/metadata/{ratingKey} response.
+ * This provides the TRUE source file information, which is needed because
+ * during transcodes, the session's Media/Part/Stream data shows transcoded output.
+ */
+export function parseMediaMetadataResponse(data: unknown): PlexOriginalMedia | null {
+  const container = data as { MediaContainer?: { Metadata?: unknown[] } };
+  const metadata = container?.MediaContainer?.Metadata;
+  if (!Array.isArray(metadata) || metadata.length === 0) return null;
+
+  const item = metadata[0] as Record<string, unknown>;
+  const mediaArray = item?.Media as Array<Record<string, unknown>> | undefined;
+  if (!mediaArray || mediaArray.length === 0) return null;
+
+  // Get the first media (or selected one if multiple versions exist)
+  const selectedMedia = mediaArray.find((m) => parseString(m.selected) === '1') ?? mediaArray[0];
+  const parts = selectedMedia?.Part as Array<Record<string, unknown>> | undefined;
+  const part = parts?.[0];
+
+  // Find video and audio streams
+  const streams = part?.Stream as Array<Record<string, unknown>> | undefined;
+  const videoStream = streams?.find((s) => parseNumber(s.streamType) === STREAM_TYPE.VIDEO);
+  const audioStream = streams?.find((s) => parseNumber(s.streamType) === STREAM_TYPE.AUDIO);
+
+  // Extract source video details
+  const sourceVideoDetails: SourceVideoDetails = {};
+  if (videoStream) {
+    const videoBitrate = parseOptionalNumber(videoStream.bitrate);
+    if (videoBitrate) sourceVideoDetails.bitrate = videoBitrate;
+
+    const frameRate =
+      parseOptionalString(videoStream.frameRate) ??
+      parseOptionalString(selectedMedia?.videoFrameRate);
+    if (frameRate) sourceVideoDetails.framerate = frameRate;
+
+    const dynamicRange = deriveDynamicRange(videoStream);
+    if (dynamicRange !== 'SDR') sourceVideoDetails.dynamicRange = dynamicRange;
+    else sourceVideoDetails.dynamicRange = 'SDR';
+
+    const aspectRatio = parseOptionalNumber(selectedMedia?.aspectRatio);
+    if (aspectRatio) sourceVideoDetails.aspectRatio = aspectRatio;
+
+    const profile = parseOptionalString(videoStream.profile);
+    if (profile) sourceVideoDetails.profile = profile;
+
+    const level = parseOptionalString(videoStream.level);
+    if (level) sourceVideoDetails.level = level;
+
+    const colorSpace = parseOptionalString(videoStream.colorSpace);
+    if (colorSpace) sourceVideoDetails.colorSpace = colorSpace;
+
+    const colorDepth = parseOptionalNumber(videoStream.bitDepth);
+    if (colorDepth) sourceVideoDetails.colorDepth = colorDepth;
+  }
+
+  // Extract source audio details
+  const sourceAudioDetails: SourceAudioDetails = {};
+  if (audioStream) {
+    const audioBitrate = parseOptionalNumber(audioStream.bitrate);
+    if (audioBitrate) sourceAudioDetails.bitrate = audioBitrate;
+
+    const channelLayout = parseOptionalString(audioStream.audioChannelLayout);
+    if (channelLayout) sourceAudioDetails.channelLayout = channelLayout;
+
+    const language = parseOptionalString(audioStream.language);
+    if (language) sourceAudioDetails.language = language;
+
+    const sampleRate = parseOptionalNumber(audioStream.samplingRate);
+    if (sampleRate) sourceAudioDetails.sampleRate = sampleRate;
+  }
+
+  return {
+    videoBitrate: parseOptionalNumber(videoStream?.bitrate),
+    audioBitrate: parseOptionalNumber(audioStream?.bitrate),
+    videoWidth: parseOptionalNumber(videoStream?.width),
+    videoHeight: parseOptionalNumber(videoStream?.height),
+    bitrate: parseOptionalNumber(selectedMedia?.bitrate),
+    videoCodec: parseOptionalString(videoStream?.codec)?.toUpperCase(),
+    audioCodec: parseOptionalString(audioStream?.codec)?.toUpperCase(),
+    audioChannels: parseOptionalNumber(audioStream?.channels),
+    container: parseOptionalString(selectedMedia?.container)?.toUpperCase(),
+    sourceVideoDetails: Object.keys(sourceVideoDetails).length > 0 ? sourceVideoDetails : undefined,
+    sourceAudioDetails: Object.keys(sourceAudioDetails).length > 0 ? sourceAudioDetails : undefined,
+  };
+}
+
+// ============================================================================
 // Session Parsing
 // ============================================================================
 
@@ -500,8 +619,16 @@ function parsePlaybackState(state: unknown): MediaSession['playback']['state'] {
 
 /**
  * Parse raw Plex session data into a MediaSession object
+ *
+ * @param item - Raw session data from /status/sessions
+ * @param originalMedia - Optional original media metadata from /library/metadata/{ratingKey}.
+ *   When provided and session is transcoding, this is used for true source info because
+ *   Plex's session data shows transcoded output in Media/Part/Stream during transcodes.
  */
-export function parseSession(item: Record<string, unknown>): MediaSession {
+export function parseSession(
+  item: Record<string, unknown>,
+  originalMedia?: PlexOriginalMedia | null
+): MediaSession {
   const player = (item.Player as Record<string, unknown>) ?? {};
   const user = (item.User as Record<string, unknown>) ?? {};
   const sessionInfo = (item.Session as Record<string, unknown>) ?? {};
@@ -516,23 +643,90 @@ export function parseSession(item: Record<string, unknown>): MediaSession {
   const isLive = parseString(item.live) === '1';
   const mediaType = parseMediaType(item.type, isLive);
 
-  // Get bitrate and resolution from the selected Media element
-  // When multiple versions exist (e.g., 4K and 1080p), Plex marks the playing one with selected=1
-  const bitrate = parseNumber(parseSelectedArrayElement(item.Media, 'bitrate'));
-  const videoResolution = parseOptionalString(
-    parseSelectedArrayElement(item.Media, 'videoResolution')
-  );
-  const videoWidth = parseOptionalNumber(parseSelectedArrayElement(item.Media, 'width'));
-  const videoHeight = parseOptionalNumber(parseSelectedArrayElement(item.Media, 'height'));
-
   // Get stream decisions using the transcode normalizer
   const { videoDecision, audioDecision, isTranscode } = normalizeStreamDecisions(
     transcodeSession?.videoDecision as string | null,
     transcodeSession?.audioDecision as string | null
   );
 
-  // Extract detailed stream metadata from Media[].Part[].Stream[]
-  const streamDetails = extractStreamDetails(mediaArray, transcodeSession);
+  // CRITICAL: During transcodes, Plex's session Media/Part/Stream shows the TRANSCODED output,
+  // not the original source. We need originalMedia from /library/metadata to get true source info.
+  //
+  // When transcoding with originalMedia:
+  //   - Source info comes from originalMedia (true source file)
+  //   - Stream info comes from session's Media/Part/Stream (transcoded output)
+  // When direct play or no originalMedia:
+  //   - Session's Media/Part/Stream IS the source (no transcoding happening)
+
+  // Get session bitrate and resolution (this is transcoded output during transcodes)
+  const sessionBitrate = parseNumber(parseSelectedArrayElement(item.Media, 'bitrate'));
+  const sessionVideoResolution = parseOptionalString(
+    parseSelectedArrayElement(item.Media, 'videoResolution')
+  );
+  const sessionVideoWidth = parseOptionalNumber(parseSelectedArrayElement(item.Media, 'width'));
+  const sessionVideoHeight = parseOptionalNumber(parseSelectedArrayElement(item.Media, 'height'));
+
+  // Extract detailed stream metadata from session
+  const sessionStreamDetails = extractStreamDetails(mediaArray, transcodeSession);
+
+  // When transcoding with original media available, use it for true source info
+  // and treat session data as the stream (transcoded) output
+  let streamDetails: StreamDetailsResult;
+  let bitrate: number;
+  let videoWidth: number | undefined;
+  let videoHeight: number | undefined;
+  let videoResolution: string | undefined;
+
+  if (isTranscode && originalMedia) {
+    // Use original media for source, session data for stream output
+    bitrate = sessionBitrate; // Current streaming bitrate (transcoded)
+    videoWidth = originalMedia.videoWidth; // Source dimensions
+    videoHeight = originalMedia.videoHeight;
+    videoResolution = undefined; // Will be derived from width/height
+
+    // Build stream details with correct source vs stream separation
+    streamDetails = {
+      // Source info from original media
+      sourceVideoCodec: sessionStreamDetails.sourceVideoCodec ?? originalMedia.videoCodec,
+      sourceAudioCodec: sessionStreamDetails.sourceAudioCodec ?? originalMedia.audioCodec,
+      sourceAudioChannels: sessionStreamDetails.sourceAudioChannels ?? originalMedia.audioChannels,
+      sourceVideoDetails: originalMedia.sourceVideoDetails,
+      sourceAudioDetails: originalMedia.sourceAudioDetails,
+
+      // Stream (transcoded) info from session data
+      streamVideoCodec: sessionStreamDetails.streamVideoCodec,
+      streamAudioCodec: sessionStreamDetails.streamAudioCodec,
+      streamVideoDetails: {
+        ...sessionStreamDetails.streamVideoDetails,
+        // Session's Media width/height during transcode IS the transcoded output
+        width: sessionVideoWidth,
+        height: sessionVideoHeight,
+        // Session's Stream[].bitrate during transcode IS the transcoded video bitrate
+        bitrate: sessionStreamDetails.sourceVideoDetails?.bitrate,
+      },
+      streamAudioDetails: {
+        ...sessionStreamDetails.streamAudioDetails,
+        // Session's Stream[].bitrate for audio during transcode IS the transcoded audio bitrate
+        bitrate: sessionStreamDetails.sourceAudioDetails?.bitrate,
+      },
+
+      // Transcode and subtitle info
+      transcodeInfo: {
+        ...sessionStreamDetails.transcodeInfo,
+        // Add source container from original media if available
+        sourceContainer:
+          sessionStreamDetails.transcodeInfo?.sourceContainer ?? originalMedia.container,
+      },
+      subtitleInfo: sessionStreamDetails.subtitleInfo,
+    };
+  } else {
+    // Direct play or no original media - session data is the source
+    streamDetails = sessionStreamDetails;
+    bitrate = sessionBitrate;
+    videoWidth = sessionVideoWidth;
+    videoHeight = sessionVideoHeight;
+    videoResolution = sessionVideoResolution;
+  }
 
   const session: MediaSession = {
     sessionKey: parseString(item.sessionKey),
@@ -614,11 +808,48 @@ export function parseSession(item: Record<string, unknown>): MediaSession {
 
 /**
  * Parse Plex sessions API response
+ *
+ * @param data - Raw response from /status/sessions
+ * @param originalMediaMap - Optional map of ratingKey -> PlexOriginalMedia for transcoding sessions
  */
-export function parseSessionsResponse(data: unknown): MediaSession[] {
+export function parseSessionsResponse(
+  data: unknown,
+  originalMediaMap?: Map<string, PlexOriginalMedia>
+): MediaSession[] {
   const container = data as { MediaContainer?: { Metadata?: unknown[] } };
   const metadata = container?.MediaContainer?.Metadata;
-  return parseArray(metadata, (item) => parseSession(item as Record<string, unknown>));
+  return parseArray(metadata, (item) => {
+    const session = item as Record<string, unknown>;
+    const ratingKey = parseString(session.ratingKey);
+    const originalMedia = originalMediaMap?.get(ratingKey) ?? null;
+    return parseSession(session, originalMedia);
+  });
+}
+
+/**
+ * Extract ratingKeys of sessions that are transcoding and would benefit from
+ * fetching original media metadata for accurate source info.
+ *
+ * @param data - Raw response from /status/sessions
+ * @returns Array of ratingKeys for transcoding sessions
+ */
+export function getTranscodingSessionRatingKeys(data: unknown): string[] {
+  const container = data as { MediaContainer?: { Metadata?: unknown[] } };
+  const metadata = container?.MediaContainer?.Metadata;
+  if (!Array.isArray(metadata)) return [];
+
+  return metadata
+    .filter((item) => {
+      const session = item as Record<string, unknown>;
+      const transcodeSession = session.TranscodeSession as Record<string, unknown> | undefined;
+      // Session is transcoding if it has a TranscodeSession with video or audio transcode
+      if (!transcodeSession) return false;
+      const videoDecision = parseOptionalString(transcodeSession.videoDecision);
+      const audioDecision = parseOptionalString(transcodeSession.audioDecision);
+      return videoDecision === 'transcode' || audioDecision === 'transcode';
+    })
+    .map((item) => parseString((item as Record<string, unknown>).ratingKey))
+    .filter((key) => key !== ''); // Filter out empty keys
 }
 
 // ============================================================================

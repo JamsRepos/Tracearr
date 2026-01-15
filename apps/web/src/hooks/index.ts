@@ -11,5 +11,8 @@ export { useEstimatedProgress } from './useEstimatedProgress';
 export { useDebouncedSave } from './useDebouncedSave';
 export type { SaveStatus } from './useDebouncedSave';
 
+// Document title
+export { useDocumentTitle } from './useDocumentTitle';
+
 // React Query hooks
 export * from './queries';
