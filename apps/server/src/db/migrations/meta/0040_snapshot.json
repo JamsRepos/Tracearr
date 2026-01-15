@@ -1,5 +1,5 @@
 {
-  "id": "9c64468a-beda-41c6-8354-cb7555a2d268",
+  "id": "5119f928-ebbd-4c28-a4a9-87e9bc46ab0b",
   "prevId": "0c9eb645-5022-4611-ba3c-06e3f1d27df9",
   "version": "7",
   "dialect": "postgresql",
@@ -1294,6 +1294,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "geo_continent": {
+          "name": "geo_continent",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo_postal": {
+          "name": "geo_postal",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "geo_lat": {
           "name": "geo_lat",
           "type": "real",
@@ -1303,6 +1315,18 @@
         "geo_lon": {
           "name": "geo_lon",
           "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo_asn_number": {
+          "name": "geo_asn_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo_asn_organization": {
+          "name": "geo_asn_organization",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
