@@ -53,16 +53,55 @@ function formatDuration(ms: number | null): string {
   return `${seconds}s`;
 }
 
+/**
+ * Get display title for media (handles TV shows vs movies)
+ */
+function getMediaDisplay(session: Session): { title: string; subtitle: string | null } {
+  if (session.mediaType === 'episode' && session.grandparentTitle) {
+    // TV Show episode
+    const episodeInfo =
+      session.seasonNumber && session.episodeNumber
+        ? `S${session.seasonNumber.toString().padStart(2, '0')} E${session.episodeNumber.toString().padStart(2, '0')}`
+        : '';
+    return {
+      title: session.grandparentTitle,
+      subtitle: episodeInfo ? `${episodeInfo} · ${session.mediaTitle}` : session.mediaTitle,
+    };
+  }
+  if (session.mediaType === 'track') {
+    // Music track - show track name as title, artist/album as subtitle
+    const parts: string[] = [];
+    if (session.artistName) parts.push(session.artistName);
+    if (session.albumName) parts.push(session.albumName);
+    return {
+      title: session.mediaTitle,
+      subtitle: parts.length > 0 ? parts.join(' · ') : null,
+    };
+  }
+  // Movie
+  return {
+    title: session.mediaTitle,
+    subtitle: session.year ? `${session.year}` : null,
+  };
+}
+
 const sessionColumns: ColumnDef<Session>[] = [
   {
     accessorKey: 'mediaTitle',
     header: 'Media',
-    cell: ({ row }) => (
-      <div className="max-w-[200px]">
-        <p className="truncate font-medium">{row.original.mediaTitle}</p>
-        <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const { title, subtitle } = getMediaDisplay(row.original);
+      return (
+        <div className="max-w-[200px]">
+          <p className="truncate font-medium">{title}</p>
+          {subtitle ? (
+            <p className="text-muted-foreground text-xs">{subtitle}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: 'state',
