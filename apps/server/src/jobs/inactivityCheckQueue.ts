@@ -26,6 +26,9 @@ const QUEUE_NAME = 'inactivity-check';
 // Default check interval (24 hours)
 const DEFAULT_CHECK_INTERVAL_MS = 24 * TIME_MS.HOUR;
 
+// Startup delay before first check (5 minutes) - allows server to fully initialize
+const STARTUP_DELAY_MS = 5 * TIME_MS.MINUTE;
+
 // Job types
 interface InactivityCheckJobData {
   type: 'check';
@@ -180,8 +183,16 @@ export async function scheduleInactivityChecks(): Promise<void> {
     }
   );
 
-  // Run an immediate check on startup
-  await inactivityQueue.add('startup-check', { type: 'check' }, { jobId: `startup-${Date.now()}` });
+  // Schedule a delayed startup check to allow server to fully initialize
+  // This prevents false positives during server startup
+  await inactivityQueue.add(
+    'startup-check',
+    { type: 'check' },
+    {
+      delay: STARTUP_DELAY_MS,
+      jobId: `startup-${Date.now()}`,
+    }
+  );
 
   console.log(
     `[Inactivity] Scheduled checks for ${activeRules.length} rules (interval: ${minIntervalMs / TIME_MS.HOUR}h)`
