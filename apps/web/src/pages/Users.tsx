@@ -8,6 +8,7 @@ import { TrustScoreBadge } from '@/components/users/TrustScoreBadge';
 import { getAvatarUrl } from '@/components/users/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkActionsToolbar, type BulkAction } from '@/components/ui/bulk-actions-toolbar';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { User as UserIcon, Crown, Clock, Search, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -86,6 +87,7 @@ export function Users() {
   const navigate = useNavigate();
   const [searchFilter, setSearchFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [resetTrustConfirmOpen, setResetTrustConfirmOpen] = useState(false);
   const pageSize = 100;
   const { selectedServerId } = useServer();
 
@@ -116,7 +118,10 @@ export function Users() {
     // For users, we only support selecting specific IDs (not selectAll with filters)
     // since users don't have the same filter complexity as violations
     bulkResetTrust.mutate(Array.from(selectedIds), {
-      onSuccess: clearSelection,
+      onSuccess: () => {
+        clearSelection();
+        setResetTrustConfirmOpen(false);
+      },
     });
   };
 
@@ -126,7 +131,7 @@ export function Users() {
       label: 'Reset Trust Score',
       icon: <RotateCcw className="h-4 w-4" />,
       color: 'info',
-      onClick: handleBulkResetTrust,
+      onClick: () => setResetTrustConfirmOpen(true),
       isLoading: bulkResetTrust.isPending,
     },
   ];
@@ -207,6 +212,17 @@ export function Users() {
         totalCount={total}
         actions={bulkActions}
         onClearSelection={clearSelection}
+      />
+
+      {/* Reset Trust Score Confirmation */}
+      <ConfirmDialog
+        open={resetTrustConfirmOpen}
+        onOpenChange={setResetTrustConfirmOpen}
+        title={`Reset Trust Score for ${selectedCount} User${selectedCount !== 1 ? 's' : ''}`}
+        description={`Are you sure you want to reset the trust score to 100 for ${selectedCount} user${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmLabel="Reset Trust Score"
+        onConfirm={handleBulkResetTrust}
+        isLoading={bulkResetTrust.isPending}
       />
     </div>
   );
