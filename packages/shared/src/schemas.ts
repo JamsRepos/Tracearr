@@ -264,8 +264,6 @@ export const geoRestrictionParamsSchema = z.object({
 export const accountInactivityParamsSchema = z.object({
   inactivityValue: z.number().int().positive().default(30),
   inactivityUnit: z.enum(['days', 'weeks', 'months']).default('days'),
-  notificationMode: z.enum(['once', 'repeated', 'reminder']).default('once'),
-  reminderIntervalDays: z.number().int().positive().min(1).max(365).optional(),
 });
 
 export const ruleParamsSchema = z.union([

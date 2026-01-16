@@ -37,7 +37,6 @@ describe('RuleEngine - Account Inactivity', () => {
   ): AccountInactivityParams => ({
     inactivityValue: 30,
     inactivityUnit: 'days',
-    notificationMode: 'once',
     ...overrides,
   });
 

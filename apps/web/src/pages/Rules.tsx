@@ -90,8 +90,6 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   account_inactivity: {
     inactivityValue: 30,
     inactivityUnit: 'days',
-    notificationMode: 'once',
-    reminderIntervalDays: 7,
   },
 };
 
@@ -352,8 +350,6 @@ function RuleParamsForm({
       const inactivityParams = params as {
         inactivityValue: number;
         inactivityUnit: 'days' | 'weeks' | 'months';
-        notificationMode: 'once' | 'repeated' | 'reminder';
-        reminderIntervalDays?: number;
       };
       return (
         <div className="space-y-4">
@@ -390,49 +386,9 @@ function RuleParamsForm({
             </div>
           </div>
           <p className="text-muted-foreground text-xs">
-            Notify when a user has not watched anything for this period. Checks run hourly.
+            Creates an alert when a user has not watched anything for this period. Checks run
+            hourly.
           </p>
-
-          <div className="space-y-2">
-            <Label htmlFor="notificationMode">Notification Mode</Label>
-            <Select
-              value={inactivityParams.notificationMode}
-              onValueChange={(v) => {
-                onChange({
-                  ...params,
-                  notificationMode: v as 'once' | 'repeated' | 'reminder',
-                });
-              }}
-            >
-              <SelectTrigger id="notificationMode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="once">Once (when first becomes inactive)</SelectItem>
-                <SelectItem value="repeated">Every hour</SelectItem>
-                <SelectItem value="reminder">Periodic reminders</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {inactivityParams.notificationMode === 'reminder' && (
-            <div className="space-y-2">
-              <Label htmlFor="reminderIntervalDays">Reminder Interval (days)</Label>
-              <Input
-                id="reminderIntervalDays"
-                type="number"
-                min={1}
-                max={365}
-                value={inactivityParams.reminderIntervalDays ?? 7}
-                onChange={(e) => {
-                  onChange({ ...params, reminderIntervalDays: parseInt(e.target.value) || 7 });
-                }}
-              />
-              <p className="text-muted-foreground text-xs">
-                How many days between reminder notifications
-              </p>
-            </div>
-          )}
         </div>
       );
     }
@@ -641,11 +597,10 @@ function RuleCard({
                     const p = rule.params as {
                       inactivityValue: number;
                       inactivityUnit: string;
-                      notificationMode: string;
                     };
                     return (
                       <span>
-                        Inactive for {p.inactivityValue} {p.inactivityUnit} ({p.notificationMode})
+                        Inactive for {p.inactivityValue} {p.inactivityUnit}
                       </span>
                     );
                   })()}

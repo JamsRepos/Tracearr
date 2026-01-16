@@ -7,13 +7,8 @@
 
 import { Queue, Worker, type Job, type ConnectionOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
-import { eq, and, isNull, sql } from 'drizzle-orm';
-import type {
-  Rule,
-  AccountInactivityParams,
-  ViolationWithDetails,
-  AccountInactivityNotificationMode,
-} from '@tracearr/shared';
+import { eq, and, isNull } from 'drizzle-orm';
+import type { Rule, AccountInactivityParams, ViolationWithDetails } from '@tracearr/shared';
 import { WS_EVENTS, TIME_MS } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { rules, serverUsers, violations, users, servers } from '../db/schema.js';
@@ -262,13 +257,8 @@ async function processInactivityCheck(job: Job<InactivityCheckJobData>): Promise
       const result = ruleEngine.evaluateAccountInactivity(user, params);
 
       if (result.violated) {
-        // Check deduplication based on notification mode
-        const shouldCreate = await shouldCreateViolation(
-          user.id,
-          rule.id,
-          params.notificationMode,
-          params.reminderIntervalDays
-        );
+        // Only create violation if no existing unacknowledged violation exists
+        const shouldCreate = await shouldCreateViolation(user.id, rule.id);
 
         if (shouldCreate) {
           await createInactivityViolation(rule as unknown as Rule, user, result);
@@ -282,67 +272,24 @@ async function processInactivityCheck(job: Job<InactivityCheckJobData>): Promise
 }
 
 /**
- * Check if we should create a new violation based on notification mode
+ * Check if we should create a new violation
+ * Only creates a violation if no existing unacknowledged violation exists
  */
-async function shouldCreateViolation(
-  serverUserId: string,
-  ruleId: string,
-  notificationMode: AccountInactivityNotificationMode,
-  reminderIntervalDays?: number
-): Promise<boolean> {
-  switch (notificationMode) {
-    case 'once': {
-      // Only create if no existing unacknowledged violation exists for this user/rule
-      const existing = await db
-        .select({ id: violations.id })
-        .from(violations)
-        .where(
-          and(
-            eq(violations.serverUserId, serverUserId),
-            eq(violations.ruleId, ruleId),
-            isNull(violations.acknowledgedAt)
-          )
-        )
-        .limit(1);
+async function shouldCreateViolation(serverUserId: string, ruleId: string): Promise<boolean> {
+  // Only create if no existing unacknowledged violation exists
+  const existing = await db
+    .select({ id: violations.id })
+    .from(violations)
+    .where(
+      and(
+        eq(violations.serverUserId, serverUserId),
+        eq(violations.ruleId, ruleId),
+        isNull(violations.acknowledgedAt)
+      )
+    )
+    .limit(1);
 
-      return existing.length === 0;
-    }
-
-    case 'repeated': {
-      // Always create a new violation on each check
-      return true;
-    }
-
-    case 'reminder': {
-      // Create if no violation exists, or if last one was > reminderIntervalDays ago
-      const intervalDays = reminderIntervalDays ?? 7;
-      const cutoffDate = new Date(Date.now() - intervalDays * TIME_MS.DAY);
-
-      const recent = await db
-        .select({ id: violations.id, createdAt: violations.createdAt })
-        .from(violations)
-        .where(
-          and(
-            eq(violations.serverUserId, serverUserId),
-            eq(violations.ruleId, ruleId),
-            isNull(violations.acknowledgedAt)
-          )
-        )
-        .orderBy(sql`${violations.createdAt} DESC`)
-        .limit(1);
-
-      // No existing violation - create one
-      if (recent.length === 0) {
-        return true;
-      }
-
-      // Create new reminder if last violation is older than the interval
-      return recent[0]!.createdAt < cutoffDate;
-    }
-
-    default:
-      return true;
-  }
+  return existing.length === 0;
 }
 
 /**

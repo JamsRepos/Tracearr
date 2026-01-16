@@ -38,8 +38,6 @@ export interface GeoRestrictionParams {
 export interface AccountInactivityParams {
   inactivityValue: number;
   inactivityUnit: 'days' | 'weeks' | 'months';
-  notificationMode: 'once' | 'repeated' | 'reminder';
-  reminderIntervalDays?: number;
 }
 
 export type RuleParams =
@@ -84,8 +82,6 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   account_inactivity: {
     inactivityValue: 30,
     inactivityUnit: 'days',
-    notificationMode: 'once',
-    reminderIntervalDays: 7,
   },
 };
 

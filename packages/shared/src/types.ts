@@ -377,9 +377,6 @@ export interface GeoRestrictionParams {
   excludePrivateIps?: boolean;
 }
 
-/** Notification mode for account inactivity rules */
-export type AccountInactivityNotificationMode = 'once' | 'repeated' | 'reminder';
-
 /** Time unit for inactivity threshold */
 export type AccountInactivityUnit = 'days' | 'weeks' | 'months';
 
@@ -388,10 +385,6 @@ export interface AccountInactivityParams {
   inactivityValue: number;
   /** Time unit for the inactivity threshold */
   inactivityUnit: AccountInactivityUnit;
-  /** How to handle notifications for ongoing inactivity */
-  notificationMode: AccountInactivityNotificationMode;
-  /** For 'reminder' mode: how many days between reminders (default: 7) */
-  reminderIntervalDays?: number;
 }
 
 export type RuleParams =

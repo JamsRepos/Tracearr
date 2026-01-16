@@ -39,7 +39,6 @@ export type {
   ConcurrentStreamsParams,
   GeoRestrictionMode,
   GeoRestrictionParams,
-  AccountInactivityNotificationMode,
   AccountInactivityUnit,
   AccountInactivityParams,
   RuleParams,

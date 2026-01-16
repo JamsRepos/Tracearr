@@ -31,8 +31,6 @@ export const RULE_DEFAULTS = {
   account_inactivity: {
     inactivityValue: 30,
     inactivityUnit: 'days',
-    notificationMode: 'once',
-    reminderIntervalDays: 7,
   },
 } as const;
 
