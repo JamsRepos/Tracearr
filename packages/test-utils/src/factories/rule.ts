@@ -36,11 +36,11 @@ export interface GeoRestrictionParams {
 }
 
 export interface AccountInactivityParams {
-  inactivity_value: number;
-  inactivity_unit: 'days' | 'weeks' | 'months';
-  check_interval_hours: number;
-  notification_mode: 'once' | 'repeated' | 'reminder';
-  reminder_interval_days?: number;
+  inactivityValue: number;
+  inactivityUnit: 'days' | 'weeks' | 'months';
+  checkIntervalHours: number;
+  notificationMode: 'once' | 'repeated' | 'reminder';
+  reminderIntervalDays?: number;
 }
 
 export type RuleParams =
@@ -83,11 +83,11 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   concurrent_streams: { max_streams: 3 },
   geo_restriction: { blocked_countries: [] },
   account_inactivity: {
-    inactivity_value: 30,
-    inactivity_unit: 'days',
-    check_interval_hours: 24,
-    notification_mode: 'once',
-    reminder_interval_days: 7,
+    inactivityValue: 30,
+    inactivityUnit: 'days',
+    checkIntervalHours: 24,
+    notificationMode: 'once',
+    reminderIntervalDays: 7,
   },
 };
 
