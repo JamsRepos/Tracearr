@@ -25,10 +25,10 @@
     "test:services:coverage": "vitest run --config vitest.services.config.ts --coverage",
     "test:routes:coverage": "vitest run --config vitest.routes.config.ts --coverage",
     "clean": "rm -rf dist .turbo coverage",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "drizzle-kit generate --config=drizzle.config.cjs",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.cjs",
+    "db:push": "drizzle-kit push --config=drizzle.config.cjs",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.cjs"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.0",
