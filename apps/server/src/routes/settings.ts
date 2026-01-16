@@ -4,9 +4,19 @@
 
 import type { FastifyPluginAsync } from 'fastify';
 import { eq } from 'drizzle-orm';
+import { randomBytes } from 'crypto';
 import { updateSettingsSchema, type Settings, type WebhookFormat } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { settings } from '../db/schema.js';
+import { settings, users } from '../db/schema.js';
+
+// API token format: trr_pub_<32 random bytes as base64url>
+const API_TOKEN_PREFIX = 'trr_pub_';
+
+function generateApiToken(): string {
+  const randomPart = randomBytes(32).toString('base64url');
+  return `${API_TOKEN_PREFIX}${randomPart}`;
+}
+
 import { notificationManager } from '../services/notifications/index.js';
 
 // Default settings row ID (singleton pattern)
@@ -430,6 +440,49 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return { success: true };
+  });
+
+  /**
+   * GET /settings/api-key - Get current API key
+   * Returns the full API key (retrievable anytime like Sonarr/Radarr)
+   */
+  app.get('/api-key', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can manage API keys
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can manage API keys');
+    }
+
+    const [user] = await db
+      .select({ apiToken: users.apiToken })
+      .from(users)
+      .where(eq(users.id, authUser.userId))
+      .limit(1);
+
+    return { token: user?.apiToken ?? null };
+  });
+
+  /**
+   * POST /settings/api-key/regenerate - Generate or regenerate API key
+   * Creates a new API key, invalidating any previous key
+   */
+  app.post('/api-key/regenerate', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can manage API keys
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can manage API keys');
+    }
+
+    const newToken = generateApiToken();
+
+    await db
+      .update(users)
+      .set({ apiToken: newToken, updatedAt: new Date() })
+      .where(eq(users.id, authUser.userId));
+
+    return { token: newToken };
   });
 };
 

@@ -5,7 +5,18 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import jwt from '@fastify/jwt';
+import { eq } from 'drizzle-orm';
 import type { AuthUser } from '@tracearr/shared';
+import { db } from '../db/client.js';
+import { users } from '../db/schema.js';
+
+// Public API token prefix
+const PUBLIC_API_TOKEN_PREFIX = 'trr_pub_';
+
+// Context attached to public API requests
+export interface PublicApiContext {
+  userId: string;
+}
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -19,6 +30,10 @@ declare module 'fastify' {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireOwner: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireMobile: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    authenticatePublicApi: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+  interface FastifyRequest {
+    publicApiContext?: PublicApiContext;
   }
 }
 
@@ -74,6 +89,42 @@ const authPlugin: FastifyPluginAsync = async (app) => {
       reply.unauthorized('Invalid or expired token');
     }
   });
+
+  // Public API authentication - validates bearer token from Authorization header
+  app.decorate(
+    'authenticatePublicApi',
+    async function (request: FastifyRequest, reply: FastifyReply) {
+      const authHeader = request.headers.authorization;
+
+      if (!authHeader?.startsWith('Bearer ')) {
+        return reply.unauthorized('Missing or invalid Authorization header');
+      }
+
+      const token = authHeader.slice(7); // Remove "Bearer "
+
+      if (!token.startsWith(PUBLIC_API_TOKEN_PREFIX)) {
+        return reply.unauthorized('Invalid API key format');
+      }
+
+      // Find user with matching token
+      const [user] = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.apiToken, token))
+        .limit(1);
+
+      if (!user) {
+        return reply.unauthorized('Invalid API key');
+      }
+
+      if (user.role !== 'owner') {
+        return reply.forbidden('API key is not associated with an owner account');
+      }
+
+      // Attach context for use in route handlers
+      request.publicApiContext = { userId: user.id };
+    }
+  );
 };
 
 export default fp(authPlugin, {
