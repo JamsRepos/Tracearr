@@ -832,4 +832,225 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
 
     return { success: true };
   });
+
+  /**
+   * POST /violations/bulk/acknowledge - Bulk acknowledge violations
+   * Accepts either specific IDs or filter params with selectAll flag
+   */
+  app.post('/bulk/acknowledge', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can acknowledge violations
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can acknowledge violations');
+    }
+
+    const body = request.body as {
+      ids?: string[];
+      selectAll?: boolean;
+      filters?: {
+        serverId?: string;
+        severity?: string;
+        acknowledged?: boolean;
+      };
+    };
+
+    if (!body.ids && !body.selectAll) {
+      return reply.badRequest('Either ids or selectAll must be provided');
+    }
+
+    let violationIds: string[] = [];
+
+    if (body.selectAll && body.filters) {
+      // Query for all violations matching filters
+      const conditions = [];
+
+      if (body.filters.serverId) {
+        if (!hasServerAccess(authUser, body.filters.serverId)) {
+          return reply.forbidden('You do not have access to this server');
+        }
+        conditions.push(eq(serverUsers.serverId, body.filters.serverId));
+      } else if (authUser.role !== 'owner') {
+        if (authUser.serverIds.length === 0) {
+          return { success: true, acknowledged: 0 };
+        }
+        conditions.push(inArray(serverUsers.serverId, authUser.serverIds));
+      }
+
+      if (body.filters.severity) {
+        conditions.push(
+          eq(violations.severity, body.filters.severity as 'low' | 'warning' | 'high')
+        );
+      }
+
+      if (body.filters.acknowledged === false) {
+        conditions.push(isNull(violations.acknowledgedAt));
+      }
+
+      const matchingViolations = await db
+        .select({ id: violations.id })
+        .from(violations)
+        .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      violationIds = matchingViolations.map((v) => v.id);
+    } else if (body.ids) {
+      violationIds = body.ids;
+    }
+
+    if (violationIds.length === 0) {
+      return { success: true, acknowledged: 0 };
+    }
+
+    // Verify access to all violations
+    const accessibleViolations = await db
+      .select({
+        id: violations.id,
+        serverId: serverUsers.serverId,
+      })
+      .from(violations)
+      .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+      .where(inArray(violations.id, violationIds));
+
+    // Filter to only accessible violations
+    const accessibleIds = accessibleViolations
+      .filter((v) => hasServerAccess(authUser, v.serverId))
+      .map((v) => v.id);
+
+    if (accessibleIds.length === 0) {
+      return { success: true, acknowledged: 0 };
+    }
+
+    // Bulk update
+    await db
+      .update(violations)
+      .set({ acknowledgedAt: new Date() })
+      .where(inArray(violations.id, accessibleIds));
+
+    return { success: true, acknowledged: accessibleIds.length };
+  });
+
+  /**
+   * DELETE /violations/bulk - Bulk dismiss (delete) violations
+   * Accepts either specific IDs or filter params with selectAll flag
+   */
+  app.delete('/bulk', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can dismiss violations
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can dismiss violations');
+    }
+
+    const body = request.body as {
+      ids?: string[];
+      selectAll?: boolean;
+      filters?: {
+        serverId?: string;
+        severity?: string;
+        acknowledged?: boolean;
+      };
+    };
+
+    if (!body.ids && !body.selectAll) {
+      return reply.badRequest('Either ids or selectAll must be provided');
+    }
+
+    let violationIds: string[] = [];
+
+    if (body.selectAll && body.filters) {
+      // Query for all violations matching filters
+      const conditions = [];
+
+      if (body.filters.serverId) {
+        if (!hasServerAccess(authUser, body.filters.serverId)) {
+          return reply.forbidden('You do not have access to this server');
+        }
+        conditions.push(eq(serverUsers.serverId, body.filters.serverId));
+      } else if (authUser.role !== 'owner') {
+        if (authUser.serverIds.length === 0) {
+          return { success: true, dismissed: 0 };
+        }
+        conditions.push(inArray(serverUsers.serverId, authUser.serverIds));
+      }
+
+      if (body.filters.severity) {
+        conditions.push(
+          eq(violations.severity, body.filters.severity as 'low' | 'warning' | 'high')
+        );
+      }
+
+      if (body.filters.acknowledged === false) {
+        conditions.push(isNull(violations.acknowledgedAt));
+      } else if (body.filters.acknowledged === true) {
+        conditions.push(isNotNull(violations.acknowledgedAt));
+      }
+
+      const matchingViolations = await db
+        .select({ id: violations.id })
+        .from(violations)
+        .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      violationIds = matchingViolations.map((v) => v.id);
+    } else if (body.ids) {
+      violationIds = body.ids;
+    }
+
+    if (violationIds.length === 0) {
+      return { success: true, dismissed: 0 };
+    }
+
+    // Get violation details for trust score restoration
+    const violationDetails = await db
+      .select({
+        id: violations.id,
+        severity: violations.severity,
+        serverUserId: violations.serverUserId,
+        serverId: serverUsers.serverId,
+      })
+      .from(violations)
+      .innerJoin(serverUsers, eq(violations.serverUserId, serverUsers.id))
+      .where(inArray(violations.id, violationIds));
+
+    // Filter to only accessible violations
+    const accessibleViolations = violationDetails.filter((v) =>
+      hasServerAccess(authUser, v.serverId)
+    );
+
+    if (accessibleViolations.length === 0) {
+      return { success: true, dismissed: 0 };
+    }
+
+    // Group violations by serverUserId to aggregate trust score restoration
+    const trustRestoreByUser = new Map<string, number>();
+    for (const v of accessibleViolations) {
+      const penalty = getTrustScorePenalty(v.severity);
+      trustRestoreByUser.set(
+        v.serverUserId,
+        (trustRestoreByUser.get(v.serverUserId) ?? 0) + penalty
+      );
+    }
+
+    const accessibleIds = accessibleViolations.map((v) => v.id);
+
+    // Delete violations and restore trust scores atomically
+    await db.transaction(async (tx) => {
+      // Delete all violations
+      await tx.delete(violations).where(inArray(violations.id, accessibleIds));
+
+      // Restore trust scores for each affected user
+      for (const [serverUserId, totalPenalty] of trustRestoreByUser) {
+        await tx
+          .update(serverUsers)
+          .set({
+            trustScore: sql`LEAST(100, ${serverUsers.trustScore} + ${totalPenalty})`,
+            updatedAt: new Date(),
+          })
+          .where(eq(serverUsers.id, serverUserId));
+      }
+    });
+
+    return { success: true, dismissed: accessibleIds.length };
+  });
 };

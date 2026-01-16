@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, type SortingState } from '@/components/ui/data-table';
@@ -7,6 +7,7 @@ import { SeverityBadge } from '@/components/violations/SeverityBadge';
 import { ViolationDetailDialog } from '@/components/violations/ViolationDetailDialog';
 import { getAvatarUrl } from '@/components/users/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BulkActionsToolbar, type BulkAction } from '@/components/ui/bulk-actions-toolbar';
 import {
   Select,
   SelectContent,
@@ -33,12 +34,20 @@ import {
   Zap,
   Shield,
   Globe,
+  Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { ViolationWithDetails, ViolationSeverity, ViolationSortField } from '@tracearr/shared';
-import { useViolations, useAcknowledgeViolation, useDismissViolation } from '@/hooks/queries';
+import {
+  useViolations,
+  useAcknowledgeViolation,
+  useDismissViolation,
+  useBulkAcknowledgeViolations,
+  useBulkDismissViolations,
+} from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
+import { useRowSelection } from '@/hooks/useRowSelection';
 
 const ruleIcons: Record<string, React.ReactNode> = {
   impossible_travel: <MapPin className="h-4 w-4" />,
@@ -65,6 +74,7 @@ export function Violations() {
   );
   const [dismissId, setDismissId] = useState<string | null>(null);
   const [selectedViolation, setSelectedViolation] = useState<ViolationWithDetails | null>(null);
+  const [bulkDismissConfirmOpen, setBulkDismissConfirmOpen] = useState(false);
   const pageSize = 10;
   const { selectedServerId } = useServer();
 
@@ -83,10 +93,40 @@ export function Violations() {
   });
   const acknowledgeViolation = useAcknowledgeViolation();
   const dismissViolation = useDismissViolation();
+  const bulkAcknowledge = useBulkAcknowledgeViolations();
+  const bulkDismiss = useBulkDismissViolations();
 
   const violations = violationsData?.data ?? [];
   const totalPages = violationsData?.totalPages ?? 1;
   const total = violationsData?.total ?? 0;
+
+  // Row selection
+  const {
+    selectedIds,
+    selectAllMode,
+    selectedCount,
+    isSelected: _isSelected,
+    toggleRow,
+    togglePage,
+    selectAll,
+    clearSelection,
+    isPageSelected,
+    isPageIndeterminate,
+  } = useRowSelection({
+    getRowId: (row: ViolationWithDetails) => row.id,
+    totalCount: total,
+  });
+
+  // Current filter params for bulk operations
+  const currentFilters = useMemo(
+    () => ({
+      serverId: selectedServerId ?? undefined,
+      severity: severityFilter === 'all' ? undefined : severityFilter,
+      acknowledged:
+        acknowledgedFilter === 'all' ? undefined : acknowledgedFilter === 'acknowledged',
+    }),
+    [selectedServerId, severityFilter, acknowledgedFilter]
+  );
 
   const handleAcknowledge = (id: string) => {
     acknowledgeViolation.mutate(id);
@@ -104,10 +144,64 @@ export function Violations() {
     }
   };
 
+  const handleBulkAcknowledge = () => {
+    if (selectAllMode) {
+      bulkAcknowledge.mutate(
+        { selectAll: true, filters: currentFilters },
+        { onSuccess: clearSelection }
+      );
+    } else {
+      bulkAcknowledge.mutate({ ids: Array.from(selectedIds) }, { onSuccess: clearSelection });
+    }
+  };
+
+  const handleBulkDismiss = () => {
+    if (selectAllMode) {
+      bulkDismiss.mutate(
+        { selectAll: true, filters: currentFilters },
+        {
+          onSuccess: () => {
+            clearSelection();
+            setBulkDismissConfirmOpen(false);
+          },
+        }
+      );
+    } else {
+      bulkDismiss.mutate(
+        { ids: Array.from(selectedIds) },
+        {
+          onSuccess: () => {
+            clearSelection();
+            setBulkDismissConfirmOpen(false);
+          },
+        }
+      );
+    }
+  };
+
   const handleSortingChange = useCallback((newSorting: SortingState) => {
     setSorting(newSorting);
     setPage(1);
   }, []);
+
+  const bulkActions: BulkAction[] = [
+    {
+      key: 'acknowledge',
+      label: 'Acknowledge',
+      icon: <Check className="h-4 w-4" />,
+      color: 'success',
+      onClick: handleBulkAcknowledge,
+      isLoading: bulkAcknowledge.isPending,
+    },
+    {
+      key: 'dismiss',
+      label: 'Dismiss',
+      icon: <Trash2 className="h-4 w-4" />,
+      color: 'destructive',
+      onClick: () => setBulkDismissConfirmOpen(true),
+      isLoading: bulkDismiss.isPending,
+    },
+  ];
 
   const violationColumns: ColumnDef<ViolationWithDetails>[] = [
     {
@@ -207,6 +301,7 @@ export function Violations() {
                   handleAcknowledge(violation.id);
                 }}
                 disabled={acknowledgeViolation.isPending}
+                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
               >
                 <Check className="mr-1 h-4 w-4" />
                 Acknowledge
@@ -258,6 +353,7 @@ export function Violations() {
                 onValueChange={(value) => {
                   setSeverityFilter(value as ViolationSeverity | 'all');
                   setPage(1);
+                  clearSelection();
                 }}
               >
                 <SelectTrigger className="w-40">
@@ -278,6 +374,7 @@ export function Violations() {
                 onValueChange={(value) => {
                   setAcknowledgedFilter(value as 'all' | 'pending' | 'acknowledged');
                   setPage(1);
+                  clearSelection();
                 }}
               >
                 <SelectTrigger className="w-40">
@@ -296,8 +393,13 @@ export function Violations() {
 
       {/* Violations Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Violation Log</CardTitle>
+          {selectedCount > 0 && !selectAllMode && total > selectedCount && (
+            <Button variant="link" size="sm" onClick={selectAll} className="text-sm">
+              Select all {total} violations matching filters
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -339,10 +441,27 @@ export function Violations() {
                 setSelectedViolation(violation);
               }}
               emptyMessage="No violations found."
+              selectable
+              getRowId={(row) => row.id}
+              selectedIds={selectedIds}
+              selectAllMode={selectAllMode}
+              onRowSelect={toggleRow}
+              onPageSelect={togglePage}
+              isPageSelected={isPageSelected(violations)}
+              isPageIndeterminate={isPageIndeterminate(violations)}
             />
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        selectAllMode={selectAllMode}
+        totalCount={total}
+        actions={bulkActions}
+        onClearSelection={clearSelection}
+      />
 
       {/* Violation Detail Dialog */}
       <ViolationDetailDialog
@@ -389,6 +508,34 @@ export function Violations() {
               disabled={dismissViolation.isPending}
             >
               {dismissViolation.isPending ? 'Dismissing...' : 'Dismiss'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Dismiss Confirmation Dialog */}
+      <Dialog open={bulkDismissConfirmOpen} onOpenChange={setBulkDismissConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dismiss {selectAllMode ? total : selectedCount} Violations</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to dismiss {selectAllMode ? `all ${total}` : selectedCount}{' '}
+              violation{(selectAllMode ? total : selectedCount) !== 1 ? 's' : ''}? This will remove
+              them from the violation log permanently and restore associated trust scores.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDismissConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDismiss}
+              disabled={bulkDismiss.isPending}
+            >
+              {bulkDismiss.isPending
+                ? 'Dismissing...'
+                : `Dismiss ${selectAllMode ? total : selectedCount} Violations`}
             </Button>
           </DialogFooter>
         </DialogContent>

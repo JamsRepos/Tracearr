@@ -30,7 +30,7 @@ export {
 } from './useStats';
 
 // Session hooks
-export { useSessions, useActiveSessions, useSession } from './useSessions';
+export { useSessions, useActiveSessions, useSession, useBulkDeleteSessions } from './useSessions';
 export { useTerminateSession } from './useTerminateSession';
 
 // History hooks (advanced session queries with infinite scroll)
@@ -53,13 +53,28 @@ export {
   useUserLocations,
   useUserDevices,
   useUserTerminations,
+  useBulkResetTrust,
 } from './useUsers';
 
 // Rule hooks
-export { useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRule } from './useRules';
+export {
+  useRules,
+  useCreateRule,
+  useUpdateRule,
+  useDeleteRule,
+  useToggleRule,
+  useBulkToggleRules,
+  useBulkDeleteRules,
+} from './useRules';
 
 // Violation hooks
-export { useViolations, useAcknowledgeViolation, useDismissViolation } from './useViolations';
+export {
+  useViolations,
+  useAcknowledgeViolation,
+  useDismissViolation,
+  useBulkAcknowledgeViolations,
+  useBulkDismissViolations,
+} from './useViolations';
 
 // Server hooks
 export {

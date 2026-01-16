@@ -524,6 +524,11 @@ class ApiClient {
         `/users/${id}/terminations?${query}`
       );
     },
+    bulkResetTrust: (ids: string[]) =>
+      this.request<{ success: boolean; updated: number }>('/users/bulk/reset-trust', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }),
   };
 
   // Sessions
@@ -630,6 +635,11 @@ class ApiClient {
         `/sessions/${id}/terminate`,
         { method: 'POST', body: JSON.stringify({ reason }) }
       ),
+    bulkDelete: (ids: string[]) =>
+      this.request<{ success: boolean; deleted: number }>('/sessions/bulk', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids }),
+      }),
   };
 
   // Rules
@@ -643,6 +653,16 @@ class ApiClient {
     update: (id: string, data: Partial<Rule>) =>
       this.request<Rule>(`/rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => this.request<void>(`/rules/${id}`, { method: 'DELETE' }),
+    bulkUpdate: (ids: string[], isActive: boolean) =>
+      this.request<{ success: boolean; updated: number }>('/rules/bulk', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids, isActive }),
+      }),
+    bulkDelete: (ids: string[]) =>
+      this.request<{ success: boolean; deleted: number }>('/rules/bulk', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids }),
+      }),
   };
 
   // Violations
@@ -673,6 +693,24 @@ class ApiClient {
     },
     acknowledge: (id: string) => this.request<Violation>(`/violations/${id}`, { method: 'PATCH' }),
     dismiss: (id: string) => this.request<void>(`/violations/${id}`, { method: 'DELETE' }),
+    bulkAcknowledge: (params: {
+      ids?: string[];
+      selectAll?: boolean;
+      filters?: { serverId?: string; severity?: string; acknowledged?: boolean };
+    }) =>
+      this.request<{ success: boolean; acknowledged: number }>('/violations/bulk/acknowledge', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+    bulkDismiss: (params: {
+      ids?: string[];
+      selectAll?: boolean;
+      filters?: { serverId?: string; severity?: string; acknowledged?: boolean };
+    }) =>
+      this.request<{ success: boolean; dismissed: number }>('/violations/bulk', {
+        method: 'DELETE',
+        body: JSON.stringify(params),
+      }),
   };
 
   // Stats - helper to build stats query params

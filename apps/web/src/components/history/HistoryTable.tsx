@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -139,6 +140,14 @@ interface Props {
   sortBy?: SortableColumn;
   sortDir?: SortDirection;
   onSortChange?: (column: SortableColumn) => void;
+  // Selection props
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  selectAllMode?: boolean;
+  onRowSelect?: (session: SessionWithDetails) => void;
+  onSelectAllVisible?: () => void;
+  isAllVisibleSelected?: boolean;
+  isAllVisibleIndeterminate?: boolean;
 }
 
 // State icon component
@@ -146,7 +155,7 @@ function StateIcon({ state }: { state: SessionState }) {
   const config: Record<SessionState, { icon: typeof Play; color: string; label: string }> = {
     playing: { icon: Play, color: 'text-green-500', label: 'Playing' },
     paused: { icon: Pause, color: 'text-yellow-500', label: 'Paused' },
-    stopped: { icon: Square, color: 'text-muted-foreground', label: 'Stopped' },
+    stopped: { icon: Square, color: 'text-red-500', label: 'Stopped' },
   };
   const { icon: Icon, color, label } = config[state];
   return (
@@ -204,17 +213,40 @@ function getProgress(session: SessionWithDetails): number {
 // Session row component with column visibility support
 export const HistoryTableRow = forwardRef<
   HTMLTableRowElement,
-  { session: SessionWithDetails; onClick?: () => void; columnVisibility: ColumnVisibility }
->(({ session, onClick, columnVisibility }, ref) => {
+  {
+    session: SessionWithDetails;
+    onClick?: () => void;
+    columnVisibility: ColumnVisibility;
+    selectable?: boolean;
+    isSelected?: boolean;
+    onSelect?: () => void;
+  }
+>(({ session, onClick, columnVisibility, selectable, isSelected, onSelect }, ref) => {
   const { title: primary, subtitle: secondary } = getMediaDisplay(session);
   const progress = getProgress(session);
 
   return (
     <TableRow
       ref={ref}
-      className={cn('cursor-pointer transition-colors', onClick && 'hover:bg-muted/50')}
+      className={cn(
+        'cursor-pointer transition-colors',
+        onClick && 'hover:bg-muted/50',
+        isSelected && 'bg-muted/50'
+      )}
       onClick={onClick}
     >
+      {/* Selection checkbox */}
+      {selectable && (
+        <TableCell className="w-10">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select session`}
+          />
+        </TableCell>
+      )}
+
       {/* Date/Time with State */}
       {columnVisibility.date && (
         <TableCell className="w-[140px]">
@@ -416,9 +448,20 @@ export const HistoryTableRow = forwardRef<
 HistoryTableRow.displayName = 'HistoryTableRow';
 
 // Loading skeleton row with column visibility support
-function SkeletonRow({ columnVisibility }: { columnVisibility: ColumnVisibility }) {
+function SkeletonRow({
+  columnVisibility,
+  selectable = false,
+}: {
+  columnVisibility: ColumnVisibility;
+  selectable?: boolean;
+}) {
   return (
     <TableRow>
+      {selectable && (
+        <TableCell className="w-10">
+          <Skeleton className="h-4 w-4" />
+        </TableCell>
+      )}
       {columnVisibility.date && (
         <TableCell>
           <div className="flex items-center gap-2">
@@ -529,13 +572,29 @@ export function HistoryTable({
   sortBy,
   sortDir,
   onSortChange,
+  selectable = false,
+  selectedIds,
+  selectAllMode = false,
+  onRowSelect,
+  onSelectAllVisible,
+  isAllVisibleSelected = false,
+  isAllVisibleIndeterminate: _isAllVisibleIndeterminate = false,
 }: Props) {
-  const visibleColumnCount = getVisibleColumnCount(columnVisibility);
+  const visibleColumnCount = getVisibleColumnCount(columnVisibility) + (selectable ? 1 : 0);
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {selectable && (
+            <TableHead className="w-10">
+              <Checkbox
+                checked={selectAllMode || isAllVisibleSelected}
+                onCheckedChange={onSelectAllVisible}
+                aria-label="Select all visible"
+              />
+            </TableHead>
+          )}
           {columnVisibility.date && (
             <TableHead className="w-[140px]">
               <SortableHeader
@@ -581,7 +640,7 @@ export function HistoryTable({
         {isLoading ? (
           // Show skeleton rows when loading initially
           Array.from({ length: 10 }).map((_, i) => (
-            <SkeletonRow key={i} columnVisibility={columnVisibility} />
+            <SkeletonRow key={i} columnVisibility={columnVisibility} selectable={selectable} />
           ))
         ) : sessions.length === 0 ? (
           <TableRow>
@@ -601,12 +660,19 @@ export function HistoryTable({
                 session={session}
                 onClick={onSessionClick ? () => onSessionClick(session) : undefined}
                 columnVisibility={columnVisibility}
+                selectable={selectable}
+                isSelected={selectAllMode || (selectedIds?.has(session.id) ?? false)}
+                onSelect={onRowSelect ? () => onRowSelect(session) : undefined}
               />
             ))}
             {/* Show skeleton rows when fetching next page */}
             {isFetchingNextPage &&
               Array.from({ length: 5 }).map((_, i) => (
-                <SkeletonRow key={`loading-${i}`} columnVisibility={columnVisibility} />
+                <SkeletonRow
+                  key={`loading-${i}`}
+                  columnVisibility={columnVisibility}
+                  selectable={selectable}
+                />
               ))}
           </>
         )}

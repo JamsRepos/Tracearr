@@ -7,6 +7,7 @@ import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useInView } from 'react-intersection-observer';
 import { Card, CardContent } from '@/components/ui/card';
+import { Trash2 } from 'lucide-react';
 import {
   HistoryFiltersBar,
   DEFAULT_COLUMN_VISIBILITY,
@@ -15,13 +16,17 @@ import {
 import { HistoryTable, type SortableColumn } from '@/components/history/HistoryTable';
 import { HistoryAggregates } from '@/components/history/HistoryAggregates';
 import { SessionDetailSheet } from '@/components/history/SessionDetailSheet';
+import { BulkActionsToolbar, type BulkAction } from '@/components/ui/bulk-actions-toolbar';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useHistorySessions,
   useHistoryAggregates,
   useFilterOptions,
+  useBulkDeleteSessions,
   type HistoryFilters,
 } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
+import { useRowSelection } from '@/hooks/useRowSelection';
 import type { SessionWithDetails } from '@tracearr/shared';
 
 // Local storage key for column visibility
@@ -173,6 +178,9 @@ export function History() {
   const { selectedServerId } = useServer();
   const [selectedSession, setSelectedSession] = useState<SessionWithDetails | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(loadColumnVisibility);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  const bulkDeleteSessions = useBulkDeleteSessions();
 
   // Parse filters from URL on mount and when URL changes
   const filters = useMemo(() => {
@@ -220,6 +228,40 @@ export function History() {
   // Use aggregates from dedicated query (doesn't reload on sort changes)
   const aggregates = aggregatesData;
   const total = aggregatesData?.playCount;
+
+  // Row selection for bulk operations
+  const {
+    selectedIds,
+    selectedCount,
+    toggleRow,
+    togglePage,
+    clearSelection,
+    isPageSelected,
+    isPageIndeterminate,
+  } = useRowSelection({
+    getRowId: (session: SessionWithDetails) => session.id,
+    totalCount: sessions.length, // Using visible sessions count since we don't support "select all matching"
+  });
+
+  const handleBulkDelete = () => {
+    bulkDeleteSessions.mutate(Array.from(selectedIds), {
+      onSuccess: () => {
+        clearSelection();
+        setBulkDeleteConfirmOpen(false);
+      },
+    });
+  };
+
+  const bulkActions: BulkAction[] = [
+    {
+      key: 'delete',
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4" />,
+      color: 'destructive',
+      onClick: () => setBulkDeleteConfirmOpen(true),
+      isLoading: bulkDeleteSessions.isPending,
+    },
+  ];
 
   // Handle filter changes - update URL
   const handleFiltersChange = useCallback(
@@ -300,6 +342,12 @@ export function History() {
             sortBy={filters.orderBy ?? 'startedAt'}
             sortDir={filters.orderDir ?? 'desc'}
             onSortChange={handleSortChange}
+            selectable
+            selectedIds={selectedIds}
+            onRowSelect={toggleRow}
+            onSelectAllVisible={() => togglePage(sessions)}
+            isAllVisibleSelected={isPageSelected(sessions)}
+            isAllVisibleIndeterminate={isPageIndeterminate(sessions)}
           />
 
           {/* Infinite scroll trigger */}
@@ -326,6 +374,24 @@ export function History() {
         session={selectedSession}
         open={!!selectedSession}
         onOpenChange={(open) => !open && setSelectedSession(null)}
+      />
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        actions={bulkActions}
+        onClearSelection={clearSelection}
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        title={`Delete ${selectedCount} Sessions`}
+        description={`Are you sure you want to delete ${selectedCount} session${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleBulkDelete}
+        isLoading={bulkDeleteSessions.isPending}
       />
     </div>
   );

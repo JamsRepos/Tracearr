@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { TrustScoreBadge } from '@/components/users/TrustScoreBadge';
 import { getAvatarUrl } from '@/components/users/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User as UserIcon, Crown, Clock, Search } from 'lucide-react';
+import { BulkActionsToolbar, type BulkAction } from '@/components/ui/bulk-actions-toolbar';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { User as UserIcon, Crown, Clock, Search, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { ServerUserWithIdentity } from '@tracearr/shared';
-import { useUsers } from '@/hooks/queries';
+import { useUsers, useBulkResetTrust } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
+import { useRowSelection } from '@/hooks/useRowSelection';
 
 const userColumns: ColumnDef<ServerUserWithIdentity>[] = [
   {
@@ -83,14 +87,54 @@ export function Users() {
   const navigate = useNavigate();
   const [searchFilter, setSearchFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [resetTrustConfirmOpen, setResetTrustConfirmOpen] = useState(false);
   const pageSize = 100;
   const { selectedServerId } = useServer();
 
   const { data, isLoading } = useUsers({ page, pageSize, serverId: selectedServerId ?? undefined });
+  const bulkResetTrust = useBulkResetTrust();
 
   const users = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+
+  // Row selection
+  const {
+    selectedIds,
+    selectAllMode,
+    selectedCount,
+    toggleRow,
+    togglePage,
+    selectAll,
+    clearSelection,
+    isPageSelected,
+    isPageIndeterminate,
+  } = useRowSelection({
+    getRowId: (row: ServerUserWithIdentity) => row.id,
+    totalCount: total,
+  });
+
+  const handleBulkResetTrust = () => {
+    // For users, we only support selecting specific IDs (not selectAll with filters)
+    // since users don't have the same filter complexity as violations
+    bulkResetTrust.mutate(Array.from(selectedIds), {
+      onSuccess: () => {
+        clearSelection();
+        setResetTrustConfirmOpen(false);
+      },
+    });
+  };
+
+  const bulkActions: BulkAction[] = [
+    {
+      key: 'reset-trust',
+      label: 'Reset Trust Score',
+      icon: <RotateCcw className="h-4 w-4" />,
+      color: 'info',
+      onClick: () => setResetTrustConfirmOpen(true),
+      isLoading: bulkResetTrust.isPending,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -113,7 +157,15 @@ export function Users() {
       </div>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>All Users</CardTitle>
+          {selectedCount > 0 && !selectAllMode && total > selectedCount && (
+            <Button variant="link" size="sm" onClick={selectAll} className="text-sm">
+              Select all {total} users
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
           {isLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
@@ -140,10 +192,38 @@ export function Users() {
                 void navigate(`/users/${user.id}`);
               }}
               emptyMessage="No users found."
+              selectable
+              getRowId={(row) => row.id}
+              selectedIds={selectedIds}
+              selectAllMode={selectAllMode}
+              onRowSelect={toggleRow}
+              onPageSelect={togglePage}
+              isPageSelected={isPageSelected(users)}
+              isPageIndeterminate={isPageIndeterminate(users)}
             />
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        selectAllMode={selectAllMode}
+        totalCount={total}
+        actions={bulkActions}
+        onClearSelection={clearSelection}
+      />
+
+      {/* Reset Trust Score Confirmation */}
+      <ConfirmDialog
+        open={resetTrustConfirmOpen}
+        onOpenChange={setResetTrustConfirmOpen}
+        title={`Reset Trust Score for ${selectedCount} User${selectedCount !== 1 ? 's' : ''}`}
+        description={`Are you sure you want to reset the trust score to 100 for ${selectedCount} user${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmLabel="Reset Trust Score"
+        onConfirm={handleBulkResetTrust}
+        isLoading={bulkResetTrust.isPending}
+      />
     </div>
   );
 }

@@ -88,3 +88,38 @@ export function useToggleRule() {
     },
   });
 }
+
+export function useBulkToggleRules() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ids, isActive }: { ids: string[]; isActive: boolean }) =>
+      api.rules.bulkUpdate(ids, isActive),
+    onSuccess: (data, { isActive }) => {
+      void queryClient.invalidateQueries({ queryKey: ['rules', 'list'] });
+      toast.success(`Rules ${isActive ? 'Enabled' : 'Disabled'}`, {
+        description: `${data.updated} rule${data.updated !== 1 ? 's' : ''} ${isActive ? 'enabled' : 'disabled'}.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Update Rules', { description: error.message });
+    },
+  });
+}
+
+export function useBulkDeleteRules() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => api.rules.bulkDelete(ids),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ['rules', 'list'] });
+      toast.success('Rules Deleted', {
+        description: `${data.deleted} rule${data.deleted !== 1 ? 's' : ''} deleted.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Delete Rules', { description: error.message });
+    },
+  });
+}

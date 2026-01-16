@@ -7,7 +7,7 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, inArray } from 'drizzle-orm';
 import {
   sessionQuerySchema,
   historyQuerySchema,
@@ -1353,5 +1353,47 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       terminationLogId: result.terminationLogId,
       message: 'Stream termination command sent successfully',
     };
+  });
+
+  /**
+   * DELETE /sessions/bulk - Bulk delete historical sessions
+   * Owner-only. Accepts array of session IDs.
+   */
+  app.delete('/bulk', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can delete sessions
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only owners can delete sessions');
+    }
+
+    const body = request.body as { ids: string[] };
+
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      return reply.badRequest('ids array is required');
+    }
+
+    // Verify access to all sessions
+    const sessionDetails = await db
+      .select({
+        id: sessions.id,
+        serverId: sessions.serverId,
+      })
+      .from(sessions)
+      .where(inArray(sessions.id, body.ids));
+
+    // Filter to only accessible sessions
+    const accessibleIds = sessionDetails
+      .filter((s) => hasServerAccess(authUser, s.serverId))
+      .map((s) => s.id);
+
+    if (accessibleIds.length === 0) {
+      return { success: true, deleted: 0 };
+    }
+
+    // Bulk delete sessions
+    await db.delete(sessions).where(inArray(sessions.id, accessibleIds));
+
+    return { success: true, deleted: accessibleIds.length };
   });
 };
