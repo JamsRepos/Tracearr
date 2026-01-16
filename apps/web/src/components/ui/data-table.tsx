@@ -15,6 +15,7 @@ import {
 export type { SortingState };
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -45,6 +46,15 @@ interface DataTableProps<TData, TValue> {
   filterValue?: string;
   // Set to true when data arrives pre-filtered from server (skips client-side filtering)
   isServerFiltered?: boolean;
+  // Row selection props
+  selectable?: boolean;
+  getRowId?: (row: TData) => string;
+  selectedIds?: Set<string>;
+  selectAllMode?: boolean;
+  onRowSelect?: (row: TData) => void;
+  onPageSelect?: (rows: TData[]) => void;
+  isPageSelected?: boolean;
+  isPageIndeterminate?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -63,6 +73,15 @@ export function DataTable<TData, TValue>({
   filterColumn,
   filterValue,
   isServerFiltered = false,
+  // Selection props
+  selectable = false,
+  getRowId,
+  selectedIds,
+  selectAllMode = false,
+  onRowSelect,
+  onPageSelect,
+  isPageSelected = false,
+  isPageIndeterminate: _isPageIndeterminate = false,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -93,9 +112,51 @@ export function DataTable<TData, TValue>({
     }
   };
 
+  // Build columns with optional checkbox column
+  const allColumns = useMemo(() => {
+    if (!selectable) return columns;
+
+    const checkboxColumn: ColumnDef<TData, TValue> = {
+      id: '_select',
+      header: () => (
+        <Checkbox
+          checked={selectAllMode || isPageSelected}
+          onCheckedChange={() => onPageSelect?.(data)}
+          aria-label="Select all on page"
+        />
+      ),
+      cell: ({ row }) => {
+        const rowId = getRowId?.(row.original) ?? '';
+        const isSelected = selectAllMode || (selectedIds?.has(rowId) ?? false);
+        return (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onRowSelect?.(row.original)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Select row"
+          />
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    };
+
+    return [checkboxColumn, ...columns];
+  }, [
+    selectable,
+    columns,
+    selectAllMode,
+    isPageSelected,
+    data,
+    onPageSelect,
+    getRowId,
+    selectedIds,
+    onRowSelect,
+  ]);
+
   const table = useReactTable({
     data,
-    columns,
+    columns: allColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isServerSorted ? undefined : getSortedRowModel(),
     getFilteredRowModel: isServerFiltered ? undefined : getFilteredRowModel(),
@@ -125,6 +186,8 @@ export function DataTable<TData, TValue>({
   const canPreviousPage = isServerPaginated ? (page ?? 1) > 1 : table.getCanPreviousPage();
   const canNextPage = isServerPaginated ? (page ?? 1) < (pageCount ?? 1) : table.getCanNextPage();
 
+  const columnCount = allColumns.length;
+
   return (
     <div className={cn('space-y-4', className)}>
       <div className="rounded-md border">
@@ -133,8 +196,13 @@ export function DataTable<TData, TValue>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="px-4 py-3">
-                    {header.isPlaceholder ? null : (
+                  <TableHead
+                    key={header.id}
+                    className={cn('px-4 py-3', header.column.id === '_select' && 'w-12')}
+                  >
+                    {header.isPlaceholder ? null : header.column.id === '_select' ? (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    ) : (
                       <div
                         className={cn(
                           'flex items-center gap-2',
@@ -166,30 +234,37 @@ export function DataTable<TData, TValue>({
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columnCount}
                   className="text-muted-foreground py-10 text-center"
                 >
                   Loading...
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={cn(onRowClick && 'cursor-pointer')}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const rowId = getRowId?.(row.original) ?? '';
+                const isRowSelected = selectAllMode || (selectedIds?.has(rowId) ?? false);
+                return (
+                  <TableRow
+                    key={row.id}
+                    className={cn(onRowClick && 'cursor-pointer', isRowSelected && 'bg-muted/50')}
+                    onClick={() => onRowClick?.(row.original)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn('px-4 py-3', cell.column.id === '_select' && 'w-12')}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columnCount}
                   className="text-muted-foreground py-10 text-center"
                 >
                   {emptyMessage}

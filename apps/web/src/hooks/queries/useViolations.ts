@@ -88,3 +88,49 @@ export function useDismissViolation() {
     },
   });
 }
+
+export interface BulkViolationParams {
+  ids?: string[];
+  selectAll?: boolean;
+  filters?: {
+    serverId?: string;
+    severity?: string;
+    acknowledged?: boolean;
+  };
+}
+
+export function useBulkAcknowledgeViolations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: BulkViolationParams) => api.violations.bulkAcknowledge(params),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ['violations'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
+      toast.success('Violations Acknowledged', {
+        description: `${data.acknowledged} violation${data.acknowledged !== 1 ? 's' : ''} acknowledged.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Acknowledge', { description: error.message });
+    },
+  });
+}
+
+export function useBulkDismissViolations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: BulkViolationParams) => api.violations.bulkDismiss(params),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ['violations'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
+      toast.success('Violations Dismissed', {
+        description: `${data.dismissed} violation${data.dismissed !== 1 ? 's' : ''} dismissed.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Dismiss', { description: error.message });
+    },
+  });
+}

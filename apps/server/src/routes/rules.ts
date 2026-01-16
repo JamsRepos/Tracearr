@@ -3,7 +3,7 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, inArray } from 'drizzle-orm';
 import { createRuleSchema, updateRuleSchema, ruleIdParamSchema } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { rules, serverUsers, violations, servers } from '../db/schema.js';
@@ -296,5 +296,113 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
     await db.delete(rules).where(eq(rules.id, id));
 
     return { success: true };
+  });
+
+  /**
+   * PATCH /bulk - Bulk enable/disable rules
+   * Owner-only. Accepts array of rule IDs and isActive flag.
+   */
+  app.patch('/bulk', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can update rules
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only owners can update rules');
+    }
+
+    const body = request.body as { ids: string[]; isActive: boolean };
+
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      return reply.badRequest('ids array is required');
+    }
+
+    if (typeof body.isActive !== 'boolean') {
+      return reply.badRequest('isActive boolean is required');
+    }
+
+    // Get all requested rules with server info
+    const ruleDetails = await db
+      .select({
+        id: rules.id,
+        serverUserId: rules.serverUserId,
+        serverId: serverUsers.serverId,
+      })
+      .from(rules)
+      .leftJoin(serverUsers, eq(rules.serverUserId, serverUsers.id))
+      .where(inArray(rules.id, body.ids));
+
+    // Filter to only accessible rules
+    // Global rules (serverUserId = null) are accessible to all owners
+    // User-specific rules require server access
+    const accessibleIds = ruleDetails
+      .filter((r) => {
+        if (!r.serverUserId) return true; // Global rule
+        if (!r.serverId) return false;
+        return hasServerAccess(authUser, r.serverId);
+      })
+      .map((r) => r.id);
+
+    if (accessibleIds.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    // Bulk update isActive
+    await db
+      .update(rules)
+      .set({
+        isActive: body.isActive,
+        updatedAt: new Date(),
+      })
+      .where(inArray(rules.id, accessibleIds));
+
+    return { success: true, updated: accessibleIds.length };
+  });
+
+  /**
+   * DELETE /bulk - Bulk delete rules
+   * Owner-only. Accepts array of rule IDs.
+   */
+  app.delete('/bulk', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can delete rules
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only owners can delete rules');
+    }
+
+    const body = request.body as { ids: string[] };
+
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      return reply.badRequest('ids array is required');
+    }
+
+    // Get all requested rules with server info
+    const ruleDetails = await db
+      .select({
+        id: rules.id,
+        serverUserId: rules.serverUserId,
+        serverId: serverUsers.serverId,
+      })
+      .from(rules)
+      .leftJoin(serverUsers, eq(rules.serverUserId, serverUsers.id))
+      .where(inArray(rules.id, body.ids));
+
+    // Filter to only accessible rules
+    const accessibleIds = ruleDetails
+      .filter((r) => {
+        if (!r.serverUserId) return true; // Global rule
+        if (!r.serverId) return false;
+        return hasServerAccess(authUser, r.serverId);
+      })
+      .map((r) => r.id);
+
+    if (accessibleIds.length === 0) {
+      return { success: true, deleted: 0 };
+    }
+
+    // Bulk delete (cascade will handle violations)
+    await db.delete(rules).where(inArray(rules.id, accessibleIds));
+
+    return { success: true, deleted: accessibleIds.length };
   });
 };

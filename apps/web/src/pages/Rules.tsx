@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BulkActionsToolbar, type BulkAction } from '@/components/ui/bulk-actions-toolbar';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +24,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Shield, MapPin, Zap, Users, Globe } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Shield,
+  MapPin,
+  Zap,
+  Users,
+  Globe,
+  Power,
+  PowerOff,
+} from 'lucide-react';
 import { CountryMultiSelect } from '@/components/ui/country-multi-select';
 import { getCountryName } from '@/lib/utils';
 import type { Rule, RuleType, RuleParams, UnitSystem } from '@tracearr/shared';
@@ -38,8 +51,11 @@ import {
   useUpdateRule,
   useDeleteRule,
   useToggleRule,
+  useBulkToggleRules,
+  useBulkDeleteRules,
   useSettings,
 } from '@/hooks/queries';
+import { useRowSelection } from '@/hooks/useRowSelection';
 
 const RULE_TYPES: { value: RuleType; label: string; icon: React.ReactNode; description: string }[] =
   [
@@ -456,22 +472,35 @@ function RuleCard({
   onDelete,
   onToggle,
   unitSystem,
+  isSelected,
+  onSelect,
 }: {
   rule: Rule;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
   unitSystem: UnitSystem;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }) {
   const ruleType = RULE_TYPES.find((t) => t.value === rule.type);
   const speedUnit = getSpeedUnit(unitSystem);
   const distanceUnit = getDistanceUnit(unitSystem);
 
   return (
-    <Card className={!rule.isActive ? 'opacity-60' : ''}>
+    <Card
+      className={`${!rule.isActive ? 'opacity-60' : ''} ${isSelected ? 'ring-primary ring-2' : ''}`}
+    >
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-4">
+            {onSelect && (
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={onSelect}
+                aria-label={`Select ${rule.name}`}
+              />
+            )}
             <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
               {ruleType?.icon ?? <Shield className="h-5 w-5" />}
             </div>
@@ -561,12 +590,21 @@ export function Rules() {
   const updateRule = useUpdateRule();
   const deleteRule = useDeleteRule();
   const toggleRule = useToggleRule();
+  const bulkToggleRules = useBulkToggleRules();
+  const bulkDeleteRules = useBulkDeleteRules();
 
   const unitSystem = settings?.unitSystem ?? 'metric';
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | undefined>();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  // Row selection for bulk operations
+  const { selectedIds, selectedCount, toggleRow, clearSelection, isSelected } = useRowSelection({
+    getRowId: (rule: Rule) => rule.id,
+    totalCount: rules?.length ?? 0,
+  });
 
   const handleCreate = (data: RuleFormData) => {
     createRule.mutate(
@@ -618,6 +656,29 @@ export function Rules() {
     toggleRule.mutate({ id: rule.id, isActive: !rule.isActive });
   };
 
+  const handleBulkEnable = () => {
+    bulkToggleRules.mutate(
+      { ids: Array.from(selectedIds), isActive: true },
+      { onSuccess: clearSelection }
+    );
+  };
+
+  const handleBulkDisable = () => {
+    bulkToggleRules.mutate(
+      { ids: Array.from(selectedIds), isActive: false },
+      { onSuccess: clearSelection }
+    );
+  };
+
+  const handleBulkDelete = () => {
+    bulkDeleteRules.mutate(Array.from(selectedIds), {
+      onSuccess: () => {
+        clearSelection();
+        setBulkDeleteConfirmOpen(false);
+      },
+    });
+  };
+
   const openCreateDialog = () => {
     setEditingRule(undefined);
     setIsDialogOpen(true);
@@ -627,6 +688,31 @@ export function Rules() {
     setEditingRule(rule);
     setIsDialogOpen(true);
   };
+
+  const bulkActions: BulkAction[] = [
+    {
+      key: 'enable',
+      label: 'Enable',
+      icon: <Power className="h-4 w-4" />,
+      onClick: handleBulkEnable,
+      isLoading: bulkToggleRules.isPending,
+    },
+    {
+      key: 'disable',
+      label: 'Disable',
+      icon: <PowerOff className="h-4 w-4" />,
+      onClick: handleBulkDisable,
+      isLoading: bulkToggleRules.isPending,
+    },
+    {
+      key: 'delete',
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4" />,
+      variant: 'destructive',
+      onClick: () => setBulkDeleteConfirmOpen(true),
+      isLoading: bulkDeleteRules.isPending,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -714,10 +800,30 @@ export function Rules() {
                 handleToggle(rule);
               }}
               unitSystem={unitSystem}
+              isSelected={isSelected(rule)}
+              onSelect={() => toggleRow(rule)}
             />
           ))}
         </div>
       )}
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        actions={bulkActions}
+        onClearSelection={clearSelection}
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        title={`Delete ${selectedCount} Rules`}
+        description={`Are you sure you want to delete ${selectedCount} rule${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleBulkDelete}
+        isLoading={bulkDeleteRules.isPending}
+      />
 
       <ConfirmDialog
         open={!!deleteConfirmId}

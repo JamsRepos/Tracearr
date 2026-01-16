@@ -307,4 +307,52 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
 
     return { success: true, name: updated.name };
   });
+
+  /**
+   * POST /bulk/reset-trust - Bulk reset trust scores to 100
+   * Owner-only. Accepts array of user IDs.
+   */
+  app.post('/bulk/reset-trust', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    // Only owners can reset trust scores
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only owners can reset trust scores');
+    }
+
+    const body = request.body as { ids: string[] };
+
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      return reply.badRequest('ids array is required');
+    }
+
+    // Verify access to all users
+    const userDetails = await db
+      .select({
+        id: serverUsers.id,
+        serverId: serverUsers.serverId,
+      })
+      .from(serverUsers)
+      .where(inArray(serverUsers.id, body.ids));
+
+    // Filter to only accessible users
+    const accessibleIds = userDetails
+      .filter((u) => hasServerAccess(authUser, u.serverId))
+      .map((u) => u.id);
+
+    if (accessibleIds.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    // Bulk update trust scores to 100
+    await db
+      .update(serverUsers)
+      .set({
+        trustScore: 100,
+        updatedAt: new Date(),
+      })
+      .where(inArray(serverUsers.id, accessibleIds));
+
+    return { success: true, updated: accessibleIds.length };
+  });
 };

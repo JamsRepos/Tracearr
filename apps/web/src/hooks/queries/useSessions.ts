@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import '@tracearr/shared';
 import { api } from '@/lib/api';
 
@@ -33,5 +34,23 @@ export function useSession(id: string) {
     queryFn: () => api.sessions.get(id),
     enabled: !!id,
     staleTime: 1000 * 60, // 1 minute
+  });
+}
+
+export function useBulkDeleteSessions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => api.sessions.bulkDelete(ids),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      void queryClient.invalidateQueries({ queryKey: ['history'] });
+      toast.success('Sessions Deleted', {
+        description: `${data.deleted} session${data.deleted !== 1 ? 's' : ''} deleted.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Delete Sessions', { description: error.message });
+    },
   });
 }

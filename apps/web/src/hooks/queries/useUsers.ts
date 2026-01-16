@@ -100,3 +100,20 @@ export function useUserTerminations(id: string, params: { page?: number; pageSiz
     staleTime: 1000 * 60, // 1 minute
   });
 }
+
+export function useBulkResetTrust() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => api.users.bulkResetTrust(ids),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Trust Scores Reset', {
+        description: `${data.updated} user${data.updated !== 1 ? 's' : ''} reset to 100.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to Reset Trust Scores', { description: error.message });
+    },
+  });
+}
