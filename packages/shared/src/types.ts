@@ -388,8 +388,6 @@ export interface AccountInactivityParams {
   inactivityValue: number;
   /** Time unit for the inactivity threshold */
   inactivityUnit: AccountInactivityUnit;
-  /** How often to check for inactivity (in hours, default: 24) */
-  checkIntervalHours: number;
   /** How to handle notifications for ongoing inactivity */
   notificationMode: AccountInactivityNotificationMode;
   /** For 'reminder' mode: how many days between reminders (default: 7) */

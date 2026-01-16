@@ -23,8 +23,8 @@ import { enqueueNotification } from './notificationQueue.js';
 // Queue name
 const QUEUE_NAME = 'inactivity-check';
 
-// Default check interval (24 hours)
-const DEFAULT_CHECK_INTERVAL_MS = 24 * TIME_MS.HOUR;
+// Fixed check interval (1 hour)
+const CHECK_INTERVAL_MS = TIME_MS.HOUR;
 
 // Startup delay before first check (5 minutes) - allows server to fully initialize
 const STARTUP_DELAY_MS = 5 * TIME_MS.MINUTE;
@@ -150,7 +150,6 @@ export async function scheduleInactivityChecks(): Promise<void> {
   const activeRules = await db
     .select({
       id: rules.id,
-      params: rules.params,
     })
     .from(rules)
     .where(and(eq(rules.isActive, true), eq(rules.type, 'account_inactivity')));
@@ -160,24 +159,13 @@ export async function scheduleInactivityChecks(): Promise<void> {
     return;
   }
 
-  // Find the minimum check interval across all rules
-  let minIntervalMs = DEFAULT_CHECK_INTERVAL_MS;
-  for (const rule of activeRules) {
-    const params = rule.params as unknown as AccountInactivityParams;
-    const intervalMs = (params.checkIntervalHours || 24) * TIME_MS.HOUR;
-    if (intervalMs < minIntervalMs) {
-      minIntervalMs = intervalMs;
-    }
-  }
-
-  // Schedule a single recurring job that checks all rules
-  // Using the minimum interval ensures we catch all rules in time
+  // Schedule a single recurring job that checks all rules hourly
   await inactivityQueue.add(
     'scheduled-check',
     { type: 'check' },
     {
       repeat: {
-        every: minIntervalMs,
+        every: CHECK_INTERVAL_MS,
       },
       jobId: 'inactivity-check-repeatable',
     }
@@ -194,9 +182,7 @@ export async function scheduleInactivityChecks(): Promise<void> {
     }
   );
 
-  console.log(
-    `[Inactivity] Scheduled checks for ${activeRules.length} rules (interval: ${minIntervalMs / TIME_MS.HOUR}h)`
-  );
+  console.log(`[Inactivity] Scheduled hourly checks for ${activeRules.length} rule(s)`);
 }
 
 /**

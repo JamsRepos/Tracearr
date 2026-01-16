@@ -90,7 +90,6 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
   account_inactivity: {
     inactivityValue: 30,
     inactivityUnit: 'days',
-    checkIntervalHours: 24,
     notificationMode: 'once',
     reminderIntervalDays: 7,
   },
@@ -353,7 +352,6 @@ function RuleParamsForm({
       const inactivityParams = params as {
         inactivityValue: number;
         inactivityUnit: 'days' | 'weeks' | 'months';
-        checkIntervalHours: number;
         notificationMode: 'once' | 'repeated' | 'reminder';
         reminderIntervalDays?: number;
       };
@@ -392,25 +390,8 @@ function RuleParamsForm({
             </div>
           </div>
           <p className="text-muted-foreground text-xs">
-            Notify when a user has not watched anything for this period
+            Notify when a user has not watched anything for this period. Checks run hourly.
           </p>
-
-          <div className="space-y-2">
-            <Label htmlFor="checkIntervalHours">Check Interval (hours)</Label>
-            <Input
-              id="checkIntervalHours"
-              type="number"
-              min={1}
-              max={720}
-              value={inactivityParams.checkIntervalHours}
-              onChange={(e) => {
-                onChange({ ...params, checkIntervalHours: parseInt(e.target.value) || 24 });
-              }}
-            />
-            <p className="text-muted-foreground text-xs">
-              How often to check for inactive accounts. Default: 24 hours
-            </p>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notificationMode">Notification Mode</Label>
@@ -428,7 +409,7 @@ function RuleParamsForm({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="once">Once (when first becomes inactive)</SelectItem>
-                <SelectItem value="repeated">Every check period</SelectItem>
+                <SelectItem value="repeated">Every hour</SelectItem>
                 <SelectItem value="reminder">Periodic reminders</SelectItem>
               </SelectContent>
             </Select>
