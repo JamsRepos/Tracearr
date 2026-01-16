@@ -155,7 +155,7 @@ function StateIcon({ state }: { state: SessionState }) {
   const config: Record<SessionState, { icon: typeof Play; color: string; label: string }> = {
     playing: { icon: Play, color: 'text-green-500', label: 'Playing' },
     paused: { icon: Pause, color: 'text-yellow-500', label: 'Paused' },
-    stopped: { icon: Square, color: 'text-muted-foreground', label: 'Stopped' },
+    stopped: { icon: Square, color: 'text-red-500', label: 'Stopped' },
   };
   const { icon: Icon, color, label } = config[state];
   return (
