@@ -125,6 +125,7 @@ export function Users() {
       key: 'reset-trust',
       label: 'Reset Trust Score',
       icon: <RotateCcw className="h-4 w-4" />,
+      color: 'info',
       onClick: handleBulkResetTrust,
       isLoading: bulkResetTrust.isPending,
     },

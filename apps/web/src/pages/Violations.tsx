@@ -189,6 +189,7 @@ export function Violations() {
       key: 'acknowledge',
       label: 'Acknowledge',
       icon: <Check className="h-4 w-4" />,
+      color: 'success',
       onClick: handleBulkAcknowledge,
       isLoading: bulkAcknowledge.isPending,
     },
@@ -196,7 +197,7 @@ export function Violations() {
       key: 'dismiss',
       label: 'Dismiss',
       icon: <Trash2 className="h-4 w-4" />,
-      variant: 'destructive',
+      color: 'destructive',
       onClick: () => setBulkDismissConfirmOpen(true),
       isLoading: bulkDismiss.isPending,
     },
@@ -300,6 +301,7 @@ export function Violations() {
                   handleAcknowledge(violation.id);
                 }}
                 disabled={acknowledgeViolation.isPending}
+                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
               >
                 <Check className="mr-1 h-4 w-4" />
                 Acknowledge

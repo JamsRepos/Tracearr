@@ -11,6 +11,8 @@ export interface BulkAction {
   icon?: React.ReactNode;
   /** Button variant */
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost';
+  /** Action color theme - overrides variant for semantic coloring */
+  color?: 'success' | 'warning' | 'destructive' | 'info' | 'default';
   /** Action handler */
   onClick: () => void;
   /** Whether the action is currently loading */
@@ -63,18 +65,43 @@ export function BulkActionsToolbar({
       <div className="bg-primary-foreground/20 h-6 w-px" />
 
       <div className="flex items-center gap-2">
-        {actions.map((action) => (
-          <Button
-            key={action.key}
-            variant={action.variant ?? 'secondary'}
-            size="sm"
-            onClick={action.onClick}
-            disabled={action.disabled || action.isLoading}
-          >
-            {action.icon && <span className="mr-1.5">{action.icon}</span>}
-            {action.isLoading ? 'Processing...' : action.label}
-          </Button>
-        ))}
+        {actions.map((action) => {
+          // Determine button styling based on color or variant
+          let buttonClassName = '';
+          let buttonVariant = action.variant ?? 'secondary';
+
+          if (action.color === 'success') {
+            buttonClassName =
+              'bg-green-600/80 hover:bg-green-700/90 text-white border-green-600/50 backdrop-blur-sm';
+            buttonVariant = 'default';
+          } else if (action.color === 'warning') {
+            buttonClassName =
+              'bg-yellow-600/80 hover:bg-yellow-700/90 text-white border-yellow-600/50 backdrop-blur-sm';
+            buttonVariant = 'default';
+          } else if (action.color === 'destructive' || action.variant === 'destructive') {
+            buttonClassName =
+              'bg-red-600/80 hover:bg-red-700/90 text-white border-red-600/50 backdrop-blur-sm';
+            buttonVariant = 'default';
+          } else if (action.color === 'info') {
+            buttonClassName =
+              'bg-blue-600/80 hover:bg-blue-700/90 text-white border-blue-600/50 backdrop-blur-sm';
+            buttonVariant = 'default';
+          }
+
+          return (
+            <Button
+              key={action.key}
+              variant={buttonVariant}
+              size="sm"
+              onClick={action.onClick}
+              disabled={action.disabled || action.isLoading}
+              className={buttonClassName}
+            >
+              {action.icon && <span className="mr-1.5">{action.icon}</span>}
+              {action.isLoading ? 'Processing...' : action.label}
+            </Button>
+          );
+        })}
       </div>
 
       <div className="bg-primary-foreground/20 h-6 w-px" />
