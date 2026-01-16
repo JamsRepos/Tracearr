@@ -286,7 +286,9 @@ export abstract class BaseMediaServerClient
 
     const params = new URLSearchParams({
       Ids: ids.join(','),
-      Fields: 'ProductionYear,ParentIndexNumber,IndexNumber,SeriesId,SeriesPrimaryImageTag',
+      // Include episode, movie, and music metadata fields
+      Fields:
+        'ProductionYear,ParentIndexNumber,IndexNumber,SeriesId,SeriesPrimaryImageTag,Album,AlbumArtist,Artists,AlbumId,AlbumPrimaryImageTag',
     });
 
     const data = await fetchJson<{ Items?: unknown[] }>(`${this.baseUrl}/Items?${params}`, {

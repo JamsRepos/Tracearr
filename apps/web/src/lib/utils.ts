@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { getName as getCountryNameFromCode } from 'country-list';
+import type { MediaType } from '@tracearr/shared';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,4 +16,59 @@ export function getCountryName(code: string | null | undefined): string | null {
   const name = getCountryNameFromCode(code) ?? code;
   // Strip ISO 3166-1 article suffixes like "(the)", "(The)"
   return name.replace(/\s*\([Tt]he\)$/, '');
+}
+
+/**
+ * Media display fields interface for formatting media titles
+ */
+interface MediaDisplayFields {
+  mediaType: MediaType | null;
+  mediaTitle: string | null;
+  grandparentTitle?: string | null;
+  seasonNumber?: number | null;
+  episodeNumber?: number | null;
+  year?: number | null;
+  artistName?: string | null;
+  albumName?: string | null;
+}
+
+/**
+ * Get display title for media (handles TV shows vs movies vs music)
+ * Formats media information consistently across the application.
+ *
+ * @param media - Media object with display fields
+ * @returns Object with title and subtitle for display
+ */
+export function getMediaDisplay(media: MediaDisplayFields): {
+  title: string;
+  subtitle: string | null;
+} {
+  if (media.mediaType === 'episode' && media.grandparentTitle) {
+    // TV Show episode
+    const episodeInfo =
+      media.seasonNumber && media.episodeNumber
+        ? `S${media.seasonNumber.toString().padStart(2, '0')} E${media.episodeNumber.toString().padStart(2, '0')}`
+        : '';
+    return {
+      title: media.grandparentTitle,
+      subtitle: episodeInfo
+        ? `${episodeInfo} · ${media.mediaTitle ?? ''}`
+        : (media.mediaTitle ?? null),
+    };
+  }
+  if (media.mediaType === 'track') {
+    // Music track - show track name as title, artist/album as subtitle
+    const parts: string[] = [];
+    if (media.artistName) parts.push(media.artistName);
+    if (media.albumName) parts.push(media.albumName);
+    return {
+      title: media.mediaTitle ?? '',
+      subtitle: parts.length > 0 ? parts.join(' · ') : null,
+    };
+  }
+  // Movie or other
+  return {
+    title: media.mediaTitle ?? '',
+    subtitle: media.year ? `${media.year}` : null,
+  };
 }

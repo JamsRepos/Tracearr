@@ -83,6 +83,12 @@ export interface JellyfinEmbyItemResult {
   };
   SeriesId?: string;
   SeriesPrimaryImageTag?: string;
+  // Music track metadata
+  Album?: string;
+  AlbumArtist?: string;
+  Artists?: string[];
+  AlbumId?: string;
+  AlbumPrimaryImageTag?: string;
 }
 
 // ============================================================================
@@ -383,6 +389,12 @@ export function parseAuthResponse(data: Record<string, unknown>): JellyfinEmbyAu
 export function parseItem(item: Record<string, unknown>): JellyfinEmbyItemResult {
   const imageTags = getNestedObject(item, 'ImageTags');
 
+  // Parse Artists array if present
+  const artistsRaw = item.Artists;
+  const artists = Array.isArray(artistsRaw)
+    ? artistsRaw.filter((a): a is string => typeof a === 'string')
+    : undefined;
+
   return {
     Id: parseString(item.Id),
     ParentIndexNumber: parseOptionalNumber(item.ParentIndexNumber),
@@ -391,6 +403,12 @@ export function parseItem(item: Record<string, unknown>): JellyfinEmbyItemResult
     ImageTags: imageTags?.Primary ? { Primary: parseString(imageTags.Primary) } : undefined,
     SeriesId: parseOptionalString(item.SeriesId),
     SeriesPrimaryImageTag: parseOptionalString(item.SeriesPrimaryImageTag),
+    // Music metadata
+    Album: parseOptionalString(item.Album),
+    AlbumArtist: parseOptionalString(item.AlbumArtist),
+    Artists: artists?.length ? artists : undefined,
+    AlbumId: parseOptionalString(item.AlbumId),
+    AlbumPrimaryImageTag: parseOptionalString(item.AlbumPrimaryImageTag),
   };
 }
 

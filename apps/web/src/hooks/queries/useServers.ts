@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SERVER_STATS_CONFIG, type ServerResourceDataPoint } from '@tracearr/shared';
+import { SERVER_STATS_CONFIG, type Server, type ServerResourceDataPoint } from '@tracearr/shared';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 export function useServers() {
   return useQuery({
@@ -117,6 +117,85 @@ export function useSyncServer() {
       toast.error('Sync Failed', { description: error.message });
     },
   });
+}
+
+export function useReorderServers() {
+  const queryClient = useQueryClient();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingOrderRef = useRef<{ id: string; displayOrder: number }[] | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (servers: { id: string; displayOrder: number }[]) => api.servers.reorder(servers),
+    onMutate: async (newOrder) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['servers', 'list'] });
+
+      // Snapshot the previous value
+      const previousServers = queryClient.getQueryData<Server[]>(['servers', 'list']);
+
+      // Optimistically update to the new value
+      if (previousServers) {
+        const reordered = [...previousServers].sort((a, b) => {
+          const aOrder = newOrder.find((s) => s.id === a.id)?.displayOrder ?? 0;
+          const bOrder = newOrder.find((s) => s.id === b.id)?.displayOrder ?? 0;
+          return aOrder - bOrder;
+        });
+        queryClient.setQueryData(['servers', 'list'], reordered);
+      }
+
+      // Return context with the previous servers
+      return { previousServers };
+    },
+    onError: (error: Error, _newOrder, context) => {
+      // Rollback on error
+      if (context?.previousServers) {
+        queryClient.setQueryData(['servers', 'list'], context.previousServers);
+      }
+      toast.error('Failed to Reorder Servers', { description: error.message });
+    },
+    onSuccess: () => {
+      // Invalidate to ensure we have the latest data
+      void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
+    },
+  });
+
+  // Cleanup debounce timer on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Use ref to avoid stale closure issues with mutation
+  const mutateRef = useRef(mutation.mutate);
+  mutateRef.current = mutation.mutate;
+
+  // Debounced mutation function to avoid excessive API calls during drag
+  const debouncedMutate = useCallback(
+    (servers: { id: string; displayOrder: number }[]) => {
+      // Store pending order in ref to use latest value when timer fires
+      pendingOrderRef.current = servers;
+
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(() => {
+        if (pendingOrderRef.current) {
+          mutateRef.current(pendingOrderRef.current);
+          pendingOrderRef.current = null;
+        }
+      }, 500);
+    },
+    [] // No dependencies - uses refs to avoid stale closures
+  );
+
+  return {
+    ...mutation,
+    mutate: debouncedMutate,
+  };
 }
 
 /**

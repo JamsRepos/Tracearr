@@ -3,6 +3,7 @@
  * Uses condensed info sections matching the app's design patterns.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Separator } from '@/components/ui/separator';
 import {
   Film,
   Tv,
@@ -31,8 +34,9 @@ import {
   Gauge,
   Clock,
   ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
-import { cn, getCountryName } from '@/lib/utils';
+import { cn, getCountryName, getMediaDisplay } from '@/lib/utils';
 import { getAvatarUrl } from '@/components/users/utils';
 import { useTheme } from '@/components/theme-provider';
 import { StreamDetailsPanel } from './StreamDetailsPanel';
@@ -121,42 +125,12 @@ function getWatchTime(session: SessionWithDetails | ActiveSession): number | nul
   return Math.max(0, elapsedMs - pausedMs);
 }
 
-// Get progress percentage
+// Get progress percentage (playback position)
+// Uses progressMs (where in the video) not durationMs (how long watched)
 function getProgress(session: SessionWithDetails): number {
   if (!session.totalDurationMs || session.totalDurationMs === 0) return 0;
-  const progress = session.progressMs ?? session.durationMs ?? 0;
+  const progress = session.progressMs ?? 0;
   return Math.min(100, Math.round((progress / session.totalDurationMs) * 100));
-}
-
-// Get media title formatted
-function getMediaTitle(session: SessionWithDetails | ActiveSession): {
-  primary: string;
-  secondary?: string;
-} {
-  if (session.mediaType === 'episode' && session.grandparentTitle) {
-    const epNum =
-      session.seasonNumber && session.episodeNumber
-        ? `S${session.seasonNumber.toString().padStart(2, '0')} E${session.episodeNumber.toString().padStart(2, '0')}`
-        : '';
-    return {
-      primary: session.grandparentTitle,
-      secondary: `${epNum}${epNum ? ' · ' : ''}${session.mediaTitle}`,
-    };
-  }
-  if (session.mediaType === 'track') {
-    // Music track - show track name, artist/album as secondary
-    const parts: string[] = [];
-    if (session.artistName) parts.push(session.artistName);
-    if (session.albumName) parts.push(session.albumName);
-    return {
-      primary: session.mediaTitle,
-      secondary: parts.length > 0 ? parts.join(' · ') : undefined,
-    };
-  }
-  return {
-    primary: session.mediaTitle,
-    secondary: session.year ? `(${session.year})` : undefined,
-  };
 }
 
 // Mini map component for session location
@@ -227,15 +201,23 @@ function Section({
 }
 
 export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
+  const [locationOpen, setLocationOpen] = useState(false);
+
   if (!session) return null;
 
   const serverConfig = SERVER_CONFIG[session.server.type];
   const stateConfig = STATE_CONFIG[session.state];
   const mediaConfig = MEDIA_CONFIG[session.mediaType];
   const MediaIcon = mediaConfig.icon;
-  const title = getMediaTitle(session);
+  const { title: primary, subtitle: secondary } = getMediaDisplay(session);
   const progress = getProgress(session);
-  const hasLocation = session.geoLat && session.geoLon;
+  const hasLocation = session.geoLat !== null && session.geoLon !== null;
+  const geoCountryName = getCountryName(session.geoCountry);
+  const geoCoordinates =
+    session.geoLat !== null && session.geoLon !== null
+      ? `${session.geoLat.toFixed(4)}, ${session.geoLon.toFixed(4)}`
+      : null;
+  const geoAsnNumber = session.geoAsnNumber ? `AS${session.geoAsnNumber}` : null;
 
   // Get poster URL if available
   const posterUrl = session.thumbPath
@@ -243,11 +225,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
     : null;
 
   // Build location string
-  const locationParts = [
-    session.geoCity,
-    session.geoRegion,
-    getCountryName(session.geoCountry),
-  ].filter(Boolean);
+  const locationParts = [session.geoCity, session.geoRegion, geoCountryName].filter(Boolean);
   const locationString = locationParts.join(', ');
   const transcodeReasons = session.transcodeInfo?.reasons ?? [];
   const hasTranscodeReason = transcodeReasons.length > 0;
@@ -281,7 +259,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
             {posterUrl && (
               <img
                 src={posterUrl}
-                alt={title.primary}
+                alt={primary}
                 className="h-20 w-14 flex-shrink-0 rounded object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -295,13 +273,11 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
                 {session.year && <span>· {session.year}</span>}
               </div>
               <div className="flex items-center gap-1.5 leading-tight font-medium">
-                <span className="truncate">{title.primary}</span>
+                <span className="truncate">{primary}</span>
                 {session.watched && <Eye className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />}
               </div>
-              {title.secondary && (
-                <div className="text-muted-foreground mt-0.5 truncate text-sm">
-                  {title.secondary}
-                </div>
+              {secondary && (
+                <div className="text-muted-foreground mt-0.5 truncate text-sm">{secondary}</div>
               )}
               {/* Progress inline */}
               <div className="mt-2 flex items-center gap-2">
@@ -399,19 +375,71 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
 
           {/* Location & Network */}
           <Section icon={MapPin} title="Location">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">IP Address</span>
-                <span className="font-mono text-xs">{session.ipAddress || '—'}</span>
-              </div>
+            <Collapsible open={locationOpen} onOpenChange={setLocationOpen} className="space-y-2">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="hover:text-foreground flex w-full items-center justify-between text-sm transition-colors"
+                >
+                  <span className="text-muted-foreground">IP Address</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs">{session.ipAddress || '—'}</span>
+                    <ChevronDown
+                      className={cn(
+                        'text-muted-foreground h-3.5 w-3.5 transition-transform',
+                        locationOpen && 'rotate-180'
+                      )}
+                    />
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              {hasLocation && <MiniMap lat={session.geoLat!} lon={session.geoLon!} />}
               {locationString && (
                 <div className="flex items-center gap-1.5 text-sm">
                   <Globe className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
                   <span>{locationString}</span>
                 </div>
               )}
-              {hasLocation && <MiniMap lat={session.geoLat!} lon={session.geoLon!} />}
-            </div>
+              <CollapsibleContent className="space-y-2">
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Continent</span>
+                    <span>{session.geoContinent ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Country</span>
+                    <span>{geoCountryName ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Region</span>
+                    <span>{session.geoRegion ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">City</span>
+                    <span>{session.geoCity ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Postal Code</span>
+                    <span>{session.geoPostal ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Coordinates</span>
+                    <span className="font-mono text-xs">{geoCoordinates ?? '—'}</span>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">ASN</span>
+                    <span>{geoAsnNumber ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">ASN Org</span>
+                    <span className="max-w-[180px] truncate text-right">
+                      {session.geoAsnOrganization ?? '—'}
+                    </span>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </Section>
 
           {/* Device */}
@@ -513,6 +541,7 @@ export function SessionDetailSheet({ session, open, onOpenChange }: Props) {
               videoDecision={session.videoDecision ?? null}
               audioDecision={session.audioDecision ?? null}
               bitrate={session.bitrate ?? null}
+              serverType={session.server.type}
             />
           </Section>
         </div>

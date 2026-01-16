@@ -199,8 +199,12 @@ export function buildActiveSession(input: BuildActiveSessionInput): ActiveSessio
     geoCity: geo.city,
     geoRegion: geo.region,
     geoCountry: geo.countryCode ?? geo.country,
+    geoContinent: geo.continent,
+    geoPostal: geo.postal,
     geoLat: geo.lat,
     geoLon: geo.lon,
+    geoAsnNumber: geo.asnNumber,
+    geoAsnOrganization: geo.asnOrganization,
     playerName: processed.playerName,
     deviceId: processed.deviceId || null,
     product: processed.product || null,
@@ -424,8 +428,12 @@ export async function createSessionWithRulesAtomic(
             geoCity: geo.city,
             geoRegion: geo.region,
             geoCountry: geo.countryCode ?? geo.country,
+            geoContinent: geo.continent,
+            geoPostal: geo.postal,
             geoLat: geo.lat,
             geoLon: geo.lon,
+            geoAsnNumber: geo.asnNumber,
+            geoAsnOrganization: geo.asnOrganization,
             playerName: processed.playerName,
             deviceId: processed.deviceId || null,
             product: processed.product || null,
@@ -491,8 +499,12 @@ export async function createSessionWithRulesAtomic(
           geoCity: geo.city,
           geoRegion: geo.region,
           geoCountry: geo.countryCode ?? geo.country,
+          geoContinent: geo.continent,
+          geoPostal: geo.postal,
           geoLat: geo.lat,
           geoLon: geo.lon,
+          geoAsnNumber: geo.asnNumber,
+          geoAsnOrganization: geo.asnOrganization,
           playerName: processed.playerName,
           deviceId: processed.deviceId || null,
           product: processed.product || null,
@@ -610,9 +622,11 @@ export async function stopSessionAtomic(input: SessionStopInput): Promise<Sessio
 
   // For quality changes (preserveWatched=true), keep the existing watched status
   // since playback is continuing in a new session
+  // Use durationMs (actual watch time) for completion check, not progressMs (playback position)
+  // because some servers report incorrect position (e.g., Emby iOS transcoded sessions)
   const watched = preserveWatched
     ? session.watched
-    : session.watched || checkWatchCompletion(session.progressMs, session.totalDurationMs);
+    : session.watched || checkWatchCompletion(durationMs, session.totalDurationMs);
 
   const shortSession = !shouldRecordSession(durationMs);
 

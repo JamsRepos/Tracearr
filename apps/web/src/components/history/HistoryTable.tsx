@@ -36,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, getCountryName } from '@/lib/utils';
+import { cn, getCountryName, getMediaDisplay } from '@/lib/utils';
 import { getAvatarUrl } from '@/components/users/utils';
 import type { SessionWithDetails, SessionState, MediaType, EngagementTier } from '@tracearr/shared';
 import type { ColumnVisibility } from './HistoryFilters';
@@ -103,9 +103,9 @@ function getEngagementTier(progress: number): EngagementTier {
 }
 
 // Engagement tier badge component
-function EngagementTierBadge({ progress }: { progress: number }) {
+function EngagementTierBadge({ progress, state }: { progress: number; state: SessionState }) {
   const tier = getEngagementTier(progress);
-  if (tier === 'unknown') return null;
+  if (tier === 'unknown' || state !== 'stopped') return null;
 
   const config = ENGAGEMENT_TIER_CONFIG[tier];
   return (
@@ -193,39 +193,12 @@ function formatDuration(ms: number | null): string {
   return `${seconds}s`;
 }
 
-// Calculate progress percentage
+// Calculate progress percentage (playback position)
+// Uses progressMs (where in the video) not durationMs (how long watched)
 function getProgress(session: SessionWithDetails): number {
   if (!session.totalDurationMs || session.totalDurationMs === 0) return 0;
-  const progress = session.progressMs ?? session.durationMs ?? 0;
+  const progress = session.progressMs ?? 0;
   return Math.min(100, Math.round((progress / session.totalDurationMs) * 100));
-}
-
-// Get formatted content title
-function getContentTitle(session: SessionWithDetails): { primary: string; secondary?: string } {
-  if (session.mediaType === 'episode' && session.grandparentTitle) {
-    const epNum =
-      session.seasonNumber && session.episodeNumber
-        ? `S${session.seasonNumber.toString().padStart(2, '0')} E${session.episodeNumber.toString().padStart(2, '0')}`
-        : '';
-    return {
-      primary: session.grandparentTitle,
-      secondary: `${epNum}${epNum ? ' · ' : ''}${session.mediaTitle}`,
-    };
-  }
-  if (session.mediaType === 'track') {
-    // Music track - show track name, artist/album as secondary
-    const parts: string[] = [];
-    if (session.artistName) parts.push(session.artistName);
-    if (session.albumName) parts.push(session.albumName);
-    return {
-      primary: session.mediaTitle,
-      secondary: parts.length > 0 ? parts.join(' · ') : undefined,
-    };
-  }
-  return {
-    primary: session.mediaTitle,
-    secondary: session.year ? `(${session.year})` : undefined,
-  };
 }
 
 // Session row component with column visibility support
@@ -233,7 +206,7 @@ export const HistoryTableRow = forwardRef<
   HTMLTableRowElement,
   { session: SessionWithDetails; onClick?: () => void; columnVisibility: ColumnVisibility }
 >(({ session, onClick, columnVisibility }, ref) => {
-  const title = getContentTitle(session);
+  const { title: primary, subtitle: secondary } = getMediaDisplay(session);
   const progress = getProgress(session);
 
   return (
@@ -296,11 +269,11 @@ export const HistoryTableRow = forwardRef<
             <MediaTypeIcon type={session.mediaType} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="truncate font-medium">{title.primary}</span>
-                <EngagementTierBadge progress={progress} />
+                <span className="truncate font-medium">{primary}</span>
+                <EngagementTierBadge progress={progress} state={session.state} />
               </div>
-              {title.secondary && (
-                <div className="text-muted-foreground truncate text-xs">{title.secondary}</div>
+              {secondary && (
+                <div className="text-muted-foreground truncate text-xs">{secondary}</div>
               )}
             </div>
           </div>

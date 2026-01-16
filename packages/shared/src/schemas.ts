@@ -118,6 +118,15 @@ export const serverIdParamSchema = z.object({
   id: uuidSchema,
 });
 
+export const reorderServersSchema = z.object({
+  servers: z.array(
+    z.object({
+      id: uuidSchema,
+      displayOrder: z.number().int().min(0),
+    })
+  ),
+});
+
 // ============================================================================
 // User Schemas
 // ============================================================================
@@ -617,6 +626,7 @@ export const showsQuerySchema = z
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CallbackInput = z.infer<typeof callbackSchema>;
 export type CreateServerInput = z.infer<typeof createServerSchema>;
+export type ReorderServersInput = z.infer<typeof reorderServersSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type SessionQueryInput = z.infer<typeof sessionQuerySchema>;
 export type HistoryQueryInput = z.infer<typeof historyQuerySchema>;

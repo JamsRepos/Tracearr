@@ -226,16 +226,26 @@ async function handleProgress(event: {
       return;
     }
 
-    // Update progress in database
-    const watched =
-      existingSession.watched ||
-      checkWatchCompletion(notification.viewOffset, existingSession.totalDurationMs);
+    // Calculate current watch time for completion check (not playback position)
+    // Some servers report incorrect position (e.g., Emby iOS transcoded sessions)
+    const now = new Date();
+    let watched = existingSession.watched;
+    if (!watched && existingSession.totalDurationMs) {
+      const elapsedMs = now.getTime() - existingSession.startedAt.getTime();
+      const pausedMs = existingSession.pausedDurationMs || 0;
+      // Account for ongoing pause if currently paused
+      const ongoingPauseMs = existingSession.lastPausedAt
+        ? now.getTime() - existingSession.lastPausedAt.getTime()
+        : 0;
+      const currentWatchTimeMs = Math.max(0, elapsedMs - pausedMs - ongoingPauseMs);
+      watched = checkWatchCompletion(currentWatchTimeMs, existingSession.totalDurationMs);
+    }
 
     await db
       .update(sessions)
       .set({
         progressMs: notification.viewOffset,
-        lastSeenAt: new Date(), // Update for stale session detection
+        lastSeenAt: now, // Update for stale session detection
         watched,
       })
       .where(eq(sessions.id, existingSession.id));
@@ -539,10 +549,21 @@ async function updateExistingSession(
     now
   );
 
-  // Check watch completion
-  const watched =
-    existingSession.watched ||
-    checkWatchCompletion(processed.progressMs, processed.totalDurationMs);
+  // Check watch completion using actual watch time (not playback position)
+  // Some servers report incorrect position (e.g., Emby iOS transcoded sessions)
+  let watched = existingSession.watched;
+  if (!watched && processed.totalDurationMs) {
+    const elapsedMs = now.getTime() - existingSession.startedAt.getTime();
+    // Account for accumulated pauses and any ongoing pause
+    const ongoingPauseMs = pauseResult.lastPausedAt
+      ? now.getTime() - pauseResult.lastPausedAt.getTime()
+      : 0;
+    const currentWatchTimeMs = Math.max(
+      0,
+      elapsedMs - pauseResult.pausedDurationMs - ongoingPauseMs
+    );
+    watched = checkWatchCompletion(currentWatchTimeMs, processed.totalDurationMs);
+  }
 
   // Update session in database
   await db

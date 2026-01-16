@@ -167,6 +167,10 @@ describe('GeoIPService', () => {
         countryCode: 'US',
         lat: 40.7128,
         lon: -74.006,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       losAngeles: {
         city: 'Los Angeles',
@@ -175,6 +179,10 @@ describe('GeoIPService', () => {
         countryCode: 'US',
         lat: 34.0522,
         lon: -118.2437,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       london: {
         city: 'London',
@@ -183,6 +191,10 @@ describe('GeoIPService', () => {
         countryCode: 'GB',
         lat: 51.5074,
         lon: -0.1278,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       tokyo: {
         city: 'Tokyo',
@@ -191,6 +203,10 @@ describe('GeoIPService', () => {
         countryCode: 'JP',
         lat: 35.6762,
         lon: 139.6503,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       sydney: {
         city: 'Sydney',
@@ -199,6 +215,10 @@ describe('GeoIPService', () => {
         countryCode: 'AU',
         lat: -33.8688,
         lon: 151.2093,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       nullLocation: {
         city: null,
@@ -207,6 +227,10 @@ describe('GeoIPService', () => {
         countryCode: null,
         lat: null,
         lon: null,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
       partialNull: {
         city: 'Test',
@@ -215,6 +239,10 @@ describe('GeoIPService', () => {
         countryCode: null,
         lat: 40.0,
         lon: null,
+        continent: null,
+        postal: null,
+        asnNumber: null,
+        asnOrganization: null,
       },
     };
 
@@ -316,8 +344,12 @@ describe('GeoIPService', () => {
       region: null,
       country: 'USA',
       countryCode: 'US',
+      continent: 'North America',
+      postal: null,
       lat: 40.7128,
       lon: -74.006,
+      asnNumber: null,
+      asnOrganization: null,
     };
 
     const losAngeles: GeoLocation = {
@@ -325,8 +357,12 @@ describe('GeoIPService', () => {
       region: null,
       country: 'USA',
       countryCode: 'US',
+      continent: 'North America',
+      postal: null,
       lat: 34.0522,
       lon: -118.2437,
+      asnNumber: null,
+      asnOrganization: null,
     };
 
     const london: GeoLocation = {
@@ -334,8 +370,12 @@ describe('GeoIPService', () => {
       region: null,
       country: 'UK',
       countryCode: 'GB',
+      continent: 'Europe',
+      postal: null,
       lat: 51.5074,
       lon: -0.1278,
+      asnNumber: null,
+      asnOrganization: null,
     };
 
     const nullLocation: GeoLocation = {
@@ -343,8 +383,12 @@ describe('GeoIPService', () => {
       region: null,
       country: null,
       countryCode: null,
+      continent: null,
+      postal: null,
       lat: null,
       lon: null,
+      asnNumber: null,
+      asnOrganization: null,
     };
 
     // NYC to LA is ~3940 km
@@ -439,8 +483,12 @@ describe('GeoIPService', () => {
         region: null,
         country: 'USA',
         countryCode: 'US',
+        continent: 'North America',
+        postal: null,
         lat: 40.7128 + 0.001, // Very small offset (~111 meters)
         lon: -74.006,
+        asnNumber: null,
+        asnOrganization: null,
       };
 
       const fiveMinutesMs = 5 * 60 * 1000;

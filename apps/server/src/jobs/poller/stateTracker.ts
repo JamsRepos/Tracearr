@@ -154,9 +154,14 @@ export function shouldRecordSession(
 // ============================================================================
 
 /**
- * Check if a session should be marked as "watched" based on progress threshold.
+ * Check if a session should be marked as "watched" based on watch time threshold.
  *
- * @param progressMs - Current playback position in milliseconds
+ * Uses durationMs (actual watch time) rather than progressMs (playback position)
+ * because some media servers report incorrect position data (e.g., Emby iOS
+ * transcoded sessions can report 96% position when user only watched 35%).
+ * Watch time is calculated from elapsed time minus paused time, which is reliable.
+ *
+ * @param durationMs - Actual watch time in milliseconds (elapsed - paused)
  * @param totalDurationMs - Total media duration in milliseconds
  * @param threshold - Optional custom threshold (0-1), defaults to 85%
  * @returns true if watched at least the threshold percentage of the content
@@ -165,15 +170,15 @@ export function shouldRecordSession(
  * checkWatchCompletion(8500, 10000);         // true (85% with default threshold)
  * checkWatchCompletion(8000, 10000);         // false (80% < 85% default)
  * checkWatchCompletion(9000, 10000, 0.90);   // true (90% with custom threshold)
- * checkWatchCompletion(null, 6000000);       // false (no progress)
+ * checkWatchCompletion(null, 6000000);       // false (no duration)
  */
 export function checkWatchCompletion(
-  progressMs: number | null,
+  durationMs: number | null,
   totalDurationMs: number | null,
   threshold: number = SESSION_LIMITS.WATCH_COMPLETION_THRESHOLD
 ): boolean {
-  if (!progressMs || !totalDurationMs) return false;
-  return progressMs / totalDurationMs >= threshold;
+  if (!durationMs || !totalDurationMs) return false;
+  return durationMs / totalDurationMs >= threshold;
 }
 
 // ============================================================================

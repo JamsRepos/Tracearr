@@ -76,6 +76,9 @@ log_timezone = 'UTC'
 timezone = 'UTC'
 # Allow unlimited tuple decompression for migrations on compressed hypertables
 timescaledb.max_tuples_decompressed_per_dml_transaction = 0
+# Increase lock table size for large imports (Tautulli imports with many chunks)
+# Default is 64, which is insufficient for TimescaleDB hypertables with many chunks
+max_locks_per_transaction = 256
 EOF
 
     # Allow local connections
@@ -245,17 +248,44 @@ if [ -f /data/postgres/postgresql.conf ]; then
 fi
 
 # =============================================================================
+# Ensure max_locks_per_transaction is set (for existing databases)
+# =============================================================================
+# This setting increases the lock table size for large imports.
+# TimescaleDB hypertables with many chunks require more locks than the default (64).
+# Without it, Tautulli imports with large histories will fail with
+# "out of shared memory" or "max_locks_per_transaction exceeded" errors.
+if [ -f /data/postgres/postgresql.conf ]; then
+    if ! grep -q "max_locks_per_transaction" /data/postgres/postgresql.conf; then
+        log "Adding max_locks_per_transaction setting for large imports..."
+        echo "" >> /data/postgres/postgresql.conf
+        echo "# Increase lock table size for large imports (Tautulli imports with many chunks)" >> /data/postgres/postgresql.conf
+        echo "max_locks_per_transaction = 256" >> /data/postgres/postgresql.conf
+    fi
+fi
+
+# =============================================================================
 # Link GeoIP database if exists
 # =============================================================================
+mkdir -p /app/data
+
 if [ -f /data/tracearr/GeoLite2-City.mmdb ]; then
-    mkdir -p /app/data
     ln -sf /data/tracearr/GeoLite2-City.mmdb /app/data/GeoLite2-City.mmdb
-    log "GeoIP database linked from /data/tracearr/"
+    log "GeoIP City database linked from /data/tracearr/"
 elif [ -f /app/data/GeoLite2-City.mmdb ]; then
-    log "Using bundled GeoIP database"
+    log "Using bundled GeoIP City database"
 else
-    warn "GeoIP database not found - geolocation features will be limited"
+    warn "GeoIP City database not found - geolocation features will be limited"
     warn "Place GeoLite2-City.mmdb in /data/tracearr/ for full functionality"
+fi
+
+if [ -f /data/tracearr/GeoLite2-ASN.mmdb ]; then
+    ln -sf /data/tracearr/GeoLite2-ASN.mmdb /app/data/GeoLite2-ASN.mmdb
+    log "GeoIP ASN database linked from /data/tracearr/"
+elif [ -f /app/data/GeoLite2-ASN.mmdb ]; then
+    log "Using bundled GeoIP ASN database"
+else
+    warn "GeoIP ASN database not found - geolocation features will be limited"
+    warn "Place GeoLite2-ASN.mmdb in /data/tracearr/ for full functionality"
 fi
 
 # =============================================================================

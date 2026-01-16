@@ -172,6 +172,7 @@ export {
   // Server
   createServerSchema,
   serverIdParamSchema,
+  reorderServersSchema,
   // User
   updateUserSchema,
   updateUserIdentitySchema,
@@ -226,6 +227,7 @@ export type {
   LoginInput,
   CallbackInput,
   CreateServerInput,
+  ReorderServersInput,
   UpdateUserInput,
   UpdateUserIdentityInput,
   SessionQueryInput,

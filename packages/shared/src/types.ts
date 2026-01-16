@@ -39,6 +39,7 @@ export interface Server {
   name: string;
   type: ServerType;
   url: string;
+  displayOrder?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -287,8 +288,12 @@ export interface Session extends StreamDetailFields {
   geoCity: string | null;
   geoRegion: string | null; // State/province/subdivision
   geoCountry: string | null;
+  geoContinent: string | null;
+  geoPostal: string | null;
   geoLat: number | null;
   geoLon: number | null;
+  geoAsnNumber: number | null;
+  geoAsnOrganization: string | null;
   playerName: string | null; // Friendly device name
   deviceId: string | null; // Unique device identifier (machineIdentifier)
   product: string | null; // Product/app name (e.g., "Plex for iOS")
@@ -437,6 +442,8 @@ export interface ViolationSessionInfo {
   geoCity: string | null;
   geoRegion: string | null;
   geoCountry: string | null;
+  geoContinent: string | null;
+  geoPostal: string | null;
   geoLat: number | null;
   geoLon: number | null;
   playerName: string | null;
@@ -1150,6 +1157,12 @@ export interface TerminationLogWithDetails {
   // Session info for context
   mediaTitle: string | null;
   mediaType: MediaType | null;
+  grandparentTitle: string | null; // Show name (for episodes)
+  seasonNumber: number | null; // Season number (for episodes)
+  episodeNumber: number | null; // Episode number (for episodes)
+  year: number | null; // Release year
+  artistName: string | null; // Artist name (for music tracks)
+  albumName: string | null; // Album name (for music tracks)
 }
 
 // =============================================================================

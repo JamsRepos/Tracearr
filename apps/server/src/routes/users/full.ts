@@ -132,8 +132,12 @@ export const fullRoutes: FastifyPluginAsync = async (app) => {
           geoCity: sessions.geoCity,
           geoRegion: sessions.geoRegion,
           geoCountry: sessions.geoCountry,
+          geoContinent: sessions.geoContinent,
+          geoPostal: sessions.geoPostal,
           geoLat: sessions.geoLat,
           geoLon: sessions.geoLon,
+          geoAsnNumber: sessions.geoAsnNumber,
+          geoAsnOrganization: sessions.geoAsnOrganization,
           playerName: sessions.playerName,
           deviceId: sessions.deviceId,
           product: sessions.product,
@@ -354,6 +358,12 @@ export const fullRoutes: FastifyPluginAsync = async (app) => {
           createdAt: terminationLogs.createdAt,
           mediaTitle: sessions.mediaTitle,
           mediaType: sessions.mediaType,
+          grandparentTitle: sessions.grandparentTitle,
+          seasonNumber: sessions.seasonNumber,
+          episodeNumber: sessions.episodeNumber,
+          year: sessions.year,
+          artistName: sessions.artistName,
+          albumName: sessions.albumName,
         })
         .from(terminationLogs)
         .leftJoin(users, eq(terminationLogs.triggeredByUserId, users.id))

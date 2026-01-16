@@ -20,8 +20,10 @@ RUN apt-get update \
 
 # Enable TimescaleDB in PostgreSQL config
 # Set unlimited tuple decompression to allow migrations on compressed hypertables
+# Increase lock table size for large imports (Tautulli imports with many TimescaleDB chunks)
 RUN echo "shared_preload_libraries = 'timescaledb'" >> /usr/share/postgresql/postgresql.conf.sample \
-    && echo "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" >> /usr/share/postgresql/postgresql.conf.sample
+    && echo "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" >> /usr/share/postgresql/postgresql.conf.sample \
+    && echo "max_locks_per_transaction = 256" >> /usr/share/postgresql/postgresql.conf.sample
 
 # OCI image labels for container registries and tools like Renovate
 LABEL org.opencontainers.image.source="https://github.com/connorgallopo/Tracearr" \

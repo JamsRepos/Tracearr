@@ -65,7 +65,8 @@ vi.stubGlobal('fetch', mockFetch);
 function mockDbSelectWhere(result: unknown[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(result),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockResolvedValue(result),
   };
   vi.mocked(db.select).mockReturnValue(chain as never);
   return chain;
@@ -168,6 +169,7 @@ describe('Server Routes', () => {
           name: mockServer.name,
           type: mockServer.type,
           url: mockServer.url,
+          displayOrder: 0,
           createdAt: mockServer.createdAt,
           updatedAt: mockServer.updatedAt,
         },
@@ -200,6 +202,7 @@ describe('Server Routes', () => {
           name: 'Guest Server',
           type: 'jellyfin',
           url: 'http://localhost:8096',
+          displayOrder: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
