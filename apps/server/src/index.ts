@@ -19,7 +19,7 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '../../..');
 
 // Load .env from project root
-config({ path: resolve(PROJECT_ROOT, '.env') });
+config({ path: resolve(PROJECT_ROOT, '.env'), quiet: true });
 
 // GeoIP database path (in project root/data)
 const GEOIP_DB_PATH = resolve(PROJECT_ROOT, 'data/GeoLite2-City.mmdb');

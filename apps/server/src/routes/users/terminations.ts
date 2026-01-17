@@ -29,7 +29,7 @@ export const terminationsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { id } = params.data;
-    const { page = 1, pageSize = 20 } = query.data;
+    const { page, pageSize } = query.data;
     const authUser = request.user;
     const offset = (page - 1) * pageSize;
 

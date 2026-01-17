@@ -197,16 +197,8 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       return reply.badRequest('Invalid query parameters');
     }
 
-    const {
-      page = 1,
-      pageSize = 50,
-      serverUserId,
-      serverId,
-      state,
-      mediaType,
-      startDate,
-      endDate,
-    } = query.data;
+    const { page, pageSize, serverUserId, serverId, state, mediaType, startDate, endDate } =
+      query.data;
 
     const authUser = request.user;
     const offset = (page - 1) * pageSize;
@@ -528,7 +520,7 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       return reply.badRequest('Invalid query parameters');
     }
 
-    const { cursor, pageSize = 50, orderBy = 'startedAt', orderDir = 'desc' } = query.data;
+    const { cursor, pageSize, orderBy, orderDir } = query.data;
 
     const authUser = request.user;
 

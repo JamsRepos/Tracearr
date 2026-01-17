@@ -26,7 +26,7 @@ export const sessionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { id } = params.data;
-    const { page = 1, pageSize = 50 } = query.data;
+    const { page, pageSize } = query.data;
     const authUser = request.user;
     const offset = (page - 1) * pageSize;
 

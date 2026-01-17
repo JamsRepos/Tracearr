@@ -50,8 +50,8 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const {
-      page = 1,
-      pageSize = 50,
+      page,
+      pageSize,
       serverId,
       serverUserId,
       ruleId,

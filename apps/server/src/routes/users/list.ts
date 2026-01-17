@@ -36,7 +36,7 @@ export const listRoutes: FastifyPluginAsync = async (app) => {
       return reply.badRequest('Invalid query parameters');
     }
 
-    const { page = 1, pageSize = 50, serverId } = query.data;
+    const { page, pageSize, serverId } = query.data;
     const authUser = request.user;
     const offset = (page - 1) * pageSize;
 
