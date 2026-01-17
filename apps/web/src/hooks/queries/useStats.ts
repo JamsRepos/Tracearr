@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { MediaType } from '@tracearr/shared';
 import { api, type StatsTimeRange, getBrowserTimezone } from '@/lib/api';
 
@@ -239,5 +239,26 @@ export function useBandwidthSummary(timeRange?: StatsTimeRange, serverId?: strin
     queryFn: () =>
       api.stats.bandwidthSummary(timeRange ?? { period: 'month' }, serverId ?? undefined),
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+// Library statistics (stored in database, updated by background job)
+export function useLibraryStats(serverId?: string | null, days = 90) {
+  return useQuery({
+    queryKey: ['stats', 'libraries', serverId, days],
+    queryFn: () => api.stats.libraries(serverId ?? undefined, days),
+    staleTime: 1000 * 60 * 60, // 1 hour (data updated daily by background job)
+  });
+}
+
+// Hook for manual refresh (admin only)
+export function useRefreshLibraryStats() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (serverId?: string) => api.stats.refreshLibraries(serverId),
+    onSuccess: () => {
+      // Invalidate and refetch library stats after refresh is triggered
+      void queryClient.invalidateQueries({ queryKey: ['stats', 'libraries'] });
+    },
   });
 }

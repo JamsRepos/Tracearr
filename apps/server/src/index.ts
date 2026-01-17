@@ -92,6 +92,12 @@ import {
   scheduleInactivityChecks,
   shutdownInactivityCheckQueue,
 } from './jobs/inactivityCheckQueue.js';
+import {
+  initLibraryStatsQueue,
+  startLibraryStatsWorker,
+  scheduleLibraryStatsUpdate,
+  shutdownLibraryStatsQueue,
+} from './jobs/libraryStatsQueue.js';
 import { initPushRateLimiter } from './services/pushRateLimiter.js';
 import { processPushReceipts } from './services/pushNotification.js';
 import { db, runMigrations } from './db/client.js';
@@ -313,6 +319,17 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     // Don't throw - inactivity checks are non-critical
   }
 
+  // Initialize library stats queue (updates library statistics daily)
+  try {
+    initLibraryStatsQueue(redisUrl, app.redis);
+    startLibraryStatsWorker();
+    void scheduleLibraryStatsUpdate();
+    app.log.info('Library stats queue initialized');
+  } catch (err) {
+    app.log.error({ err }, 'Failed to initialize library stats queue');
+    // Don't throw - library stats are non-critical
+  }
+
   // Initialize poller with cache services
   initializePoller(cacheService, pubSubService);
 
@@ -340,6 +357,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     await shutdownMaintenanceQueue();
     await shutdownVersionCheckQueue();
     await shutdownInactivityCheckQueue();
+    await shutdownLibraryStatsQueue();
   });
 
   // Health check endpoint

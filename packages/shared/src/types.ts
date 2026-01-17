@@ -1573,3 +1573,93 @@ export interface BandwidthSummary {
   peakBitrateMbps: number;
   totalHours: number;
 }
+
+// =============================================================================
+// Media Library Stats Types (for Library Statistics page)
+// =============================================================================
+
+/** File statistics for a media library */
+export interface MediaLibraryFileStats {
+  /** Average file size in bytes */
+  avgFileSize: number;
+  /** Average duration in milliseconds */
+  avgDuration: number;
+  /** Average bitrate in kbps */
+  avgBitrate: number;
+  /** Percentage of items with HDR (0-100) */
+  hdrPercentage: number;
+}
+
+/** Statistics for a single media library */
+export interface MediaLibraryStats {
+  /** Library ID from media server */
+  id: string;
+  /** Server ID this library belongs to */
+  serverId: string;
+  /** Library display name */
+  name: string;
+  /** Library type (movie, show, music, etc.) */
+  type: string;
+  /** Total size in bytes */
+  size: number;
+  /** Total number of items (movies, episodes, tracks) */
+  itemCount: number;
+  /** Number of episodes (TV libraries only) */
+  episodeCount?: number;
+  /** Number of seasons (TV libraries only) */
+  seasonCount?: number;
+  /** Number of shows (TV libraries only) */
+  showCount?: number;
+  /** Total duration in hours */
+  hours: number;
+  /** File statistics */
+  fileStats: MediaLibraryFileStats;
+  /** When this library was last updated */
+  lastUpdatedAt: string;
+}
+
+/** Historical snapshot for a single library */
+export interface MediaLibrarySnapshot {
+  /** Library ID from media server */
+  libraryId: string;
+  /** Library display name */
+  libraryName: string;
+  /** Library type */
+  libraryType: string;
+  /** Total size in bytes */
+  size: number;
+  /** Total number of items */
+  items: number;
+  /** Total duration in milliseconds */
+  durationMs: number;
+}
+
+/** Historical data point grouping all libraries for a date */
+export interface MediaLibraryHistoricalDataPoint {
+  /** ISO date string */
+  date: string;
+  /** Library snapshots for this date */
+  libraries: MediaLibrarySnapshot[];
+}
+
+/** Current library statistics summary */
+export interface MediaLibraryStatsCurrent {
+  /** Total size across all libraries in bytes */
+  totalSize: number;
+  /** Total number of items across all libraries */
+  totalItems: number;
+  /** Total hours of content across all libraries */
+  totalHours: number;
+  /** ISO timestamp of when data was last updated */
+  lastUpdated: string | null;
+  /** Statistics for each library */
+  libraries: MediaLibraryStats[];
+}
+
+/** Full response for library statistics endpoint */
+export interface MediaLibraryStatsResponse {
+  /** Current library statistics */
+  current: MediaLibraryStatsCurrent;
+  /** Historical data for growth charts */
+  historical: MediaLibraryHistoricalDataPoint[];
+}

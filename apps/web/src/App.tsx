@@ -10,7 +10,8 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Map } from '@/pages/Map';
 import {
   StatsActivity,
-  StatsLibrary,
+  StatsTopContent,
+  StatsLibraryStats,
   StatsUsers,
   StatsDevices,
   StatsBandwidth,
@@ -52,7 +53,8 @@ export function App() {
           {/* Stats routes */}
           <Route path="stats" element={<Navigate to="/stats/activity" replace />} />
           <Route path="stats/activity" element={<StatsActivity />} />
-          <Route path="stats/library" element={<StatsLibrary />} />
+          <Route path="stats/library" element={<StatsLibraryStats />} />
+          <Route path="stats/top-content" element={<StatsTopContent />} />
           <Route path="stats/users" element={<StatsUsers />} />
 
           {/* Performance routes */}

@@ -650,7 +650,8 @@ export const engagementRoutes: FastifyPluginAsync = async (app) => {
           ? sql`AND day <= date_trunc('day', ${dateRange.end}::timestamptz)`
           : sql``;
 
-      const result = await db.execute(sql`
+      try {
+        const result = await db.execute(sql`
         WITH filtered_daily AS (
           SELECT * FROM daily_content_engagement
           WHERE ${dailyStartFilter} ${dailyEndFilter}
@@ -747,6 +748,81 @@ export const engagementRoutes: FastifyPluginAsync = async (app) => {
         LIMIT ${limit}
       `);
 
+        const data: ShowEngagement[] = (
+          result.rows as {
+            show_title: string;
+            thumb_path: string | null;
+            server_id: string | null;
+            year: number | null;
+            total_episode_views: string;
+            total_watch_hours: string;
+            unique_viewers: string;
+            avg_episodes_per_viewer: string;
+            avg_completion_rate: string;
+            binge_score: string;
+            valid_sessions: string;
+            total_sessions: string;
+          }[]
+        ).map((row) => ({
+          showTitle: row.show_title,
+          thumbPath: row.thumb_path,
+          serverId: row.server_id,
+          year: row.year,
+          totalEpisodeViews: Number(row.total_episode_views),
+          totalWatchHours: Number(row.total_watch_hours),
+          uniqueViewers: Number(row.unique_viewers),
+          avgEpisodesPerViewer: Number(row.avg_episodes_per_viewer),
+          avgCompletionRate: Number(row.avg_completion_rate),
+          bingeScore: Number(row.binge_score),
+          validSessions: Number(row.valid_sessions),
+          totalSessions: Number(row.total_sessions),
+        }));
+
+        const response: ShowStatsResponse = {
+          data,
+          total: data.length,
+        };
+
+        return response;
+      } catch (error: unknown) {
+        // Handle case where materialized view hasn't been populated yet
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('has not been populated')) {
+          app.log.warn(
+            'daily_content_engagement materialized view not populated, returning empty result'
+          );
+          return {
+            data: [],
+            total: 0,
+          };
+        }
+        throw error;
+      }
+    }
+
+    // Use the materialized view for all-time queries
+    try {
+      const result = await db.execute(sql`
+      SELECT
+        show_title,
+        thumb_path,
+        server_id,
+        year,
+        total_episode_views,
+        total_watch_hours,
+        unique_viewers,
+        avg_episodes_per_viewer,
+        avg_completion_rate,
+        binge_score,
+        total_valid_sessions as valid_sessions,
+        total_all_sessions as total_sessions
+      FROM top_shows_by_engagement
+      WHERE show_title IS NOT NULL
+      ${serverFilter}
+      ORDER BY ${orderColumn} DESC
+      LIMIT ${limit}
+    `);
+
       const data: ShowEngagement[] = (
         result.rows as {
           show_title: string;
@@ -783,65 +859,19 @@ export const engagementRoutes: FastifyPluginAsync = async (app) => {
       };
 
       return response;
+    } catch (error: unknown) {
+      // Handle case where materialized view hasn't been populated yet
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('has not been populated')) {
+        app.log.warn(
+          'top_shows_by_engagement materialized view not populated, returning empty result'
+        );
+        return {
+          data: [],
+          total: 0,
+        };
+      }
+      throw error;
     }
-
-    // Use the materialized view for all-time queries
-    const result = await db.execute(sql`
-      SELECT
-        show_title,
-        thumb_path,
-        server_id,
-        year,
-        total_episode_views,
-        total_watch_hours,
-        unique_viewers,
-        avg_episodes_per_viewer,
-        avg_completion_rate,
-        binge_score,
-        total_valid_sessions as valid_sessions,
-        total_all_sessions as total_sessions
-      FROM top_shows_by_engagement
-      WHERE show_title IS NOT NULL
-      ${serverFilter}
-      ORDER BY ${orderColumn} DESC
-      LIMIT ${limit}
-    `);
-
-    const data: ShowEngagement[] = (
-      result.rows as {
-        show_title: string;
-        thumb_path: string | null;
-        server_id: string | null;
-        year: number | null;
-        total_episode_views: string;
-        total_watch_hours: string;
-        unique_viewers: string;
-        avg_episodes_per_viewer: string;
-        avg_completion_rate: string;
-        binge_score: string;
-        valid_sessions: string;
-        total_sessions: string;
-      }[]
-    ).map((row) => ({
-      showTitle: row.show_title,
-      thumbPath: row.thumb_path,
-      serverId: row.server_id,
-      year: row.year,
-      totalEpisodeViews: Number(row.total_episode_views),
-      totalWatchHours: Number(row.total_watch_hours),
-      uniqueViewers: Number(row.unique_viewers),
-      avgEpisodesPerViewer: Number(row.avg_episodes_per_viewer),
-      avgCompletionRate: Number(row.avg_completion_rate),
-      bingeScore: Number(row.binge_score),
-      validSessions: Number(row.valid_sessions),
-      totalSessions: Number(row.total_sessions),
-    }));
-
-    const response: ShowStatsResponse = {
-      data,
-      total: data.length,
-    };
-
-    return response;
   });
 };

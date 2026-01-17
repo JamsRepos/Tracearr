@@ -13,6 +13,7 @@ import {
   Gauge,
   Smartphone,
   Activity,
+  HardDrive,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -42,7 +43,8 @@ export const navigation: NavEntry[] = [
     icon: BarChart3,
     children: [
       { name: 'Activity', href: '/stats/activity', icon: TrendingUp },
-      { name: 'Library', href: '/stats/library', icon: Film },
+      { name: 'Library', href: '/stats/library', icon: HardDrive },
+      { name: 'Top Content', href: '/stats/top-content', icon: Film },
       { name: 'Users', href: '/stats/users', icon: UserCircle },
     ],
   },

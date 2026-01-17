@@ -6,7 +6,7 @@ import { useTopContent, useShowStats } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
 import { useTimeRange } from '@/hooks/useTimeRange';
 
-export function StatsLibrary() {
+export function StatsTopContent() {
   const { value: timeRange, setValue: setTimeRange, apiParams } = useTimeRange();
   const { selectedServerId } = useServer();
   const topContent = useTopContent(apiParams, selectedServerId);
@@ -22,8 +22,8 @@ export function StatsLibrary() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Library</h1>
-          <p className="text-muted-foreground text-sm">Top movies and shows on your server</p>
+          <h1 className="text-2xl font-bold">Top Content</h1>
+          <p className="text-muted-foreground text-sm">Most watched movies and TV shows</p>
         </div>
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>

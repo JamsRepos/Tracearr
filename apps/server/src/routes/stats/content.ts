@@ -2,7 +2,6 @@
  * Content Statistics Routes
  *
  * GET /top-content - Top movies and shows by play count
- * GET /libraries - Library counts (placeholder)
  */
 
 import type { FastifyPluginAsync } from 'fastify';
@@ -153,19 +152,5 @@ export const contentRoutes: FastifyPluginAsync = async (app) => {
     }));
 
     return { movies, shows };
-  });
-
-  /**
-   * GET /libraries - Library counts (placeholder - would need library sync)
-   */
-  app.get('/libraries', { preHandler: [app.authenticate] }, async () => {
-    // In a real implementation, we'd sync library counts from servers
-    // For now, return a placeholder
-    return {
-      movies: 0,
-      shows: 0,
-      episodes: 0,
-      tracks: 0,
-    };
   });
 };

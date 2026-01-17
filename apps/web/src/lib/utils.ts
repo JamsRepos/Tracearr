@@ -72,3 +72,74 @@ export function getMediaDisplay(media: MediaDisplayFields): {
     subtitle: media.year ? `${media.year}` : null,
   };
 }
+
+/**
+ * Format bytes to human-readable size
+ *
+ * @param bytes - Size in bytes
+ * @param decimals - Number of decimal places (default: 1)
+ * @returns Formatted string like "47.1 TB", "2.5 GB", "890 MB"
+ */
+export function formatBytes(bytes: number, decimals = 1): string {
+  if (bytes === 0) return '0 B';
+  if (bytes < 0) return '-' + formatBytes(-bytes, decimals);
+
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const index = Math.min(i, sizes.length - 1);
+
+  return `${(bytes / Math.pow(k, index)).toFixed(decimals)} ${sizes[index]}`;
+}
+
+/**
+ * Format bitrate to human-readable format
+ *
+ * @param kbps - Bitrate in kilobits per second
+ * @returns Formatted string like "25.3 Mbps", "850 kbps"
+ */
+export function formatBitrate(kbps: number): string {
+  if (kbps === 0) return '0 kbps';
+  if (kbps < 0) return '-' + formatBitrate(-kbps);
+
+  if (kbps >= 1000) {
+    return `${(kbps / 1000).toFixed(1)} Mbps`;
+  }
+  return `${Math.round(kbps)} kbps`;
+}
+
+/**
+ * Format duration from milliseconds to human-readable format
+ *
+ * @param ms - Duration in milliseconds
+ * @returns Formatted string like "2h 30m", "45m", "1d 5h"
+ */
+export function formatDuration(ms: number): string {
+  if (ms === 0) return '0m';
+  if (ms < 0) return '-' + formatDuration(-ms);
+
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    const remainingHours = hours % 24;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  }
+  if (hours > 0) {
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+
+/**
+ * Format hours to human-readable format
+ *
+ * @param hours - Duration in hours
+ * @returns Formatted string like "1,234 hrs", "45 hrs"
+ */
+export function formatHours(hours: number): string {
+  const rounded = Math.round(hours);
+  return `${rounded.toLocaleString()} hrs`;
+}

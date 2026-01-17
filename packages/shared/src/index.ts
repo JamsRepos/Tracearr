@@ -158,6 +158,13 @@ export type {
   BandwidthTopUser,
   BandwidthTopUsersResponse,
   BandwidthSummary,
+  // Media Library stats (Library Statistics page)
+  MediaLibraryFileStats,
+  MediaLibraryStats,
+  MediaLibrarySnapshot,
+  MediaLibraryHistoricalDataPoint,
+  MediaLibraryStatsCurrent,
+  MediaLibraryStatsResponse,
 } from './types.js';
 
 // Schema exports

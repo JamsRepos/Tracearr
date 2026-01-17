@@ -661,6 +661,83 @@ export const settings = pgTable('settings', {
 });
 
 // ============================================================================
+// Library Statistics
+// ============================================================================
+
+// Current library statistics (updated by background job)
+export const libraryStatistics = pgTable(
+  'library_statistics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    serverId: uuid('server_id')
+      .notNull()
+      .references(() => servers.id, { onDelete: 'cascade' }),
+    libraryId: varchar('library_id', { length: 100 }).notNull(),
+    libraryName: varchar('library_name', { length: 255 }).notNull(),
+    libraryType: varchar('library_type', { length: 50 }).notNull(),
+
+    // Counts
+    totalItems: integer('total_items').notNull().default(0),
+    totalEpisodes: integer('total_episodes'), // For TV libraries
+    totalSeasons: integer('total_seasons'), // For TV libraries
+    totalShows: integer('total_shows'), // For TV libraries
+
+    // Storage
+    totalSizeBytes: bigint('total_size_bytes', { mode: 'number' }).notNull().default(0),
+
+    // Duration
+    totalDurationMs: bigint('total_duration_ms', { mode: 'number' }).notNull().default(0),
+
+    // File statistics (aggregated)
+    avgFileSizeBytes: bigint('avg_file_size_bytes', { mode: 'number' }),
+    avgDurationMs: bigint('avg_duration_ms', { mode: 'number' }),
+    avgBitrateKbps: integer('avg_bitrate_kbps'),
+    hdrItemCount: integer('hdr_item_count').default(0),
+
+    // Timestamps
+    lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('library_statistics_server_idx').on(table.serverId),
+    index('library_statistics_last_updated_idx').on(table.lastUpdatedAt),
+    unique('library_statistics_unique').on(table.serverId, table.libraryId),
+  ]
+);
+
+// Historical snapshots (for growth charts)
+export const librarySnapshots = pgTable(
+  'library_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    serverId: uuid('server_id')
+      .notNull()
+      .references(() => servers.id, { onDelete: 'cascade' }),
+    libraryId: varchar('library_id', { length: 100 }).notNull(),
+    libraryName: varchar('library_name', { length: 255 }).notNull(),
+    libraryType: varchar('library_type', { length: 50 }).notNull(),
+    snapshotDate: timestamp('snapshot_date', { mode: 'date' }).notNull(),
+
+    // Core metrics for trending
+    totalItems: integer('total_items').notNull(),
+    totalSizeBytes: bigint('total_size_bytes', { mode: 'number' }).notNull(),
+    totalDurationMs: bigint('total_duration_ms', { mode: 'number' }).notNull(),
+
+    // Timestamp
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('library_snapshots_server_date_idx').on(table.serverId, table.snapshotDate),
+    index('library_snapshots_library_date_idx').on(
+      table.serverId,
+      table.libraryId,
+      table.snapshotDate
+    ),
+    unique('library_snapshots_unique').on(table.serverId, table.libraryId, table.snapshotDate),
+  ]
+);
+
+// ============================================================================
 // Relations
 // ============================================================================
 
@@ -670,6 +747,22 @@ export const serversRelations = relations(servers, ({ one, many }) => ({
   plexAccount: one(plexAccounts, {
     fields: [servers.plexAccountId],
     references: [plexAccounts.id],
+  }),
+  libraryStatistics: many(libraryStatistics),
+  librarySnapshots: many(librarySnapshots),
+}));
+
+export const libraryStatisticsRelations = relations(libraryStatistics, ({ one }) => ({
+  server: one(servers, {
+    fields: [libraryStatistics.serverId],
+    references: [servers.id],
+  }),
+}));
+
+export const librarySnapshotsRelations = relations(librarySnapshots, ({ one }) => ({
+  server: one(servers, {
+    fields: [librarySnapshots.serverId],
+    references: [servers.id],
   }),
 }));
 

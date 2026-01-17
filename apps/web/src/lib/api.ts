@@ -50,6 +50,8 @@ import type {
   DailyBandwidthResponse,
   BandwidthTopUsersResponse,
   BandwidthSummary,
+  // Media Library stats
+  MediaLibraryStatsResponse,
 } from '@tracearr/shared';
 
 // Re-export shared types needed by frontend components
@@ -917,6 +919,25 @@ class ApiClient {
     bandwidthSummary: async (timeRange?: StatsTimeRange, serverId?: string) => {
       const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
       return this.request<BandwidthSummary>(`/stats/bandwidth/summary?${params.toString()}`);
+    },
+    // Library statistics
+    libraries: async (serverId?: string, days = 90) => {
+      const params = new URLSearchParams();
+      if (serverId) params.set('serverId', serverId);
+      if (days !== 90) params.set('days', days.toString());
+      const queryString = params.toString();
+      return this.request<MediaLibraryStatsResponse>(
+        `/stats/libraries${queryString ? `?${queryString}` : ''}`
+      );
+    },
+    refreshLibraries: async (serverId?: string) => {
+      return this.request<{ success: boolean; message: string; jobId: string }>(
+        '/stats/libraries/refresh',
+        {
+          method: 'POST',
+          body: JSON.stringify({ serverId }),
+        }
+      );
     },
   };
 

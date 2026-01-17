@@ -23,6 +23,9 @@ export {
   useBandwidthDaily,
   useBandwidthTopUsers,
   useBandwidthSummary,
+  // Library stats
+  useLibraryStats,
+  useRefreshLibraryStats,
   type LocationStatsFilters,
   type StatsTimeRange,
   type EngagementStatsOptions,
