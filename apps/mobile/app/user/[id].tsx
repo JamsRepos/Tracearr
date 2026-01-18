@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Users,
   Zap,
+  Video,
   Check,
   Film,
   Music,
@@ -90,6 +91,7 @@ const ruleIcons: Record<RuleType, LucideIcon> = {
   concurrent_streams: Monitor,
   geo_restriction: Globe,
   account_inactivity: Clock,
+  FourKTranscode: Video,
 };
 
 // Rule type display names
@@ -100,6 +102,7 @@ const ruleLabels: Record<RuleType, string> = {
   concurrent_streams: 'Concurrent Streams',
   geo_restriction: 'Geo Restriction',
   account_inactivity: 'Account Inactivity',
+  FourKTranscode: '4K Transcoding',
 };
 
 function TrustScoreBadge({ score, showLabel = false }: { score: number; showLabel?: boolean }) {
