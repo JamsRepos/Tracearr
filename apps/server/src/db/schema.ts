@@ -44,6 +44,7 @@ export const ruleTypeEnum = [
   'concurrent_streams',
   'geo_restriction',
   'account_inactivity',
+  'FourKTranscode',
 ] as const;
 
 // Violation severity enum

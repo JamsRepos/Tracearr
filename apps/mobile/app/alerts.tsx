@@ -27,6 +27,7 @@ import {
   Monitor,
   Globe,
   Clock,
+  Video,
   AlertTriangle,
   Check,
   Filter,
@@ -62,6 +63,7 @@ const ruleIcons: Record<RuleType, LucideIcon> = {
   concurrent_streams: Monitor,
   geo_restriction: Globe,
   account_inactivity: Clock,
+  FourKTranscode: Video,
 };
 
 // Rule type display names
@@ -72,6 +74,7 @@ const ruleLabels: Record<RuleType, string> = {
   concurrent_streams: 'Concurrent Streams',
   geo_restriction: 'Geo Restriction',
   account_inactivity: 'Account Inactivity',
+  FourKTranscode: '4K Transcoding',
 };
 
 // Format violation data into readable description based on rule type
@@ -130,6 +133,17 @@ function getViolationDescription(
         return `Streaming from blocked region: ${country || blockedCountry}`;
       }
       return 'Streaming from restricted location';
+    }
+    case 'FourKTranscode': {
+      const sourceResolution = data.sourceResolution as string | undefined;
+      const streamResolution = data.streamResolution as string | undefined;
+      if (sourceResolution && streamResolution) {
+        return `Transcoding ${sourceResolution} to ${streamResolution}`;
+      }
+      if (streamResolution) {
+        return `Transcoding 4K to ${streamResolution}`;
+      }
+      return 'Transcoding 4K to lower quality';
     }
     default:
       return 'Rule violation detected';

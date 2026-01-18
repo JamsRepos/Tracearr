@@ -12,7 +12,8 @@ export type RuleType =
   | 'device_velocity'
   | 'concurrent_streams'
   | 'geo_restriction'
-  | 'account_inactivity';
+  | 'account_inactivity'
+  | 'FourKTranscode';
 
 export interface ImpossibleTravelParams {
   max_speed_kmh: number;
@@ -40,13 +41,18 @@ export interface AccountInactivityParams {
   inactivityUnit: 'days' | 'weeks' | 'months';
 }
 
+export interface FourKTranscodeParams {
+  // Currently empty for simple detection
+}
+
 export type RuleParams =
   | ImpossibleTravelParams
   | SimultaneousLocationsParams
   | DeviceVelocityParams
   | ConcurrentStreamsParams
   | GeoRestrictionParams
-  | AccountInactivityParams;
+  | AccountInactivityParams
+  | FourKTranscodeParams;
 
 export interface RuleData {
   id?: string;
@@ -83,6 +89,7 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
     inactivityValue: 30,
     inactivityUnit: 'days',
   },
+  FourKTranscode: {},
 };
 
 /**
@@ -206,6 +213,20 @@ export async function createAccountInactivityRule(
   return createTestRule({
     type: 'account_inactivity',
     params: { ...DEFAULT_PARAMS.account_inactivity, ...params } as AccountInactivityParams,
+    ...overrides,
+  });
+}
+
+/**
+ * Create a 4K transcode rule
+ */
+export async function createFourKTranscodeRule(
+  params: Partial<FourKTranscodeParams> = {},
+  overrides: Partial<Omit<RuleData, 'type' | 'params'>> = {}
+): Promise<CreatedRule> {
+  return createTestRule({
+    type: 'FourKTranscode',
+    params: { ...DEFAULT_PARAMS.FourKTranscode, ...params } as FourKTranscodeParams,
     ...overrides,
   });
 }

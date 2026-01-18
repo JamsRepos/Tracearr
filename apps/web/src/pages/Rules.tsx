@@ -34,6 +34,7 @@ import {
   Users,
   Globe,
   Clock,
+  Monitor,
   Power,
   PowerOff,
 } from 'lucide-react';
@@ -96,6 +97,13 @@ const RULE_TYPES: { value: RuleType; label: string; icon: React.ReactNode; descr
       icon: <Clock className="h-4 w-4" />,
       description: 'Get notified when users have not watched anything for a specified period',
     },
+    {
+      value: 'FourKTranscode',
+      label: '4K Transcoding',
+      icon: <Monitor className="h-4 w-4" />,
+      description:
+        'Detect high CPU video transcoding when 4K content is transcoded to lower quality',
+    },
   ];
 
 const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
@@ -108,6 +116,7 @@ const DEFAULT_PARAMS: Record<RuleType, RuleParams> = {
     inactivityValue: 30,
     inactivityUnit: 'days',
   },
+  FourKTranscode: {},
 };
 
 interface RuleFormData {
@@ -409,6 +418,20 @@ function RuleParamsForm({
         </div>
       );
     }
+    case 'FourKTranscode':
+      return (
+        <div className="space-y-4">
+          <p className="text-muted-foreground text-sm">
+            Detects when 4K (2160p) source content is being transcoded to lower quality resolutions
+            (e.g., 1080p, 720p). This helps identify high CPU video transcoding activities that may
+            indicate account sharing or clients that cannot handle 4K content.
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Note: This rule only triggers on actual video transcoding (high CPU), not container
+            remux or audio-only transcoding.
+          </p>
+        </div>
+      );
     default:
       return null;
   }

@@ -12,6 +12,7 @@ import type {
   ConcurrentStreamsParams,
   GeoRestrictionParams,
   AccountInactivityParams,
+  FourKTranscodeParams,
   AccountInactivityUnit,
   ServerUser,
 } from '@tracearr/shared';
@@ -20,6 +21,7 @@ import { geoipService } from './geoip.js';
 import countries from 'i18n-iso-countries';
 import countriesEn from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import { EXCLUDED_MEDIA_TYPES_SET } from '../constants/index.js';
+import { normalizeResolution } from '../utils/resolutionNormalizer.js';
 
 // Register English locale for country name lookups
 countries.registerLocale(countriesEn);
@@ -180,6 +182,8 @@ export class RuleEngine {
         );
       case 'geo_restriction':
         return this.checkGeoRestriction(session, rule.params as GeoRestrictionParams);
+      case 'FourKTranscode':
+        return this.checkFourKTranscode(session, rule.params as FourKTranscodeParams);
       default:
         return { violated: false, severity: 'low', data: {} };
     }
@@ -586,6 +590,89 @@ export class RuleEngine {
 
   private toRadians(degrees: number): number {
     return degrees * (Math.PI / 180);
+  }
+
+  /**
+   * Get resolution tier value for comparison (higher = better quality)
+   * Matches RESOLUTION_TIERS from resolutionNormalizer.ts
+   */
+  private getResolutionTier(resolution: string | null): number {
+    if (!resolution) return -1;
+    const normalized = resolution.toLowerCase();
+    if (normalized === '4k' || normalized === '2160p') return 4;
+    if (normalized === '1080p' || normalized === '1080') return 3;
+    if (normalized === '720p' || normalized === '720') return 2;
+    if (normalized === '480p' || normalized === '480') return 1;
+    if (normalized === 'sd') return 0;
+    // For numeric-only values like "2160p", extract the number
+    const match = normalized.match(/^(\d+)p?$/);
+    const heightStr = match?.[1];
+    if (heightStr) {
+      const height = parseInt(heightStr, 10);
+      if (height >= 2160) return 4;
+      if (height >= 1080) return 3;
+      if (height >= 720) return 2;
+      if (height >= 480) return 1;
+    }
+    return -1;
+  }
+
+  private checkFourKTranscode(
+    session: Session,
+    _params: FourKTranscodeParams
+  ): RuleEvaluationResult {
+    // Only check actual video transcoding (high CPU), not container remux or audio-only
+    if (session.videoDecision !== 'transcode') {
+      return { violated: false, severity: 'low', data: {} };
+    }
+
+    // Get source resolution from sourceVideoWidth/Height
+    const sourceResolution = normalizeResolution({
+      width: session.sourceVideoWidth ?? undefined,
+      height: session.sourceVideoHeight ?? undefined,
+    });
+
+    // Verify source is 4K
+    const sourceTier = this.getResolutionTier(sourceResolution);
+    if (sourceTier !== 4) {
+      // Not 4K source, ignore
+      return { violated: false, severity: 'low', data: {} };
+    }
+
+    // Get stream output resolution from streamVideoDetails
+    const streamResolution = normalizeResolution({
+      width: session.streamVideoDetails?.width,
+      height: session.streamVideoDetails?.height,
+    });
+
+    // If we can't determine stream resolution, we can't verify quality drop
+    // But if source is 4K and it's transcoding, it's likely a quality reduction
+    if (!streamResolution) {
+      // Could be codec conversion at same resolution, but still high CPU
+      // For now, only trigger if we can confirm quality drop
+      return { violated: false, severity: 'low', data: {} };
+    }
+
+    const streamTier = this.getResolutionTier(streamResolution);
+    if (streamTier < sourceTier) {
+      // Quality has been reduced (4K -> lower quality)
+      return {
+        violated: true,
+        severity: 'warning',
+        data: {
+          sourceResolution: sourceResolution ?? '4K',
+          streamResolution,
+          sourceWidth: session.sourceVideoWidth,
+          sourceHeight: session.sourceVideoHeight,
+          streamWidth: session.streamVideoDetails?.width,
+          streamHeight: session.streamVideoDetails?.height,
+        },
+      };
+    }
+
+    // Stream is still 4K (codec conversion or other processing)
+    // Still high CPU, but not a quality reduction
+    return { violated: false, severity: 'low', data: {} };
   }
 }
 

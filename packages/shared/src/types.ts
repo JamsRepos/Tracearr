@@ -338,7 +338,8 @@ export type RuleType =
   | 'device_velocity'
   | 'concurrent_streams'
   | 'geo_restriction'
-  | 'account_inactivity';
+  | 'account_inactivity'
+  | 'FourKTranscode';
 
 export interface ImpossibleTravelParams {
   maxSpeedKmh: number;
@@ -387,13 +388,18 @@ export interface AccountInactivityParams {
   inactivityUnit: AccountInactivityUnit;
 }
 
+export interface FourKTranscodeParams {
+  // Currently empty for simple detection, but structured for future expansion
+}
+
 export type RuleParams =
   | ImpossibleTravelParams
   | SimultaneousLocationsParams
   | DeviceVelocityParams
   | ConcurrentStreamsParams
   | GeoRestrictionParams
-  | AccountInactivityParams;
+  | AccountInactivityParams
+  | FourKTranscodeParams;
 
 export interface Rule {
   id: string;

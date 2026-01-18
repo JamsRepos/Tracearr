@@ -41,6 +41,7 @@ export type {
   GeoRestrictionParams,
   AccountInactivityUnit,
   AccountInactivityParams,
+  FourKTranscodeParams,
   RuleParams,
   Rule,
   // Violation

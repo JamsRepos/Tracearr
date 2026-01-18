@@ -284,6 +284,7 @@ export const createRuleSchema = z.object({
     'concurrent_streams',
     'geo_restriction',
     'account_inactivity',
+    'FourKTranscode',
   ]),
   params: z.record(z.string(), z.unknown()),
   serverUserId: uuidSchema.nullable().default(null),

@@ -74,6 +74,17 @@ export function getViolationDescription(
       }
       return 'Account has been inactive';
     }
+    case 'FourKTranscode': {
+      const sourceResolution = data.sourceResolution as string | undefined;
+      const streamResolution = data.streamResolution as string | undefined;
+      if (sourceResolution && streamResolution) {
+        return `Transcoding ${sourceResolution} to ${streamResolution}`;
+      }
+      if (streamResolution) {
+        return `Transcoding 4K to ${streamResolution}`;
+      }
+      return 'Transcoding 4K to lower quality';
+    }
     default:
       return 'Rule violation detected';
   }
@@ -190,6 +201,17 @@ export function getViolationDetails(
       }
       if (data.neverActive) {
         details['Status'] = 'Never active';
+      }
+      break;
+    }
+    case 'FourKTranscode': {
+      if (data.sourceResolution) details['Source Resolution'] = data.sourceResolution;
+      if (data.streamResolution) details['Stream Resolution'] = data.streamResolution;
+      if (typeof data.sourceWidth === 'number' && typeof data.sourceHeight === 'number') {
+        details['Source Dimensions'] = `${data.sourceWidth}x${data.sourceHeight}`;
+      }
+      if (typeof data.streamWidth === 'number' && typeof data.streamHeight === 'number') {
+        details['Stream Dimensions'] = `${data.streamWidth}x${data.streamHeight}`;
       }
       break;
     }

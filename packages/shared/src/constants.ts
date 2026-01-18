@@ -32,6 +32,7 @@ export const RULE_DEFAULTS = {
     inactivityValue: 30,
     inactivityUnit: 'days',
   },
+  FourKTranscode: {},
 } as const;
 
 // Rule type display names
@@ -42,6 +43,7 @@ export const RULE_DISPLAY_NAMES = {
   concurrent_streams: 'Concurrent Streams',
   geo_restriction: 'Geo Restriction',
   account_inactivity: 'Account Inactivity',
+  FourKTranscode: '4K Transcoding',
 } as const;
 
 // Severity levels
