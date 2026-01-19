@@ -13,7 +13,7 @@
       "@tracearr/shared/*": ["./packages/shared/src/*"],
       "@tracearr/translations": ["./packages/translations/src"],
       "@tracearr/translations/*": ["./packages/translations/src/*"],
-      "@/*": ["./apps/web/src/*"]
+      "@/*": ["./apps/web/src/*", "./apps/mobile/src/*"]
     }
   },
   "include": [
