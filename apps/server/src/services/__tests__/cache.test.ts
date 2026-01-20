@@ -133,6 +133,17 @@ function createMockRedis(): Redis & {
       const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
       return Array.from(store.keys()).filter((k) => regex.test(k));
     }),
+    // SCAN command - returns [cursor, keys] tuple
+    // Simulates Redis SCAN by returning all matching keys in one batch (cursor '0' means done)
+    scan: vi.fn(async (_cursor: string, ...args: string[]) => {
+      // Parse MATCH pattern from args (e.g., ['MATCH', 'pattern:*', 'COUNT', '100'])
+      const matchIdx = args.indexOf('MATCH');
+      const pattern = matchIdx !== -1 ? args[matchIdx + 1] : '*';
+      const regex = new RegExp('^' + (pattern ?? '*').replace(/\*/g, '.*') + '$');
+      const matchingKeys = Array.from(store.keys()).filter((k) => regex.test(k));
+      // Return '0' as cursor (indicating scan complete) and all matching keys
+      return ['0', matchingKeys];
+    }),
     mget: vi.fn(async (...keys: string[]) => {
       return keys.map((key) => store.get(key) ?? null);
     }),
@@ -314,8 +325,14 @@ describe('CacheService', () => {
 
       await cache.setActiveSessions([sampleSession] as never);
 
-      // Should have called keys to find timezone-specific stats
-      expect(redis.keys).toHaveBeenCalledWith('tracearr:stats:dashboard:*');
+      // Should have called scan to find timezone-specific stats (KEYS replaced with SCAN for performance)
+      expect(redis.scan).toHaveBeenCalledWith(
+        '0',
+        'MATCH',
+        'tracearr:stats:dashboard:*',
+        'COUNT',
+        100
+      );
       // Should have deleted the matched keys
       expect(redis.del).toHaveBeenCalledWith(
         'tracearr:stats:dashboard:UTC',
@@ -462,14 +479,14 @@ describe('CacheService', () => {
 
       // del should be called with both session keys
       expect(redis.del).toHaveBeenCalled();
-      // Verify keys were found
-      expect(redis.keys).toHaveBeenCalledWith('tracearr:sessions:*');
+      // Verify scan was used (KEYS replaced with SCAN for performance)
+      expect(redis.scan).toHaveBeenCalledWith('0', 'MATCH', 'tracearr:sessions:*', 'COUNT', 100);
     });
 
     it('should not call del when no keys match pattern', async () => {
       await cache.invalidatePattern('nonexistent:*');
 
-      expect(redis.keys).toHaveBeenCalledWith('nonexistent:*');
+      expect(redis.scan).toHaveBeenCalledWith('0', 'MATCH', 'nonexistent:*', 'COUNT', 100);
       // del should not be called since no keys matched
       expect(redis.del).not.toHaveBeenCalled();
     });

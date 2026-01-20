@@ -17,6 +17,13 @@ import { createMockActiveSession } from '../../test/fixtures.js';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Helper to create a mock Response with required methods
+const createMockResponse = (ok: boolean, body: string = '') => ({
+  ok,
+  status: ok ? 200 : 500,
+  text: vi.fn().mockResolvedValue(body),
+});
+
 describe('NotificationManager', () => {
   let manager: NotificationManager;
 
@@ -77,7 +84,7 @@ describe('NotificationManager', () => {
 
   describe('notifyViolation', () => {
     it('sends discord webhook for violations', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         discordWebhookUrl: 'https://discord.com/api/webhooks/123/abc',
@@ -96,7 +103,7 @@ describe('NotificationManager', () => {
     });
 
     it('sends custom webhook with ntfy format and auth token', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         customWebhookUrl: 'https://ntfy.example.com',
@@ -129,7 +136,7 @@ describe('NotificationManager', () => {
     });
 
     it('sends custom webhook with ntfy format without auth token', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         customWebhookUrl: 'https://ntfy.example.com',
@@ -157,7 +164,7 @@ describe('NotificationManager', () => {
     });
 
     it('sends custom webhook with apprise format (no auth)', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         customWebhookUrl: 'https://apprise.example.com/notify',
@@ -177,7 +184,7 @@ describe('NotificationManager', () => {
     });
 
     it('sends custom webhook with pushover format', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         webhookFormat: 'pushover',
@@ -201,7 +208,7 @@ describe('NotificationManager', () => {
     });
 
     it('sends custom webhook with json format', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         customWebhookUrl: 'https://example.com/webhook',
@@ -357,7 +364,7 @@ describe('NotificationManager', () => {
 
   describe('notifySessionStarted', () => {
     it('sends ntfy notification with auth for session start', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
       const settings = createMockSettings({
         customWebhookUrl: 'https://ntfy.example.com',
@@ -448,7 +455,7 @@ describe('testAgent', () => {
   });
 
   it('sends discord test webhook', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
     const result = await manager.testAgent('discord', {
       discordWebhookUrl: 'https://discord.com/api/webhooks/123/abc',
@@ -476,7 +483,7 @@ describe('testAgent', () => {
   });
 
   it('sends ntfy test webhook with auth token', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
     const result = await manager.testAgent('ntfy', {
       discordWebhookUrl: null,
@@ -508,7 +515,7 @@ describe('testAgent', () => {
   });
 
   it('sends ntfy test webhook without auth token', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
     const result = await manager.testAgent('ntfy', {
       discordWebhookUrl: null,
@@ -537,7 +544,7 @@ describe('testAgent', () => {
   });
 
   it('sends apprise test webhook', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
     const result = await manager.testAgent('apprise', {
       discordWebhookUrl: null,
@@ -558,7 +565,7 @@ describe('testAgent', () => {
   });
 
   it('sends json-webhook test', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(createMockResponse(true));
 
     const result = await manager.testAgent('json-webhook', {
       discordWebhookUrl: null,
