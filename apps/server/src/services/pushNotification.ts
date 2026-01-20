@@ -20,11 +20,20 @@ import { getNetworkSettings } from '../routes/settings.js';
 // Initialize Expo SDK
 const expo = new Expo();
 
-// Store receipt IDs for later verification (token -> receiptId)
-const pendingReceipts = new Map<string, string>();
+// Store receipt IDs for later verification (receiptId -> { token, timestamp })
+// Includes timestamp for stale entry cleanup
+interface PendingReceipt {
+  token: string;
+  createdAt: number;
+}
+const pendingReceipts = new Map<string, PendingReceipt>();
 
 // Invalid tokens that should be removed
 const tokensToRemove = new Set<string>();
+
+const MAX_PENDING_RECEIPTS = 10000;
+const MAX_TOKENS_TO_REMOVE = 1000;
+const RECEIPT_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour - receipts older than this are stale
 
 /**
  * Format media title for notifications
@@ -256,7 +265,27 @@ async function sendPushNotifications(messages: ExpoPushMessage[]): Promise<void>
 
           // Store receipt ID for later verification
           if ('id' in ticket) {
-            pendingReceipts.set(ticket.id, msg.to as string);
+            if (pendingReceipts.size >= MAX_PENDING_RECEIPTS) {
+              console.warn(
+                `[Push] pendingReceipts reached ${pendingReceipts.size} entries, clearing stale entries`
+              );
+              const now = Date.now();
+              for (const [id, receipt] of pendingReceipts) {
+                if (now - receipt.createdAt > RECEIPT_MAX_AGE_MS) {
+                  pendingReceipts.delete(id);
+                }
+              }
+              if (pendingReceipts.size >= MAX_PENDING_RECEIPTS) {
+                const entries = Array.from(pendingReceipts.entries());
+                entries.sort((a, b) => a[1].createdAt - b[1].createdAt);
+                const toRemove = entries.slice(0, Math.floor(entries.length / 2));
+                for (const [id] of toRemove) {
+                  pendingReceipts.delete(id);
+                }
+                console.warn(`[Push] Cleared ${toRemove.length} oldest pending receipts`);
+              }
+            }
+            pendingReceipts.set(ticket.id, { token: msg.to as string, createdAt: Date.now() });
           }
 
           // Handle immediate errors
@@ -291,6 +320,19 @@ function handlePushError(token: string, message?: string, details?: { error?: st
  * Should be called periodically (e.g., every 15 minutes)
  */
 export async function processPushReceipts(): Promise<void> {
+  // First, clean up stale entries that are older than max age
+  const now = Date.now();
+  let staleCount = 0;
+  for (const [id, receipt] of pendingReceipts) {
+    if (now - receipt.createdAt > RECEIPT_MAX_AGE_MS) {
+      pendingReceipts.delete(id);
+      staleCount++;
+    }
+  }
+  if (staleCount > 0) {
+    console.log(`[Push] Cleaned up ${staleCount} stale pending receipts`);
+  }
+
   if (pendingReceipts.size === 0) return;
 
   const receiptIds = Array.from(pendingReceipts.keys());
@@ -301,13 +343,13 @@ export async function processPushReceipts(): Promise<void> {
       const receipts = await expo.getPushNotificationReceiptsAsync(chunk);
 
       for (const [receiptId, receipt] of Object.entries(receipts)) {
-        const token = pendingReceipts.get(receiptId);
+        const pending = pendingReceipts.get(receiptId);
 
         if (receipt.status === 'error') {
           console.error(`[Push] Receipt error: ${receipt.message}`);
 
-          if (token && receipt.details?.error === 'DeviceNotRegistered') {
-            tokensToRemove.add(token);
+          if (pending?.token && receipt.details?.error === 'DeviceNotRegistered') {
+            tokensToRemove.add(pending.token);
           }
         }
 
@@ -328,19 +370,30 @@ export async function processPushReceipts(): Promise<void> {
 async function cleanupInvalidTokens(): Promise<void> {
   if (tokensToRemove.size === 0) return;
 
+  if (tokensToRemove.size > MAX_TOKENS_TO_REMOVE) {
+    console.warn(
+      `[Push] tokensToRemove exceeded ${MAX_TOKENS_TO_REMOVE} entries (${tokensToRemove.size}), clearing to prevent memory leak`
+    );
+    tokensToRemove.clear();
+    return;
+  }
+
   const tokensArray = Array.from(tokensToRemove);
   console.log(`[Push] Cleaning up ${tokensArray.length} invalid tokens`);
 
   for (const token of tokensArray) {
+    tokensToRemove.delete(token);
+
     try {
       await db
         .update(mobileSessions)
         .set({ expoPushToken: null })
         .where(eq(mobileSessions.expoPushToken, token));
-
-      tokensToRemove.delete(token);
     } catch (error) {
-      console.error(`[Push] Error removing token: ${error}`);
+      if (tokensToRemove.size < MAX_TOKENS_TO_REMOVE) {
+        tokensToRemove.add(token);
+      }
+      console.error(`[Push] Error removing token (will retry): ${error}`);
     }
   }
 }

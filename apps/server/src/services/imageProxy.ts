@@ -156,11 +156,19 @@ async function cleanupCache(): Promise<void> {
 }
 
 // Run cleanup periodically (every hour)
-setInterval(() => {
+let cleanupInterval: NodeJS.Timeout | null = setInterval(() => {
   void cleanupCache();
 }, TIME_MS.HOUR);
+
 // Also run on startup
 void cleanupCache();
+
+export function stopImageCacheCleanup(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
 
 /**
  * Fetch and proxy an image from a media server

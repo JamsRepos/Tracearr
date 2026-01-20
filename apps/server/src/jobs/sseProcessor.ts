@@ -36,6 +36,7 @@ import { triggerReconciliationPoll } from './poller/index.js';
 
 let cacheService: CacheService | null = null;
 let pubSubService: PubSubService | null = null;
+let isRunning = false;
 
 // Server down notification threshold in milliseconds
 // Delay prevents false alarms from brief connection blips
@@ -48,6 +49,8 @@ const pendingServerDownNotifications = new Map<string, NodeJS.Timeout>();
 // Track servers that have been notified as down (server_down was sent)
 // Used to determine if we should send server_up when connection is restored
 const notifiedDownServers = new Set<string>();
+
+const MAX_NOTIFIED_DOWN_SERVERS = 100;
 
 // Store wrapped handlers so we can properly remove them
 interface SessionEvent {
@@ -89,7 +92,13 @@ export function startSSEProcessor(): void {
     throw new Error('SSE processor not initialized');
   }
 
+  if (isRunning) {
+    console.log('[SSEProcessor] Already running, skipping start');
+    return;
+  }
+
   console.log('[SSEProcessor] Starting');
+  isRunning = true;
 
   // Subscribe to SSE events
   sseManager.on('plex:session:playing', wrappedHandlers.playing);
@@ -108,7 +117,13 @@ export function startSSEProcessor(): void {
  * Note: sseManager.stop() is called separately in index.ts during cleanup
  */
 export function stopSSEProcessor(): void {
+  if (!isRunning) {
+    console.log('[SSEProcessor] Not running, skipping stop');
+    return;
+  }
+
   console.log('[SSEProcessor] Stopping');
+  isRunning = false;
 
   sseManager.off('plex:session:playing', wrappedHandlers.playing);
   sseManager.off('plex:session:paused', wrappedHandlers.paused);
@@ -297,6 +312,14 @@ function handleFallbackActivated(event: FallbackEvent): void {
   // Schedule the notification after threshold delay
   const timeout = setTimeout(() => {
     pendingServerDownNotifications.delete(serverId);
+
+    if (notifiedDownServers.size >= MAX_NOTIFIED_DOWN_SERVERS) {
+      console.warn(
+        `[SSEProcessor] notifiedDownServers reached ${MAX_NOTIFIED_DOWN_SERVERS}, clearing oldest entries`
+      );
+      notifiedDownServers.clear();
+    }
+
     notifiedDownServers.add(serverId); // Mark as down so we know to send server_up later
     console.log(`[SSEProcessor] Server ${serverName} is DOWN (threshold exceeded)`);
 

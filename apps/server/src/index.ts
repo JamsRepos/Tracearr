@@ -49,6 +49,7 @@ import { statsRoutes } from './routes/stats/index.js';
 import { settingsRoutes } from './routes/settings.js';
 import { importRoutes } from './routes/import.js';
 import { imageRoutes } from './routes/images.js';
+import { stopImageCacheCleanup } from './services/imageProxy.js';
 import { debugRoutes } from './routes/debug.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { notificationPreferencesRoutes } from './routes/notificationPreferences.js';
@@ -331,6 +332,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     if (pushReceiptInterval) {
       clearInterval(pushReceiptInterval);
     }
+    stopImageCacheCleanup();
     await pubSubRedis.quit();
     stopPoller();
     await sseManager.stop();
@@ -439,10 +441,10 @@ async function start() {
   try {
     const app = await buildApp();
 
-    // Handle graceful shutdown
+    // Handle graceful shutdown - use process.once to prevent handler stacking in test/restart scenarios
     const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
     for (const signal of signals) {
-      process.on(signal, () => {
+      process.once(signal, () => {
         app.log.info(`Received ${signal}, shutting down gracefully...`);
         stopPoller();
         void shutdownNotificationQueue();
@@ -522,12 +524,10 @@ async function start() {
       }
     });
 
-    // Handle graceful shutdown for WebSocket subscriber
-    const cleanupWsSubscriber = () => {
-      void wsSubscriber.quit();
-    };
-    process.on('SIGINT', cleanupWsSubscriber);
-    process.on('SIGTERM', cleanupWsSubscriber);
+    // Note: WebSocket subscriber cleanup is handled in Fastify's onClose hook
+    app.addHook('onClose', async () => {
+      await wsSubscriber.quit();
+    });
 
     // Start session poller after server is listening (uses DB settings)
     const pollerSettings = await getPollerSettings();

@@ -77,15 +77,24 @@ export function initImportQueue(redisUrl: string): void {
         count: 100, // Keep last 100 completed imports
         age: 7 * 24 * 60 * 60, // 7 days
       },
-      removeOnFail: false, // Keep failed jobs for investigation
+      removeOnFail: {
+        count: 50, // Keep last 50 failed jobs for investigation
+        age: 7 * 24 * 60 * 60, // 7 days max - prevents unbounded accumulation
+      },
     },
   });
 
   dlqQueue = new Queue<ImportJobData>(DLQ_NAME, {
     connection: connectionOptions,
     defaultJobOptions: {
-      removeOnComplete: false,
-      removeOnFail: false,
+      removeOnComplete: {
+        count: 25, // Retried jobs from DLQ
+        age: 7 * 24 * 60 * 60, // 7 days
+      },
+      removeOnFail: {
+        count: 50,
+        age: 14 * 24 * 60 * 60,
+      },
     },
   });
 

@@ -232,9 +232,9 @@ export class JsonWebhookAgent extends BaseAgent {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    const text = await response.text().catch(() => '');
 
     if (!response.ok) {
-      const text = await response.text().catch(() => '');
       throw new Error(`JSON webhook failed: ${response.status} ${text}`.trim());
     }
   }

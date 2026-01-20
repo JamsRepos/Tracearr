@@ -60,14 +60,28 @@ export interface CacheService {
 }
 
 export function createCacheService(redis: Redis): CacheService {
+  const deleteKeysByPattern = async (pattern: string): Promise<number> => {
+    let cursor = '0';
+    let deletedCount = 0;
+
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        deletedCount += keys.length;
+      }
+    } while (cursor !== '0');
+
+    return deletedCount;
+  };
+
   // Helper to invalidate all dashboard stats cache keys (timezone-specific)
   // Dashboard route uses keys like tracearr:stats:dashboard:UTC or tracearr:stats:dashboard:{serverId}:{tz}
   const invalidateDashboardStats = async (): Promise<void> => {
     const pattern = `${REDIS_KEYS.DASHBOARD_STATS}:*`;
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    await deleteKeysByPattern(pattern);
   };
 
   const service: CacheService = {
@@ -173,7 +187,6 @@ export function createCacheService(redis: Redis): CacheService {
     },
 
     async updateActiveSession(session: ActiveSession): Promise<void> {
-      // Update session data and refresh SET TTL to prevent stale ID accumulation
       const pipeline = redis.multi();
       pipeline.setex(
         REDIS_KEYS.SESSION_BY_ID(session.id),
@@ -182,6 +195,7 @@ export function createCacheService(redis: Redis): CacheService {
       );
       // Refresh SET TTL to match session data TTL
       pipeline.expire(REDIS_KEYS.ACTIVE_SESSION_IDS, CACHE_TTL.ACTIVE_SESSIONS);
+      pipeline.expire(REDIS_KEYS.USER_SESSIONS(session.serverUserId), CACHE_TTL.USER_SESSIONS);
       const results = await pipeline.exec();
       if (!results || results.some(([err]) => err !== null)) {
         console.error('[Cache] updateActiveSession pipeline failed:', results);
@@ -351,10 +365,7 @@ export function createCacheService(redis: Redis): CacheService {
     },
 
     async invalidatePattern(pattern: string): Promise<void> {
-      const keys = await redis.keys(pattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
+      await deleteKeysByPattern(pattern);
     },
 
     async withSessionCreateLock<T>(

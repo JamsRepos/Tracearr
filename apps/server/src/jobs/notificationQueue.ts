@@ -82,8 +82,14 @@ export function initNotificationQueue(redisUrl: string): void {
   dlqQueue = new Queue<NotificationJobData>(DLQ_NAME, {
     connection: connectionOptions,
     defaultJobOptions: {
-      removeOnComplete: false, // Never auto-remove from DLQ
-      removeOnFail: false,
+      removeOnComplete: {
+        count: 25,
+        age: 7 * 24 * 60 * 60, // 7 days
+      },
+      removeOnFail: {
+        count: 50,
+        age: 14 * 24 * 60 * 60, // 14 days
+      },
     },
   });
 

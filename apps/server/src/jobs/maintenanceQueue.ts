@@ -71,7 +71,10 @@ export function initMaintenanceQueue(redisUrl: string): void {
         count: 50, // Keep last 50 completed jobs
         age: 7 * 24 * 60 * 60, // 7 days
       },
-      removeOnFail: false, // Keep failed jobs for investigation
+      removeOnFail: {
+        count: 25,
+        age: 7 * 24 * 60 * 60,
+      },
     },
   });
 

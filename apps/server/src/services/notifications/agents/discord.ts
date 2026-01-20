@@ -277,9 +277,9 @@ export class DiscordAgent extends BaseAgent {
         ],
       }),
     });
+    const text = await response.text().catch(() => '');
 
     if (!response.ok) {
-      const text = await response.text().catch(() => '');
       throw new Error(`Discord webhook failed: ${response.status} ${text}`.trim());
     }
   }
