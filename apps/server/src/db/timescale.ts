@@ -388,9 +388,35 @@ function getAggregateDefinitions(): AggregateDefinition[] {
 }
 
 /**
- * Create a single continuous aggregate from its definition
+ * Check if a continuous aggregate exists
+ */
+async function continuousAggregateExists(name: string): Promise<boolean> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 1 FROM timescaledb_information.continuous_aggregates
+      WHERE view_name = ${name}
+    `);
+    return result.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Create a single continuous aggregate from its definition.
+ *
+ * Note: We check existence before creating because TimescaleDB's
+ * CREATE MATERIALIZED VIEW IF NOT EXISTS doesn't work properly with
+ * continuous aggregates - it throws "invalid continuous aggregate view"
+ * instead of being a no-op when the view already exists.
  */
 async function createAggregate(def: AggregateDefinition, hasToolkit: boolean): Promise<void> {
+  // Check if aggregate already exists - skip if so
+  const exists = await continuousAggregateExists(def.name);
+  if (exists) {
+    return;
+  }
+
   const sqlStatement = hasToolkit ? def.toolkitSql : def.fallbackSql;
   await db.execute(sql.raw(sqlStatement));
 }
@@ -1096,6 +1122,19 @@ export async function initTimescaleDB(): Promise<{
     actions.push('library_snapshots hypertable: initialization skipped (table may not exist yet)');
   }
 
+  // Ensure engagement views exist (fixes broken installs and fresh installs)
+  // These views depend on daily_content_engagement continuous aggregate
+  try {
+    const aggregatesExist = await continuousAggregateExists('daily_content_engagement');
+    if (aggregatesExist) {
+      await ensureEngagementViews();
+      actions.push('Ensured engagement views exist (CREATE OR REPLACE)');
+    }
+  } catch (err) {
+    console.warn('Failed to create engagement views:', err);
+    actions.push('Engagement views: creation skipped (may need manual rebuild)');
+  }
+
   // Get final status
   const status = await getTimescaleStatus();
 
@@ -1104,6 +1143,262 @@ export async function initTimescaleDB(): Promise<{
     status,
     actions,
   };
+}
+
+/**
+ * Ensure all engagement views exist
+ *
+ * Creates or replaces all dependent views that sit on top of continuous aggregates.
+ * Uses CREATE OR REPLACE VIEW which is idempotent - safe to run every startup.
+ *
+ * This is called:
+ * 1. After rebuildTimescaleViews() recreates aggregates
+ * 2. At the end of initTimescaleDB() to fix broken installs and ensure fresh installs have views
+ */
+async function ensureEngagementViews(): Promise<void> {
+  // Create content_engagement_summary view
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW content_engagement_summary AS
+    SELECT
+      server_user_id,
+      rating_key,
+      MAX(media_title) AS media_title,
+      MAX(show_title) AS show_title,
+      MAX(media_type) AS media_type,
+      MAX(content_duration_ms) AS content_duration_ms,
+      MAX(thumb_path) AS thumb_path,
+      MAX(server_id::text)::uuid AS server_id,
+      MAX(season_number) AS season_number,
+      MAX(episode_number) AS episode_number,
+      MAX(year) AS year,
+      SUM(watched_ms) AS cumulative_watched_ms,
+      SUM(valid_session_count) AS valid_sessions,
+      SUM(total_session_count) AS total_sessions,
+      MIN(day) AS first_watched_at,
+      MAX(day) AS last_watched_at,
+      BOOL_OR(any_marked_watched) AS ever_marked_watched,
+      CASE
+        WHEN MAX(content_duration_ms) > 0 THEN
+          ROUND(100.0 * SUM(watched_ms) / MAX(content_duration_ms), 1)
+        ELSE 0
+      END AS completion_pct,
+      CASE
+        WHEN MAX(content_duration_ms) > 0 THEN
+          GREATEST(0, FLOOR(SUM(watched_ms)::float / MAX(content_duration_ms)))::int
+        ELSE 0
+      END AS plays,
+      CASE
+        WHEN MAX(content_duration_ms) > 0 THEN
+          CASE
+            WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 2.0 THEN 'rewatched'
+            WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 1.0 THEN 'finished'
+            WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.8 THEN 'completed'
+            WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.5 THEN 'engaged'
+            WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.2 THEN 'sampled'
+            ELSE 'abandoned'
+          END
+        ELSE 'unknown'
+      END AS engagement_tier
+    FROM daily_content_engagement
+    GROUP BY server_user_id, rating_key
+  `);
+
+  // Create episode_continuity_stats view (for consecutive episode detection)
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW episode_continuity_stats AS
+    WITH episode_timeline AS (
+      SELECT
+        server_user_id,
+        grandparent_title AS show_title,
+        rating_key,
+        started_at,
+        stopped_at,
+        EXTRACT(EPOCH FROM (
+          started_at - LAG(stopped_at) OVER (
+            PARTITION BY server_user_id, grandparent_title
+            ORDER BY started_at
+          )
+        )) / 60 AS gap_minutes
+      FROM sessions
+      WHERE media_type = 'episode'
+        AND grandparent_title IS NOT NULL
+        AND duration_ms >= 120000
+        AND stopped_at IS NOT NULL
+    )
+    SELECT
+      server_user_id,
+      show_title,
+      COUNT(*) AS total_episode_watches,
+      COUNT(*) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 30) AS consecutive_episodes,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 30)
+            / NULLIF(COUNT(*) - 1, 0), 1) AS consecutive_pct,
+      ROUND(AVG(gap_minutes) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 480), 1) AS avg_gap_minutes
+    FROM episode_timeline
+    GROUP BY server_user_id, show_title
+    HAVING COUNT(*) >= 2
+  `);
+
+  // Create daily_show_intensity view
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW daily_show_intensity AS
+    SELECT
+      server_user_id,
+      show_title,
+      day,
+      COUNT(DISTINCT rating_key) AS episodes_watched_this_day
+    FROM daily_content_engagement
+    WHERE media_type = 'episode'
+      AND show_title IS NOT NULL
+      AND valid_session_count > 0
+    GROUP BY server_user_id, show_title, day
+  `);
+
+  // Create show_engagement_summary view with intensity metrics
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW show_engagement_summary AS
+    WITH intensity_stats AS (
+      SELECT
+        server_user_id,
+        show_title,
+        COUNT(DISTINCT day) AS total_viewing_days,
+        MAX(episodes_watched_this_day) AS max_episodes_in_one_day,
+        ROUND(AVG(episodes_watched_this_day), 1) AS avg_episodes_per_viewing_day
+      FROM daily_show_intensity
+      GROUP BY server_user_id, show_title
+    )
+    SELECT
+      ces.server_user_id,
+      ces.show_title,
+      MAX(ces.server_id::text)::uuid AS server_id,
+      MAX(ces.thumb_path) AS thumb_path,
+      MAX(ces.year) AS year,
+      COUNT(DISTINCT ces.rating_key) AS unique_episodes_watched,
+      COUNT(DISTINCT CONCAT(ces.season_number, '-', ces.episode_number)) AS unique_episode_numbers,
+      SUM(ces.plays) AS total_episode_plays,
+      SUM(ces.cumulative_watched_ms) AS total_watched_ms,
+      ROUND(SUM(ces.cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
+      SUM(ces.valid_sessions) AS total_valid_sessions,
+      SUM(ces.total_sessions) AS total_all_sessions,
+      MIN(ces.first_watched_at) AS first_watched_at,
+      MAX(ces.last_watched_at) AS last_watched_at,
+      EXTRACT(DAYS FROM (MAX(ces.last_watched_at) - MIN(ces.first_watched_at)))::int AS viewing_span_days,
+      COALESCE(ist.total_viewing_days, 1) AS total_viewing_days,
+      COALESCE(ist.max_episodes_in_one_day, 1) AS max_episodes_in_one_day,
+      COALESCE(ist.avg_episodes_per_viewing_day, 1.0) AS avg_episodes_per_viewing_day,
+      COUNT(*) FILTER (WHERE ces.engagement_tier IN ('completed', 'finished', 'rewatched')) AS completed_episodes,
+      COUNT(*) FILTER (WHERE ces.engagement_tier = 'abandoned') AS abandoned_episodes,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE ces.engagement_tier IN ('completed', 'finished', 'rewatched'))
+            / NULLIF(COUNT(*), 0), 1) AS episode_completion_rate
+    FROM content_engagement_summary ces
+    LEFT JOIN intensity_stats ist ON ces.server_user_id = ist.server_user_id AND ces.show_title = ist.show_title
+    WHERE ces.media_type = 'episode' AND ces.show_title IS NOT NULL
+    GROUP BY ces.server_user_id, ces.show_title, ist.total_viewing_days, ist.max_episodes_in_one_day, ist.avg_episodes_per_viewing_day
+  `);
+
+  // Create top_content_by_plays view
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW top_content_by_plays AS
+    SELECT
+      rating_key,
+      media_title,
+      show_title,
+      media_type,
+      content_duration_ms,
+      thumb_path,
+      server_id,
+      year,
+      SUM(plays) AS total_plays,
+      SUM(cumulative_watched_ms) AS total_watched_ms,
+      ROUND(SUM(cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
+      COUNT(DISTINCT server_user_id) AS unique_viewers,
+      SUM(valid_sessions) AS total_valid_sessions,
+      SUM(total_sessions) AS total_all_sessions,
+      COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched')) AS completions,
+      COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') AS rewatches,
+      COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') AS abandonments,
+      COUNT(*) FILTER (WHERE engagement_tier = 'sampled') AS samples,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched'))
+            / NULLIF(COUNT(*), 0), 1) AS completion_rate,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier = 'abandoned')
+            / NULLIF(COUNT(*), 0), 1) AS abandonment_rate
+    FROM content_engagement_summary
+    GROUP BY rating_key, media_title, show_title, media_type, content_duration_ms, thumb_path, server_id, year
+  `);
+
+  // Create top_shows_by_engagement with enhanced binge score
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW top_shows_by_engagement AS
+    SELECT
+      ses.show_title,
+      MAX(ses.server_id::text)::uuid AS server_id,
+      MAX(ses.thumb_path) AS thumb_path,
+      MAX(ses.year) AS year,
+      SUM(ses.unique_episodes_watched) AS total_episode_views,
+      SUM(ses.total_watch_hours) AS total_watch_hours,
+      COUNT(DISTINCT ses.server_user_id) AS unique_viewers,
+      SUM(ses.total_valid_sessions) AS total_valid_sessions,
+      SUM(ses.total_all_sessions) AS total_all_sessions,
+      ROUND(AVG(ses.unique_episodes_watched), 1) AS avg_episodes_per_viewer,
+      ROUND(AVG(ses.episode_completion_rate), 1) AS avg_completion_rate,
+      ROUND(AVG(ses.avg_episodes_per_viewing_day), 1) AS avg_daily_intensity,
+      ROUND(AVG(ses.max_episodes_in_one_day), 1) AS avg_max_daily_episodes,
+      ROUND(AVG(COALESCE(ecs.consecutive_pct, 0)), 1) AS avg_consecutive_pct,
+      ROUND(AVG(
+        CASE
+          WHEN ses.viewing_span_days > 0 THEN ses.unique_episodes_watched / (ses.viewing_span_days / 7.0)
+          ELSE ses.unique_episodes_watched * 7
+        END
+      ), 1) AS avg_velocity,
+      -- Enhanced Binge Score (0-100 scale):
+      -- 40% Volume×Quality + 30% Daily Intensity + 20% Continuity + 10% Velocity
+      ROUND(
+        (
+          LEAST(AVG(ses.unique_episodes_watched) * AVG(ses.episode_completion_rate) / 100, 40) * 1.0
+          + LEAST(AVG(ses.avg_episodes_per_viewing_day) * 6, 30)
+          + AVG(COALESCE(ecs.consecutive_pct, 0)) * 0.2
+          + LEAST(AVG(
+              CASE
+                WHEN ses.viewing_span_days > 0 THEN ses.unique_episodes_watched / (ses.viewing_span_days / 7.0)
+                ELSE ses.unique_episodes_watched * 7
+              END
+            ), 20) * 0.5
+        ),
+      1) AS binge_score
+    FROM show_engagement_summary ses
+    LEFT JOIN episode_continuity_stats ecs
+      ON ses.server_user_id = ecs.server_user_id AND ses.show_title = ecs.show_title
+    GROUP BY ses.show_title
+  `);
+
+  // Create user_engagement_profile view
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW user_engagement_profile AS
+    SELECT
+      server_user_id,
+      COUNT(DISTINCT rating_key) AS content_started,
+      SUM(plays) AS total_plays,
+      SUM(cumulative_watched_ms)::bigint AS total_watched_ms,
+      ROUND(SUM(cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
+      SUM(valid_sessions) AS valid_session_count,
+      SUM(total_sessions) AS total_session_count,
+      COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') AS abandoned_count,
+      COUNT(*) FILTER (WHERE engagement_tier = 'sampled') AS sampled_count,
+      COUNT(*) FILTER (WHERE engagement_tier = 'engaged') AS engaged_count,
+      COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished')) AS completed_count,
+      COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') AS rewatched_count,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched'))
+            / NULLIF(COUNT(*), 0), 1) AS completion_rate,
+      CASE
+        WHEN COUNT(*) = 0 THEN 'inactive'
+        WHEN COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') > COUNT(*) * 0.2 THEN 'rewatcher'
+        WHEN COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched')) > COUNT(*) * 0.7 THEN 'completionist'
+        WHEN COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') > COUNT(*) * 0.5 THEN 'sampler'
+        ELSE 'casual'
+      END AS behavior_type,
+      MODE() WITHIN GROUP (ORDER BY media_type) AS favorite_media_type
+    FROM content_engagement_summary
+    GROUP BY server_user_id
+  `);
 }
 
 /**
@@ -1155,256 +1450,9 @@ export async function rebuildTimescaleViews(
       await addRefreshPolicy(def);
     }
 
-    // Step 5: Create content_engagement_summary view
-    report(5, 'Creating content_engagement_summary view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW content_engagement_summary AS
-      SELECT
-        server_user_id,
-        rating_key,
-        MAX(media_title) AS media_title,
-        MAX(show_title) AS show_title,
-        MAX(media_type) AS media_type,
-        MAX(content_duration_ms) AS content_duration_ms,
-        MAX(thumb_path) AS thumb_path,
-        MAX(server_id::text)::uuid AS server_id,
-        MAX(season_number) AS season_number,
-        MAX(episode_number) AS episode_number,
-        MAX(year) AS year,
-        SUM(watched_ms) AS cumulative_watched_ms,
-        SUM(valid_session_count) AS valid_sessions,
-        SUM(total_session_count) AS total_sessions,
-        MIN(day) AS first_watched_at,
-        MAX(day) AS last_watched_at,
-        BOOL_OR(any_marked_watched) AS ever_marked_watched,
-        CASE
-          WHEN MAX(content_duration_ms) > 0 THEN
-            ROUND(100.0 * SUM(watched_ms) / MAX(content_duration_ms), 1)
-          ELSE 0
-        END AS completion_pct,
-        CASE
-          WHEN MAX(content_duration_ms) > 0 THEN
-            GREATEST(0, FLOOR(SUM(watched_ms)::float / MAX(content_duration_ms)))::int
-          ELSE 0
-        END AS plays,
-        CASE
-          WHEN MAX(content_duration_ms) > 0 THEN
-            CASE
-              WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 2.0 THEN 'rewatched'
-              WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 1.0 THEN 'finished'
-              WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.8 THEN 'completed'
-              WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.5 THEN 'engaged'
-              WHEN SUM(watched_ms) >= MAX(content_duration_ms) * 0.2 THEN 'sampled'
-              ELSE 'abandoned'
-            END
-          ELSE 'unknown'
-        END AS engagement_tier
-      FROM daily_content_engagement
-      GROUP BY server_user_id, rating_key
-    `);
-
-    // Step 6: Create episode_continuity_stats view (for consecutive episode detection)
-    report(6, 'Creating episode_continuity_stats view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW episode_continuity_stats AS
-      WITH episode_timeline AS (
-        SELECT
-          server_user_id,
-          grandparent_title AS show_title,
-          rating_key,
-          started_at,
-          stopped_at,
-          EXTRACT(EPOCH FROM (
-            started_at - LAG(stopped_at) OVER (
-              PARTITION BY server_user_id, grandparent_title
-              ORDER BY started_at
-            )
-          )) / 60 AS gap_minutes
-        FROM sessions
-        WHERE media_type = 'episode'
-          AND grandparent_title IS NOT NULL
-          AND duration_ms >= 120000
-          AND stopped_at IS NOT NULL
-      )
-      SELECT
-        server_user_id,
-        show_title,
-        COUNT(*) AS total_episode_watches,
-        COUNT(*) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 30) AS consecutive_episodes,
-        ROUND(100.0 * COUNT(*) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 30)
-              / NULLIF(COUNT(*) - 1, 0), 1) AS consecutive_pct,
-        ROUND(AVG(gap_minutes) FILTER (WHERE gap_minutes IS NOT NULL AND gap_minutes <= 480), 1) AS avg_gap_minutes
-      FROM episode_timeline
-      GROUP BY server_user_id, show_title
-      HAVING COUNT(*) >= 2
-    `);
-
-    // Step 6b: Create daily_show_intensity view
-    report(6, 'Creating daily_show_intensity view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW daily_show_intensity AS
-      SELECT
-        server_user_id,
-        show_title,
-        day,
-        COUNT(DISTINCT rating_key) AS episodes_watched_this_day
-      FROM daily_content_engagement
-      WHERE media_type = 'episode'
-        AND show_title IS NOT NULL
-        AND valid_session_count > 0
-      GROUP BY server_user_id, show_title, day
-    `);
-
-    // Step 6c: Create show_engagement_summary view with intensity metrics
-    report(6, 'Creating show_engagement_summary view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW show_engagement_summary AS
-      WITH intensity_stats AS (
-        SELECT
-          server_user_id,
-          show_title,
-          COUNT(DISTINCT day) AS total_viewing_days,
-          MAX(episodes_watched_this_day) AS max_episodes_in_one_day,
-          ROUND(AVG(episodes_watched_this_day), 1) AS avg_episodes_per_viewing_day
-        FROM daily_show_intensity
-        GROUP BY server_user_id, show_title
-      )
-      SELECT
-        ces.server_user_id,
-        ces.show_title,
-        MAX(ces.server_id::text)::uuid AS server_id,
-        MAX(ces.thumb_path) AS thumb_path,
-        MAX(ces.year) AS year,
-        COUNT(DISTINCT ces.rating_key) AS unique_episodes_watched,
-        COUNT(DISTINCT CONCAT(ces.season_number, '-', ces.episode_number)) AS unique_episode_numbers,
-        SUM(ces.plays) AS total_episode_plays,
-        SUM(ces.cumulative_watched_ms) AS total_watched_ms,
-        ROUND(SUM(ces.cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
-        SUM(ces.valid_sessions) AS total_valid_sessions,
-        SUM(ces.total_sessions) AS total_all_sessions,
-        MIN(ces.first_watched_at) AS first_watched_at,
-        MAX(ces.last_watched_at) AS last_watched_at,
-        EXTRACT(DAYS FROM (MAX(ces.last_watched_at) - MIN(ces.first_watched_at)))::int AS viewing_span_days,
-        COALESCE(ist.total_viewing_days, 1) AS total_viewing_days,
-        COALESCE(ist.max_episodes_in_one_day, 1) AS max_episodes_in_one_day,
-        COALESCE(ist.avg_episodes_per_viewing_day, 1.0) AS avg_episodes_per_viewing_day,
-        COUNT(*) FILTER (WHERE ces.engagement_tier IN ('completed', 'finished', 'rewatched')) AS completed_episodes,
-        COUNT(*) FILTER (WHERE ces.engagement_tier = 'abandoned') AS abandoned_episodes,
-        ROUND(100.0 * COUNT(*) FILTER (WHERE ces.engagement_tier IN ('completed', 'finished', 'rewatched'))
-              / NULLIF(COUNT(*), 0), 1) AS episode_completion_rate
-      FROM content_engagement_summary ces
-      LEFT JOIN intensity_stats ist ON ces.server_user_id = ist.server_user_id AND ces.show_title = ist.show_title
-      WHERE ces.media_type = 'episode' AND ces.show_title IS NOT NULL
-      GROUP BY ces.server_user_id, ces.show_title, ist.total_viewing_days, ist.max_episodes_in_one_day, ist.avg_episodes_per_viewing_day
-    `);
-
-    // Step 7: Create top_content_by_plays view
-    report(7, 'Creating top_content_by_plays view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW top_content_by_plays AS
-      SELECT
-        rating_key,
-        media_title,
-        show_title,
-        media_type,
-        content_duration_ms,
-        thumb_path,
-        server_id,
-        year,
-        SUM(plays) AS total_plays,
-        SUM(cumulative_watched_ms) AS total_watched_ms,
-        ROUND(SUM(cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
-        COUNT(DISTINCT server_user_id) AS unique_viewers,
-        SUM(valid_sessions) AS total_valid_sessions,
-        SUM(total_sessions) AS total_all_sessions,
-        COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched')) AS completions,
-        COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') AS rewatches,
-        COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') AS abandonments,
-        COUNT(*) FILTER (WHERE engagement_tier = 'sampled') AS samples,
-        ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched'))
-              / NULLIF(COUNT(*), 0), 1) AS completion_rate,
-        ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier = 'abandoned')
-              / NULLIF(COUNT(*), 0), 1) AS abandonment_rate
-      FROM content_engagement_summary
-      GROUP BY rating_key, media_title, show_title, media_type, content_duration_ms, thumb_path, server_id, year
-    `);
-
-    // Step 8: Create top_shows_by_engagement with enhanced binge score
-    report(8, 'Creating top_shows_by_engagement view with enhanced binge score...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW top_shows_by_engagement AS
-      SELECT
-        ses.show_title,
-        MAX(ses.server_id::text)::uuid AS server_id,
-        MAX(ses.thumb_path) AS thumb_path,
-        MAX(ses.year) AS year,
-        SUM(ses.unique_episodes_watched) AS total_episode_views,
-        SUM(ses.total_watch_hours) AS total_watch_hours,
-        COUNT(DISTINCT ses.server_user_id) AS unique_viewers,
-        SUM(ses.total_valid_sessions) AS total_valid_sessions,
-        SUM(ses.total_all_sessions) AS total_all_sessions,
-        ROUND(AVG(ses.unique_episodes_watched), 1) AS avg_episodes_per_viewer,
-        ROUND(AVG(ses.episode_completion_rate), 1) AS avg_completion_rate,
-        ROUND(AVG(ses.avg_episodes_per_viewing_day), 1) AS avg_daily_intensity,
-        ROUND(AVG(ses.max_episodes_in_one_day), 1) AS avg_max_daily_episodes,
-        ROUND(AVG(COALESCE(ecs.consecutive_pct, 0)), 1) AS avg_consecutive_pct,
-        ROUND(AVG(
-          CASE
-            WHEN ses.viewing_span_days > 0 THEN ses.unique_episodes_watched / (ses.viewing_span_days / 7.0)
-            ELSE ses.unique_episodes_watched * 7
-          END
-        ), 1) AS avg_velocity,
-        -- Enhanced Binge Score (0-100 scale):
-        -- 40% Volume×Quality + 30% Daily Intensity + 20% Continuity + 10% Velocity
-        ROUND(
-          (
-            LEAST(AVG(ses.unique_episodes_watched) * AVG(ses.episode_completion_rate) / 100, 40) * 1.0
-            + LEAST(AVG(ses.avg_episodes_per_viewing_day) * 6, 30)
-            + AVG(COALESCE(ecs.consecutive_pct, 0)) * 0.2
-            + LEAST(AVG(
-                CASE
-                  WHEN ses.viewing_span_days > 0 THEN ses.unique_episodes_watched / (ses.viewing_span_days / 7.0)
-                  ELSE ses.unique_episodes_watched * 7
-                END
-              ), 20) * 0.5
-          ),
-        1) AS binge_score
-      FROM show_engagement_summary ses
-      LEFT JOIN episode_continuity_stats ecs
-        ON ses.server_user_id = ecs.server_user_id AND ses.show_title = ecs.show_title
-      GROUP BY ses.show_title
-    `);
-
-    // Step 9: Create user_engagement_profile view
-    report(9, 'Creating user_engagement_profile view...');
-    await db.execute(sql`
-      CREATE OR REPLACE VIEW user_engagement_profile AS
-      SELECT
-        server_user_id,
-        COUNT(DISTINCT rating_key) AS content_started,
-        SUM(plays) AS total_plays,
-        SUM(cumulative_watched_ms)::bigint AS total_watched_ms,
-        ROUND(SUM(cumulative_watched_ms) / 1000.0 / 60 / 60, 1) AS total_watch_hours,
-        SUM(valid_sessions) AS valid_session_count,
-        SUM(total_sessions) AS total_session_count,
-        COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') AS abandoned_count,
-        COUNT(*) FILTER (WHERE engagement_tier = 'sampled') AS sampled_count,
-        COUNT(*) FILTER (WHERE engagement_tier = 'engaged') AS engaged_count,
-        COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished')) AS completed_count,
-        COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') AS rewatched_count,
-        ROUND(100.0 * COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched'))
-              / NULLIF(COUNT(*), 0), 1) AS completion_rate,
-        CASE
-          WHEN COUNT(*) = 0 THEN 'inactive'
-          WHEN COUNT(*) FILTER (WHERE engagement_tier = 'rewatched') > COUNT(*) * 0.2 THEN 'rewatcher'
-          WHEN COUNT(*) FILTER (WHERE engagement_tier IN ('completed', 'finished', 'rewatched')) > COUNT(*) * 0.7 THEN 'completionist'
-          WHEN COUNT(*) FILTER (WHERE engagement_tier = 'abandoned') > COUNT(*) * 0.5 THEN 'sampler'
-          ELSE 'casual'
-        END AS behavior_type,
-        MODE() WITHIN GROUP (ORDER BY media_type) AS favorite_media_type
-      FROM content_engagement_summary
-      GROUP BY server_user_id
-    `);
+    // Steps 5-9: Create all engagement views
+    report(5, 'Creating engagement views...');
+    await ensureEngagementViews();
 
     // Step 10: Refresh ALL continuous aggregates with historical data
     report(10, 'Refreshing all continuous aggregates with historical data...');
