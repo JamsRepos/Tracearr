@@ -7,6 +7,7 @@ import { ServerProvider } from '@/hooks/useServer';
 import { SocketProvider } from '@/hooks/useSocket';
 import { ThemeProvider } from '@/components/theme-provider';
 import { App } from './App';
+import './i18n';
 import './styles/globals.css';
 
 const queryClient = new QueryClient({

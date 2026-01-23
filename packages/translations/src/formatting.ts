@@ -31,6 +31,10 @@ export function formatDate(date: Date | number, style: DateFormatStyle = 'medium
   const locale = i18n.language || 'en';
   const d = typeof date === 'number' ? new Date(date) : date;
 
+  if (isNaN(d.getTime())) {
+    return '';
+  }
+
   return new Intl.DateTimeFormat(locale, {
     dateStyle: style,
   }).format(d);
@@ -49,6 +53,10 @@ export function formatDate(date: Date | number, style: DateFormatStyle = 'medium
 export function formatTime(date: Date | number, style: DateFormatStyle = 'short'): string {
   const locale = i18n.language || 'en';
   const d = typeof date === 'number' ? new Date(date) : date;
+
+  if (isNaN(d.getTime())) {
+    return '';
+  }
 
   return new Intl.DateTimeFormat(locale, {
     timeStyle: style,
@@ -73,6 +81,10 @@ export function formatDateTime(
 ): string {
   const locale = i18n.language || 'en';
   const d = typeof date === 'number' ? new Date(date) : date;
+
+  if (isNaN(d.getTime())) {
+    return '';
+  }
 
   return new Intl.DateTimeFormat(locale, {
     dateStyle,
@@ -99,6 +111,10 @@ export function formatRelativeTime(date: Date | number, now: Date | number = Dat
   const locale = i18n.language || 'en';
   const d = typeof date === 'number' ? date : date.getTime();
   const n = typeof now === 'number' ? now : now.getTime();
+
+  if (isNaN(d) || isNaN(n)) {
+    return '';
+  }
 
   const diff = d - n;
   const absDiff = Math.abs(diff);
@@ -183,11 +199,11 @@ export function formatDuration(
     if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
   } else {
     // Long style - use i18n translation keys with pluralization
-    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
-    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
-    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+    if (days > 0) parts.push(i18n.t('common:duration.day', { count: days }));
+    if (hours > 0) parts.push(i18n.t('common:duration.hour', { count: hours }));
+    if (minutes > 0) parts.push(i18n.t('common:duration.minute', { count: minutes }));
     if (seconds > 0 || parts.length === 0)
-      parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`);
+      parts.push(i18n.t('common:duration.second', { count: seconds }));
   }
 
   return parts.slice(0, maxUnits).join(style === 'short' ? ' ' : ', ');
@@ -252,7 +268,7 @@ export function formatBytes(bytes: number, decimals = 1): string {
 
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
   const value = bytes / Math.pow(k, i);
 
   return `${formatNumber(value, { maximumFractionDigits: decimals })} ${sizes[i]}`;
@@ -274,7 +290,7 @@ export function formatBitrate(bitsPerSecond: number, decimals = 1): string {
 
   const k = 1000;
   const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps'];
-  const i = Math.floor(Math.log(bitsPerSecond) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bitsPerSecond) / Math.log(k)), sizes.length - 1);
   const value = bitsPerSecond / Math.pow(k, i);
 
   return `${formatNumber(value, { maximumFractionDigits: decimals })} ${sizes[i]}`;

@@ -17,15 +17,16 @@ import {
   HardDrive,
   Eye,
 } from 'lucide-react';
+import type { NavKey } from '@tracearr/translations';
 
 export interface NavItem {
-  name: string;
+  nameKey: NavKey;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 export interface NavGroup {
-  name: string;
+  nameKey: NavKey;
   icon: React.ComponentType<{ className?: string }>;
   children: NavItem[];
 }
@@ -37,37 +38,37 @@ export function isNavGroup(entry: NavEntry): entry is NavGroup {
 }
 
 export const navigation: NavEntry[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Map', href: '/map', icon: Map },
-  { name: 'History', href: '/history', icon: History },
+  { nameKey: 'dashboard', href: '/', icon: LayoutDashboard },
+  { nameKey: 'map', href: '/map', icon: Map },
+  { nameKey: 'history', href: '/history', icon: History },
   {
-    name: 'Stats',
+    nameKey: 'stats',
     icon: BarChart3,
     children: [
-      { name: 'Activity', href: '/stats/activity', icon: TrendingUp },
-      { name: 'Users', href: '/stats/users', icon: UserCircle },
+      { nameKey: 'activity', href: '/stats/activity', icon: TrendingUp },
+      { nameKey: 'users', href: '/stats/users', icon: UserCircle },
     ],
   },
   {
-    name: 'Library',
+    nameKey: 'library',
     icon: BookOpen,
     children: [
-      { name: 'Overview', href: '/library', icon: LayoutDashboard },
-      { name: 'Quality', href: '/library/quality', icon: Sparkles },
-      { name: 'Storage', href: '/library/storage', icon: HardDrive },
-      { name: 'Watch', href: '/library/watch', icon: Eye },
+      { nameKey: 'overview', href: '/library', icon: LayoutDashboard },
+      { nameKey: 'quality', href: '/library/quality', icon: Sparkles },
+      { nameKey: 'storage', href: '/library/storage', icon: HardDrive },
+      { nameKey: 'watch', href: '/library/watch', icon: Eye },
     ],
   },
   {
-    name: 'Performance',
+    nameKey: 'performance',
     icon: Gauge,
     children: [
-      { name: 'Devices', href: '/stats/devices', icon: Smartphone },
-      { name: 'Bandwidth', href: '/stats/bandwidth', icon: Activity },
+      { nameKey: 'devices', href: '/stats/devices', icon: Smartphone },
+      { nameKey: 'bandwidth', href: '/stats/bandwidth', icon: Activity },
     ],
   },
-  { name: 'Users', href: '/users', icon: Users },
-  { name: 'Rules', href: '/rules', icon: Shield },
-  { name: 'Violations', href: '/violations', icon: AlertTriangle },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { nameKey: 'users', href: '/users', icon: Users },
+  { nameKey: 'rules', href: '/rules', icon: Shield },
+  { nameKey: 'violations', href: '/violations', icon: AlertTriangle },
+  { nameKey: 'settings', href: '/settings', icon: Settings },
 ];

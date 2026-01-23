@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
@@ -7,6 +8,7 @@ import { api } from '@/lib/api';
  * Invalidates active sessions cache on success
  */
 export function useTerminateSession() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -14,10 +16,12 @@ export function useTerminateSession() {
       api.sessions.terminate(sessionId, reason),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions', 'active'] });
-      toast.success('Stream Terminated', { description: 'The playback session has been stopped.' });
+      toast.success(t('toast.success.streamTerminated.title'), {
+        description: t('toast.success.streamTerminated.message'),
+      });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Terminate', { description: error.message });
+      toast.error(t('toast.error.streamTerminateFailed'), { description: error.message });
     },
   });
 }

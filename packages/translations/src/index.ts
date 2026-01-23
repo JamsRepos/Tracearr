@@ -19,8 +19,8 @@
  *
  * // With namespaces
  * function RulesComponent() {
- *   const { t } = useTranslation('rules');
- *   return <span>{t('types.impossible_travel')}</span>;
+ *   const { t } = useTranslation('pages');
+ *   return <span>{t('rules.impossibleTravel')}</span>;
  * }
  * ```
  *
@@ -70,20 +70,20 @@ export type {
   TranslationResources,
   TranslationNamespace,
   CommonTranslations,
-  RulesTranslations,
-  SessionsTranslations,
   NotificationsTranslations,
   SettingsTranslations,
   NavTranslations,
+  PagesTranslations,
+  MobileTranslations,
   // Utility types for custom type-safe operations
   NestedKeyOf,
   TranslationValue,
   CommonKey,
-  RulesKey,
-  SessionsKey,
   NotificationsKey,
   SettingsKey,
   NavKey,
+  PagesKey,
+  MobileKey,
 } from './types.js';
 
 // Formatting utilities

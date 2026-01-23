@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Settings } from '@tracearr/shared';
 import { Loader2 } from 'lucide-react';
 import {
@@ -26,6 +27,7 @@ interface EditAgentDialogProps {
 }
 
 export function EditAgentDialog({ open, onOpenChange, agentType, settings }: EditAgentDialogProps) {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   const updateSettings = useUpdateSettings({ silent: true });
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
@@ -115,12 +117,12 @@ export function EditAgentDialog({ open, onOpenChange, agentType, settings }: Edi
 
     try {
       await updateSettings.mutateAsync(update);
-      toast.success(`${config.name} Updated`, {
-        description: 'Notification agent settings have been saved.',
+      toast.success(t('toast.success.agentUpdated.title'), {
+        description: t('toast.success.agentUpdated.message'),
       });
       onOpenChange(false);
     } catch {
-      toast.error('Failed to Update Agent');
+      toast.error(t('toast.error.agentUpdateFailed'));
     }
   };
 
@@ -142,17 +144,15 @@ export function EditAgentDialog({ open, onOpenChange, agentType, settings }: Edi
                 <Icon className="h-5 w-5" />
               )}
             </div>
-            Edit {config.name}
+            {t('common:actions.edit')} {config.name}
           </DialogTitle>
-          <DialogDescription>
-            Update the configuration for this notification agent.
-          </DialogDescription>
+          <DialogDescription>{t('pages:settings.notifications.editAgentDesc')}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
           {config.fields.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No configuration available for this agent.
+              {t('pages:settings.notifications.noConfigNeeded')}
             </p>
           ) : (
             config.fields.map((field) => {
@@ -181,16 +181,16 @@ export function EditAgentDialog({ open, onOpenChange, agentType, settings }: Edi
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={!canSave() || updateSettings.isPending}>
             {updateSettings.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {t('common:states.saving')}
               </>
             ) : (
-              'Save Changes'
+              t('common:actions.save')
             )}
           </Button>
         </DialogFooter>

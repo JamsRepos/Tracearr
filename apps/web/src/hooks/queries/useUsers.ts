@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
@@ -58,6 +59,7 @@ export function useUpdateUser() {
 }
 
 export function useUpdateUserIdentity() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -66,10 +68,10 @@ export function useUpdateUserIdentity() {
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['users', 'full', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['users', 'list'] });
-      toast.success('Display Name Updated');
+      toast.success(t('toast.success.displayNameUpdated.title'));
     },
     onError: (error: Error) => {
-      toast.error('Failed to Update', { description: error.message });
+      toast.error(t('toast.error.displayNameUpdateFailed'), { description: error.message });
     },
   });
 }
@@ -102,18 +104,19 @@ export function useUserTerminations(id: string, params: { page?: number; pageSiz
 }
 
 export function useBulkResetTrust() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (ids: string[]) => api.users.bulkResetTrust(ids),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Trust Scores Reset', {
-        description: `${data.updated} user${data.updated !== 1 ? 's' : ''} reset to 100.`,
+      toast.success(t('toast.success.trustScoresReset.title'), {
+        description: t('toast.success.trustScoresReset.message', { count: data.updated }),
       });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Reset Trust Scores', { description: error.message });
+      toast.error(t('toast.error.trustScoresResetFailed'), { description: error.message });
     },
   });
 }

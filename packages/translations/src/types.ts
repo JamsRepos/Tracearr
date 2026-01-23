@@ -2,7 +2,7 @@
  * Type-safe translation key definitions.
  */
 
-import type { resources, defaultNS, namespaces } from './config.js';
+import type { resources, defaultNS, Namespace } from './config.js';
 
 // ============================================================================
 // Core Type Definitions
@@ -20,8 +20,9 @@ export type TranslationResources = AllResources['en'];
 
 /**
  * Available namespace names.
+ * @deprecated Use `Namespace` from config.js instead
  */
-export type TranslationNamespace = (typeof namespaces)[number];
+export type TranslationNamespace = Namespace;
 
 // ============================================================================
 // i18next Module Augmentation
@@ -39,11 +40,11 @@ declare module 'i18next' {
 // ============================================================================
 
 export type CommonTranslations = TranslationResources['common'];
-export type RulesTranslations = TranslationResources['rules'];
-export type SessionsTranslations = TranslationResources['sessions'];
 export type NotificationsTranslations = TranslationResources['notifications'];
 export type SettingsTranslations = TranslationResources['settings'];
 export type NavTranslations = TranslationResources['nav'];
+export type PagesTranslations = TranslationResources['pages'];
+export type MobileTranslations = TranslationResources['mobile'];
 
 // ============================================================================
 // Utility Types for Translation Keys
@@ -78,8 +79,8 @@ export type TranslationValue<T, K extends string> = K extends `${infer First}.${
     : never;
 
 export type CommonKey = NestedKeyOf<CommonTranslations>;
-export type RulesKey = NestedKeyOf<RulesTranslations>;
-export type SessionsKey = NestedKeyOf<SessionsTranslations>;
 export type NotificationsKey = NestedKeyOf<NotificationsTranslations>;
 export type SettingsKey = NestedKeyOf<SettingsTranslations>;
 export type NavKey = NestedKeyOf<NavTranslations>;
+export type PagesKey = NestedKeyOf<PagesTranslations>;
+export type MobileKey = NestedKeyOf<MobileTranslations>;

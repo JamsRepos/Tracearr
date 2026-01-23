@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { NotificationEventType } from '@tracearr/shared';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 export function NotificationAgentsManager() {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   const { data: settings, isLoading: settingsLoading } = useSettings();
   const { data: routingData, isLoading: routingLoading } = useChannelRouting();
   const updateSettings = useUpdateSettings({ silent: true });
@@ -87,11 +89,11 @@ export function NotificationAgentsManager() {
 
     try {
       await updateSettings.mutateAsync(clearData);
-      toast.success(`${config.name} Removed`, {
-        description: 'Notification agent has been removed.',
+      toast.success(t('toast.success.agentRemoved.title'), {
+        description: t('toast.success.agentRemoved.message'),
       });
     } catch {
-      toast.error('Failed to Remove Agent');
+      toast.error(t('toast.error.agentRemoveFailed'));
     } finally {
       setRemovingAgent(null);
     }
@@ -119,17 +121,17 @@ export function NotificationAgentsManager() {
       }
 
       if (result.success) {
-        toast.success('Test Successful', {
-          description: 'Test notification sent successfully.',
+        toast.success(t('toast.success.webhookTest.title'), {
+          description: t('toast.success.webhookTest.message'),
         });
       } else {
-        toast.error('Test Failed', {
-          description: result.error || 'Unknown error occurred.',
+        toast.error(t('toast.error.agentTestFailed'), {
+          description: result.error,
         });
       }
     } catch (err) {
-      toast.error('Test Failed', {
-        description: err instanceof Error ? err.message : 'Unknown error',
+      toast.error(t('toast.error.agentTestFailed'), {
+        description: err instanceof Error ? err.message : undefined,
       });
     } finally {
       setTestingAgent(null);
@@ -139,7 +141,9 @@ export function NotificationAgentsManager() {
   if (isLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
-        <div className="text-muted-foreground">Loading notification settings...</div>
+        <div className="text-muted-foreground">
+          {t('pages:settings.notifications.loadingSettings')}
+        </div>
       </div>
     );
   }
@@ -168,7 +172,7 @@ export function NotificationAgentsManager() {
       {hasAddableAgents && (
         <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Notification Agent
+          {t('pages:settings.notifications.addAgent')}
         </Button>
       )}
 
@@ -196,9 +200,13 @@ export function NotificationAgentsManager() {
       <ConfirmDialog
         open={!!removingAgent}
         onOpenChange={(open: boolean) => !open && setRemovingAgent(null)}
-        title={`Remove ${removingConfig?.name ?? 'Agent'}?`}
-        description={`This will remove the ${removingConfig?.name ?? 'notification agent'} and disable all its notifications. You can add it back later.`}
-        confirmLabel="Remove"
+        title={t('pages:settings.notifications.removeAgentTitle', {
+          name: removingConfig?.name ?? 'Agent',
+        })}
+        description={t('pages:settings.notifications.removeAgentDesc', {
+          name: removingConfig?.name ?? 'notification agent',
+        })}
+        confirmLabel={t('common:actions.remove')}
         variant="destructive"
         onConfirm={handleRemoveAgent}
         isLoading={updateSettings.isPending}

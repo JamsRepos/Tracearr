@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -76,6 +77,7 @@ function formatDuration(ms: number): string {
 }
 
 export function JobsSettings() {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   const [jobs, setJobs] = useState<JobDefinition[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const [history, setHistory] = useState<JobHistoryItem[]>([]);
@@ -93,7 +95,7 @@ export function JobsSettings() {
         setJobs(result.jobs);
       } catch (err) {
         console.error('Failed to fetch jobs:', err);
-        toast.error('Failed to load maintenance jobs');
+        toast.error(t('toast.error.jobLoadFailed'));
       } finally {
         setIsLoadingJobs(false);
       }
@@ -148,13 +150,13 @@ export function JobsSettings() {
       setRunningJob(data.status === 'running' ? data.type : null);
 
       if (data.status === 'complete') {
-        toast.success('Job Completed', {
+        toast.success(t('toast.success.jobCompleted.title'), {
           description: data.message,
         });
         void fetchHistory();
         setRunningJob(null);
       } else if (data.status === 'error') {
-        toast.error('Job Failed', {
+        toast.warning(t('toast.warning.jobFailed.title'), {
           description: data.message,
         });
         setRunningJob(null);
@@ -187,12 +189,10 @@ export function JobsSettings() {
       setRunningJob(null);
       setProgress(null);
       if (err instanceof Error && err.message.includes('already in progress')) {
-        toast.error('Job Already Running', {
-          description: 'A maintenance job is already in progress. Please wait for it to complete.',
-        });
+        toast.error(t('toast.error.jobAlreadyRunning'));
       } else {
-        toast.error('Failed to Start Job', {
-          description: err instanceof Error ? err.message : 'Unknown error',
+        toast.error(t('toast.error.jobStartFailed'), {
+          description: err instanceof Error ? err.message : undefined,
         });
       }
     }
@@ -408,7 +408,7 @@ export function JobsSettings() {
           ) : history.length === 0 ? (
             <div className="flex h-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed">
               <ArrowUpDown className="text-muted-foreground h-4 w-4" />
-              <p className="text-muted-foreground text-xs">No job history yet</p>
+              <p className="text-muted-foreground text-xs">{t('common:empty.noJobHistory')}</p>
             </div>
           ) : (
             <div className="space-y-2">

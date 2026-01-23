@@ -44,6 +44,95 @@
       "webhookTest": {
         "title": "Test Successful",
         "message": "Webhook is working correctly"
+      },
+      "copiedToClipboard": {
+        "title": "Copied to clipboard"
+      },
+      "plexAccountLinked": {
+        "title": "Plex Account Linked",
+        "message": "You can now add servers from your Plex account"
+      },
+      "plexAccountUnlinked": {
+        "title": "Plex Account Unlinked",
+        "message": "Your Plex account has been disconnected"
+      },
+      "agentAdded": {
+        "title": "Agent Added",
+        "message": "The notification agent has been added"
+      },
+      "agentUpdated": {
+        "title": "Agent Updated",
+        "message": "The notification agent has been updated"
+      },
+      "agentRemoved": {
+        "title": "Agent Removed",
+        "message": "The notification agent has been removed"
+      },
+      "jobCompleted": {
+        "title": "Job Completed",
+        "message": "{{name}} finished successfully"
+      },
+      "ruleCreated": {
+        "title": "Rule Created",
+        "message": "The rule has been created successfully"
+      },
+      "ruleUpdated": {
+        "title": "Rule Updated",
+        "message": "The rule has been updated successfully"
+      },
+      "ruleDeleted": {
+        "title": "Rule Deleted",
+        "message": "The rule has been deleted successfully"
+      },
+      "streamTerminated": {
+        "title": "Stream Terminated",
+        "message": "The playback session has been stopped"
+      },
+      "serverUrlUpdated": {
+        "title": "Server URL Updated",
+        "message": "The server URL has been updated successfully"
+      },
+      "syncCompletedWithErrors": {
+        "title": "Sync Completed with Errors"
+      },
+      "sessionsDeleted": {
+        "title": "Sessions Deleted",
+        "message_one": "{{count}} session deleted",
+        "message_other": "{{count}} sessions deleted"
+      },
+      "violationsAcknowledged": {
+        "title": "Violations Acknowledged",
+        "message_one": "{{count}} violation acknowledged",
+        "message_other": "{{count}} violations acknowledged"
+      },
+      "violationsDismissed": {
+        "title": "Violations Dismissed",
+        "message_one": "{{count}} violation dismissed",
+        "message_other": "{{count}} violations dismissed"
+      },
+      "apiKeyGenerated": {
+        "title": "API Key Generated",
+        "message": "Your new API key is ready to use"
+      },
+      "mobileAccessEnabled": {
+        "title": "Mobile Access Enabled",
+        "message": "Scan the QR code with the Tracearr mobile app to connect"
+      },
+      "mobileAccessDisabled": {
+        "title": "Mobile Access Disabled",
+        "message": "All mobile sessions have been revoked"
+      },
+      "pairTokenGenerated": {
+        "title": "Pair Token Generated",
+        "message": "Scan the QR code with your mobile device to pair"
+      },
+      "displayNameUpdated": {
+        "title": "Display Name Updated"
+      },
+      "trustScoresReset": {
+        "title": "Trust Scores Reset",
+        "message_one": "{{count}} user reset to 100",
+        "message_other": "{{count}} users reset to 100"
       }
     },
     "error": {
@@ -55,7 +144,40 @@
       "acknowledgeFailed": "Failed to acknowledge violation",
       "dismissFailed": "Failed to dismiss violation",
       "authFailed": "Authentication failed",
-      "webhookTestFailed": "Webhook test failed"
+      "webhookTestFailed": "Webhook test failed",
+      "ruleCreateFailed": "Failed to create rule",
+      "ruleUpdateFailed": "Failed to update rule",
+      "ruleDeleteFailed": "Failed to delete rule",
+      "streamTerminateFailed": "Failed to terminate stream",
+      "serverUrlUpdateFailed": "Failed to update server URL",
+      "serverReorderFailed": "Failed to reorder servers",
+      "sessionsDeleteFailed": "Failed to delete sessions",
+      "apiKeyGenerateFailed": "Failed to generate API key",
+      "mobileAccessEnableFailed": "Failed to enable mobile access",
+      "mobileAccessDisableFailed": "Failed to disable mobile access",
+      "pairTokenGenerateFailed": "Failed to generate pair token",
+      "deviceRemoveFailed": "Failed to remove device",
+      "sessionsRevokeFailed": "Failed to revoke sessions",
+      "displayNameUpdateFailed": "Failed to update display name",
+      "trustScoresResetFailed": "Failed to reset trust scores",
+      "routingUpdateFailed": "Failed to update routing",
+      "clipboardFailed": "Failed to copy to clipboard",
+      "plexUnlinkFailed": "Failed to unlink Plex account",
+      "agentAddFailed": "Failed to add agent",
+      "agentUpdateFailed": "Failed to update agent",
+      "agentRemoveFailed": "Failed to remove agent",
+      "agentTestFailed": "Test failed",
+      "jobAlreadyRunning": "Job already running",
+      "jobStartFailed": "Failed to start job",
+      "jobLoadFailed": "Failed to load maintenance jobs",
+      "invalidUrl": "Invalid URL",
+      "plexDirectUrl": "plex.direct URLs are relay addresses that cannot be used here. Please use a direct IP address or hostname instead."
+    },
+    "warning": {
+      "jobFailed": {
+        "title": "Job Failed",
+        "message": "{{name}} encountered an error"
+      }
     },
     "info": {
       "streamStarted": {
@@ -68,15 +190,19 @@
       },
       "updateAvailable": {
         "title": "Update Available",
-        "message": "A new version is available"
+        "message": "Tracearr {{version}} is available"
       },
       "serverOffline": {
         "title": "Server Offline",
-        "message": "{{name}} is not responding"
+        "message": "{{name}} is unreachable"
       },
       "serverOnline": {
         "title": "Server Online",
         "message": "{{name}} is back online"
+      },
+      "violationDetected": {
+        "title": "New Violation: {{ruleName}}",
+        "message": "{{user}} triggered {{ruleType}}"
       }
     }
   },
@@ -85,7 +211,9 @@
     "streamStarted": "Stream Started",
     "streamEnded": "Stream Ended",
     "serverDown": "Server Connection Lost",
-    "serverUp": "Server Back Online"
+    "serverUp": "Server Back Online",
+    "newDevice": "New Device",
+    "trustScoreChanged": "Trust Score Changed"
   },
   "settings": {
     "title": "Notification Settings",
@@ -95,6 +223,22 @@
     "allTypes": "All Types",
     "rateLimit": "Current Rate Limit Status",
     "perMinute": "Per Minute",
-    "perHour": "Per Hour"
+    "perHour": "Per Hour",
+    "enablePushNotifications": "Enable Push Notifications",
+    "notificationEvents": "Notification Events",
+    "violationDetected": "Violation Detected",
+    "streamStarted": "Stream Started",
+    "streamStopped": "Stream Stopped",
+    "concurrentStreams": "Concurrent Streams",
+    "newDevice": "New Device",
+    "trustScoreChanged": "Trust Score Changed",
+    "serverDown": "Server Down",
+    "serverUp": "Server Up",
+    "violationFilters": "Violation Filters",
+    "minimumSeverity": "Minimum Severity",
+    "quietHours": "Quiet Hours",
+    "enableQuietHours": "Enable Quiet Hours",
+    "overrideForCritical": "Override for Critical",
+    "rateLimiting": "Rate Limiting"
   }
 }

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { SERVER_STATS_CONFIG, type Server, type ServerResourceDataPoint } from '@tracearr/shared';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -13,37 +14,44 @@ export function useServers() {
 }
 
 export function useCreateServer() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: { name: string; type: string; url: string; token: string }) =>
       api.servers.create(data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
-      toast.success('Server Added', { description: 'The server has been added successfully.' });
+      toast.success(t('toast.success.serverAdded.title'), {
+        description: t('toast.success.serverAdded.message', { name: variables.name }),
+      });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Add Server', { description: error.message });
+      toast.error(t('toast.error.serverAddFailed'), { description: error.message });
     },
   });
 }
 
 export function useDeleteServer() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => api.servers.delete(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
-      toast.success('Server Removed', { description: 'The server has been removed successfully.' });
+      toast.success(t('toast.success.serverRemoved.title'), {
+        description: t('toast.success.serverRemoved.message'),
+      });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Remove Server', { description: error.message });
+      toast.error(t('toast.error.serverRemoveFailed'), { description: error.message });
     },
   });
 }
 
 export function useUpdateServerUrl() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -58,12 +66,12 @@ export function useUpdateServerUrl() {
     }) => api.servers.updateUrl(id, url, clientIdentifier),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
-      toast.success('Server URL Updated', {
-        description: 'The server URL has been updated successfully.',
+      toast.success(t('toast.success.serverUrlUpdated.title'), {
+        description: t('toast.success.serverUrlUpdated.message'),
       });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Update URL', { description: error.message });
+      toast.error(t('toast.error.serverUrlUpdateFailed'), { description: error.message });
     },
   });
 }
@@ -86,6 +94,7 @@ export function usePlexServerConnections(serverId: string | undefined) {
 }
 
 export function useSyncServer() {
+  const { t } = useTranslation(['notifications', 'common']);
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -96,30 +105,35 @@ export function useSyncServer() {
 
       // Show detailed results
       const parts: string[] = [];
-      if (data.usersAdded > 0) parts.push(`${data.usersAdded} users added`);
-      if (data.usersUpdated > 0) parts.push(`${data.usersUpdated} users updated`);
-      if (data.librariesSynced > 0) parts.push(`${data.librariesSynced} libraries`);
-      if (data.errors.length > 0) parts.push(`${data.errors.length} errors`);
+      if (data.usersAdded > 0) parts.push(t('common:count.usersAdded', { count: data.usersAdded }));
+      if (data.usersUpdated > 0)
+        parts.push(t('common:count.usersUpdated', { count: data.usersUpdated }));
+      if (data.librariesSynced > 0)
+        parts.push(t('common:count.library', { count: data.librariesSynced }));
+      if (data.errors.length > 0)
+        parts.push(t('common:count.error', { count: data.errors.length }));
 
-      const description = parts.length > 0 ? parts.join(', ') : 'No changes detected';
+      const description =
+        parts.length > 0 ? parts.join(', ') : t('common:messages.noChangesDetected');
 
       if (data.errors.length > 0) {
-        toast.warning(data.success ? 'Sync Completed with Errors' : 'Sync Completed with Errors', {
+        toast.warning(t('notifications:toast.success.syncCompletedWithErrors.title'), {
           description,
         });
         // Log errors to console for debugging
         console.error('Sync errors:', data.errors);
       } else {
-        toast.success('Server Synced', { description });
+        toast.success(t('notifications:toast.success.serverSynced.title'), { description });
       }
     },
     onError: (error: Error) => {
-      toast.error('Sync Failed', { description: error.message });
+      toast.error(t('notifications:toast.error.serverSyncFailed'), { description: error.message });
     },
   });
 }
 
 export function useReorderServers() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingOrderRef = useRef<{ id: string; displayOrder: number }[] | null>(null);
@@ -151,7 +165,7 @@ export function useReorderServers() {
       if (context?.previousServers) {
         queryClient.setQueryData(['servers', 'list'], context.previousServers);
       }
-      toast.error('Failed to Reorder Servers', { description: error.message });
+      toast.error(t('toast.error.serverReorderFailed'), { description: error.message });
     },
     onSuccess: () => {
       // Invalidate to ensure we have the latest data

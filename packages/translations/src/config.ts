@@ -5,31 +5,31 @@ import { initReactI18next } from 'react-i18next';
 // English Translations (Base Language)
 // ============================================================================
 import commonEn from './locales/en/common.json' with { type: 'json' };
-import rulesEn from './locales/en/rules.json' with { type: 'json' };
-import sessionsEn from './locales/en/sessions.json' with { type: 'json' };
 import notificationsEn from './locales/en/notifications.json' with { type: 'json' };
 import settingsEn from './locales/en/settings.json' with { type: 'json' };
 import navEn from './locales/en/nav.json' with { type: 'json' };
+import pagesEn from './locales/en/pages.json' with { type: 'json' };
+import mobileEn from './locales/en/mobile.json' with { type: 'json' };
 
 // ============================================================================
 // German Translations
 // ============================================================================
 import commonDe from './locales/de/common.json' with { type: 'json' };
-import rulesDe from './locales/de/rules.json' with { type: 'json' };
-import sessionsDe from './locales/de/sessions.json' with { type: 'json' };
 import notificationsDe from './locales/de/notifications.json' with { type: 'json' };
 import settingsDe from './locales/de/settings.json' with { type: 'json' };
 import navDe from './locales/de/nav.json' with { type: 'json' };
+import pagesDe from './locales/de/pages.json' with { type: 'json' };
+import mobileDe from './locales/de/mobile.json' with { type: 'json' };
 
 // ============================================================================
 // Portuguese Translations
 // ============================================================================
 import commonPt from './locales/pt/common.json' with { type: 'json' };
-import rulesPt from './locales/pt/rules.json' with { type: 'json' };
-import sessionsPt from './locales/pt/sessions.json' with { type: 'json' };
 import notificationsPt from './locales/pt/notifications.json' with { type: 'json' };
 import settingsPt from './locales/pt/settings.json' with { type: 'json' };
 import navPt from './locales/pt/nav.json' with { type: 'json' };
+import pagesPt from './locales/pt/pages.json' with { type: 'json' };
+import mobilePt from './locales/pt/mobile.json' with { type: 'json' };
 
 // ============================================================================
 // Add New Languages Here
@@ -40,10 +40,10 @@ import navPt from './locales/pt/nav.json' with { type: 'json' };
 // 3. Translate the values in each JSON file
 // 4. Import the files below:
 //    import commonEs from './locales/es/common.json' with { type: 'json' };
-//    import rulesEs from './locales/es/rules.json' with { type: 'json' };
+//    import notificationsEs from './locales/es/notifications.json' with { type: 'json' };
 //    ... (all namespaces)
 // 5. Add to resources object below:
-//    es: { common: commonEs, rules: rulesEs, ... }
+//    es: { common: commonEs, notifications: notificationsEs, ... }
 // 6. Add to supportedLanguages array
 // 7. Add display name in src/language.ts languageNames object
 // ============================================================================
@@ -51,47 +51,47 @@ import navPt from './locales/pt/nav.json' with { type: 'json' };
 export const defaultNS = 'common';
 export const namespaces = [
   'common',
-  'rules',
-  'sessions',
   'notifications',
   'settings',
   'nav',
+  'pages',
+  'mobile',
 ] as const;
 export type Namespace = (typeof namespaces)[number];
 
 export const resources = {
   en: {
     common: commonEn,
-    rules: rulesEn,
-    sessions: sessionsEn,
     notifications: notificationsEn,
     settings: settingsEn,
     nav: navEn,
+    pages: pagesEn,
+    mobile: mobileEn,
   },
   de: {
     common: commonDe,
-    rules: rulesDe,
-    sessions: sessionsDe,
     notifications: notificationsDe,
     settings: settingsDe,
     nav: navDe,
+    pages: pagesDe,
+    mobile: mobileDe,
   },
   pt: {
     common: commonPt,
-    rules: rulesPt,
-    sessions: sessionsPt,
     notifications: notificationsPt,
     settings: settingsPt,
     nav: navPt,
+    pages: pagesPt,
+    mobile: mobilePt,
   },
   // Add new languages here:
   // es: {
   //   common: commonEs,
-  //   rules: rulesEs,
-  //   sessions: sessionsEs,
   //   notifications: notificationsEs,
   //   settings: settingsEs,
   //   nav: navEs,
+  //   pages: pagesEs,
+  //   mobile: mobileEs,
   // },
 } as const;
 
@@ -127,7 +127,11 @@ let initPromise: Promise<typeof i18n> | null = null;
  * Initialize i18next. Call once at app startup before rendering.
  * Safe to call concurrently - multiple calls share the same initialization.
  */
-export async function initI18n(options?: Partial<typeof defaultI18nConfig>): Promise<typeof i18n> {
+export interface InitI18nOptions {
+  lng?: SupportedLanguage;
+}
+
+export async function initI18n(options?: InitI18nOptions): Promise<typeof i18n> {
   if (i18n.isInitialized) {
     return i18n;
   }

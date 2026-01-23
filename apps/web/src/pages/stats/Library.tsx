@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Film, Tv } from 'lucide-react';
 import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import { MediaCard, MediaCardSmall } from '@/components/media';
@@ -7,6 +8,7 @@ import { useServer } from '@/hooks/useServer';
 import { useTimeRange } from '@/hooks/useTimeRange';
 
 export function StatsLibrary() {
+  const { t } = useTranslation('pages');
   const { value: timeRange, setValue: setTimeRange, apiParams } = useTimeRange();
   const { selectedServerId } = useServer();
   const topContent = useTopContent(apiParams, selectedServerId);
@@ -22,8 +24,8 @@ export function StatsLibrary() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Library</h1>
-          <p className="text-muted-foreground text-sm">Top movies and shows on your server</p>
+          <h1 className="text-2xl font-bold">{t('library.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('library.description')}</p>
         </div>
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>
@@ -32,7 +34,7 @@ export function StatsLibrary() {
       <section>
         <div className="mb-4 flex items-center gap-2">
           <Film className="text-primary h-5 w-5" />
-          <h2 className="text-lg font-semibold">Top Movies</h2>
+          <h2 className="text-lg font-semibold">{t('library.topMovies')}</h2>
         </div>
 
         {topContent.isLoading ? (
@@ -51,7 +53,7 @@ export function StatsLibrary() {
               return (
                 <div className="rounded-xl border border-dashed p-8 text-center">
                   <Film className="text-muted-foreground/50 mx-auto h-12 w-12" />
-                  <p className="text-muted-foreground mt-2">No movie plays in this period</p>
+                  <p className="text-muted-foreground mt-2">{t('library.noMoviePlays')}</p>
                 </div>
               );
             }
@@ -97,7 +99,7 @@ export function StatsLibrary() {
       <section>
         <div className="mb-4 flex items-center gap-2">
           <Tv className="text-primary h-5 w-5" />
-          <h2 className="text-lg font-semibold">Top TV Shows</h2>
+          <h2 className="text-lg font-semibold">{t('library.topShows')}</h2>
         </div>
 
         {topContent.isLoading || showStats.isLoading ? (
@@ -117,7 +119,7 @@ export function StatsLibrary() {
               return (
                 <div className="rounded-xl border border-dashed p-8 text-center">
                   <Tv className="text-muted-foreground/50 mx-auto h-12 w-12" />
-                  <p className="text-muted-foreground mt-2">No TV show plays in this period</p>
+                  <p className="text-muted-foreground mt-2">{t('library.noShowPlays')}</p>
                 </div>
               );
             }
@@ -168,7 +170,7 @@ export function StatsLibrary() {
               return (
                 <div className="rounded-xl border border-dashed p-8 text-center">
                   <Tv className="text-muted-foreground/50 mx-auto h-12 w-12" />
-                  <p className="text-muted-foreground mt-2">No TV show plays in this period</p>
+                  <p className="text-muted-foreground mt-2">{t('library.noShowPlays')}</p>
                 </div>
               );
             }

@@ -9,5 +9,14 @@
   "rules": "Rules",
   "violations": "Violations",
   "alerts": "Alerts",
-  "settings": "Settings"
+  "settings": "Settings",
+  "overview": "Overview",
+  "quality": "Quality",
+  "storage": "Storage",
+  "watch": "Watch",
+  "performance": "Performance",
+  "devices": "Devices",
+  "bandwidth": "Bandwidth",
+  "jobs": "Jobs",
+  "accessControl": "Access Control"
 }

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -49,6 +50,7 @@ interface SocketContextValue {
 const SocketContext = createContext<SocketContextValue | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(['notifications', 'common']);
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [socket, setSocket] = useState<TypedSocket | null>(null);
@@ -145,8 +147,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       // Show toast if web notifications are enabled for stream_started
       if (isWebToastEnabled('stream_started')) {
-        toast.info('New Stream Started', {
-          description: `${session.user.identityName ?? session.user.username} is watching ${session.mediaTitle}`,
+        toast.info(t('notifications:toast.info.streamStarted.title'), {
+          description: t('notifications:toast.info.streamStarted.message', {
+            user: session.user.identityName ?? session.user.username,
+            media: session.mediaTitle,
+          }),
         });
       }
     });
@@ -160,7 +165,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       // Show toast if web notifications are enabled for stream_stopped
       if (isWebToastEnabled('stream_stopped')) {
-        toast.info('Stream Stopped');
+        toast.info(t('notifications:toast.info.streamStopped.title'));
       }
     });
 
@@ -177,9 +182,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // Show toast notification if web notifications are enabled for violation_detected
       if (isWebToastEnabled('violation_detected')) {
         const toastFn = violation.severity === 'high' ? toast.error : toast.warning;
-        toastFn(`New Violation: ${violation.rule.name}`, {
-          description: `${violation.user.identityName ?? violation.user.username} triggered ${violation.rule.type}`,
-        });
+        toastFn(
+          t('notifications:toast.info.violationDetected.title', { ruleName: violation.rule.name }),
+          {
+            description: t('notifications:toast.info.violationDetected.message', {
+              user: violation.user.identityName ?? violation.user.username,
+              ruleType: violation.rule.type,
+            }),
+          }
+        );
       }
     });
 
@@ -195,10 +206,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         void queryClient.invalidateQueries({ queryKey: ['version'] });
 
         // Show toast notification for new version
-        toast.info('Update Available', {
-          description: `Tracearr ${data.latest} is available`,
+        toast.info(t('notifications:toast.info.updateAvailable.title'), {
+          description: t('notifications:toast.info.updateAvailable.message', {
+            version: data.latest,
+          }),
           action: {
-            label: 'View',
+            label: t('common:actions.view'),
             onClick: () => window.open(data.releaseUrl, '_blank'),
           },
           duration: 10000,
@@ -217,8 +230,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         });
 
         if (isWebToastEnabled('server_down')) {
-          toast.error('Server Offline', {
-            description: `${data.serverName} is unreachable`,
+          toast.error(t('notifications:toast.info.serverOffline.title'), {
+            description: t('notifications:toast.info.serverOffline.message', {
+              name: data.serverName,
+            }),
             duration: 10000,
           });
         }
@@ -232,8 +247,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         setUnhealthyServers((prev) => prev.filter((s) => s.serverId !== data.serverId));
 
         if (isWebToastEnabled('server_up')) {
-          toast.success('Server Online', {
-            description: `${data.serverName} is back online`,
+          toast.success(t('notifications:toast.info.serverOnline.title'), {
+            description: t('notifications:toast.info.serverOnline.message', {
+              name: data.serverName,
+            }),
           });
         }
       }

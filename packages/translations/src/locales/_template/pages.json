@@ -1,0 +1,108 @@
+{
+  "login": {
+    "title": "",
+    "tagline": "",
+    "createAccountHeading": "",
+    "signInHeading": "",
+    "createAccountDesc": "",
+    "signInDesc": "",
+    "signUpWithPlex": "",
+    "signInWithPlex": "",
+    "signInWithJellyfin": "",
+    "jellyfinUsername": "",
+    "jellyfinUsernamePlaceholder": "",
+    "jellyfinPassword": "",
+    "jellyfinPasswordPlaceholder": "",
+    "jellyfinAdminRequired": "",
+    "useLocalAccount": "",
+    "useJellyfinAccount": "",
+    "emailPlaceholder": "",
+    "displayNamePlaceholder": "",
+    "passwordRequirements": "",
+    "passwordPlaceholder": "",
+    "afterCreateAccount": "",
+    "selectPlexServer": "",
+    "chooseServer": "",
+    "waitingForPlex": "",
+    "completeSignIn": "",
+    "reopenPlexLogin": "",
+    "loggedInSuccess": "",
+    "plexAuthFailed": "",
+    "authFailed": "",
+    "connectionFailed": "",
+    "failedToConnect": "",
+    "signupFailed": "",
+    "failedToCreateAccount": "",
+    "loginFailed": "",
+    "invalidEmailOrPassword": "",
+    "invalidUsernameOrPassword": ""
+  },
+  "users": {
+    "title": "",
+    "allUsers": "",
+    "trustScore": "",
+    "lastActivity": "",
+    "serverOwner": "",
+    "noUsersFound": "",
+    "resetTrustScore": "",
+    "resetTrustScoreConfirm": ""
+  },
+  "history": {
+    "title": "",
+    "description": "",
+    "loadingMore": "",
+    "scrollForMore": "",
+    "showingAllResults": "",
+    "deleteSessions": "",
+    "deleteSessionsConfirm": ""
+  },
+  "activity": {
+    "title": "",
+    "description": "",
+    "playsOverTime": "",
+    "concurrentStreams": "",
+    "engagementBreakdown": "",
+    "howUsersEngage": "",
+    "platforms": "",
+    "playbackQuality": ""
+  },
+  "stats": {
+    "plays": "",
+    "watchTime": "",
+    "users": "",
+    "titles": "",
+    "hours": ""
+  },
+  "violations": {
+    "title": "",
+    "pending": "",
+    "filters": "",
+    "acknowledged": "",
+    "noMatches": "",
+    "tryAdjustingFilters": "",
+    "allClear": "",
+    "noViolationsDetected": "",
+    "dismissConfirm": ""
+  },
+  "userDetail": {
+    "sessions": "",
+    "violations": "",
+    "locations": "",
+    "owner": "",
+    "joined": ""
+  },
+  "terminateStream": {
+    "title": "",
+    "stopMedia": "",
+    "messageLabel": "",
+    "messagePlaceholder": "",
+    "messageHint": "",
+    "terminating": "",
+    "killStream": ""
+  },
+  "notFound": {
+    "title": "",
+    "heading": "",
+    "description": ""
+  }
+}

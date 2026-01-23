@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, ArrowRight, Terminal, Package, Sparkles } from 'lucide-react';
 import type { VersionInfo } from '@tracearr/shared';
 import {
@@ -22,6 +23,7 @@ interface UpdateDialogProps {
  * Dialog showing update details including version info, type, and release notes
  */
 export function UpdateDialog({ open, onOpenChange, version }: UpdateDialogProps) {
+  const { t } = useTranslation(['settings', 'common']);
   const { current, latest } = version;
 
   // Determine update type label
@@ -30,17 +32,25 @@ export function UpdateDialog({ open, onOpenChange, version }: UpdateDialogProps)
 
     // Current is beta, latest is stable of same base version
     if (current.isPrerelease && !latest.isPrerelease) {
-      return { label: 'Stable Release', variant: 'default' as const, icon: Sparkles };
+      return {
+        label: t('settings:update.stableRelease'),
+        variant: 'default' as const,
+        icon: Sparkles,
+      };
     }
 
     // Current is beta, latest is newer beta
     if (current.isPrerelease && latest.isPrerelease) {
-      return { label: 'Beta Update', variant: 'secondary' as const, icon: Package };
+      return {
+        label: t('settings:update.betaUpdate'),
+        variant: 'secondary' as const,
+        icon: Package,
+      };
     }
 
     // Current is stable, latest is newer stable
-    return { label: 'New Version', variant: 'default' as const, icon: Sparkles };
-  }, [current, latest]);
+    return { label: t('settings:update.newVersion'), variant: 'default' as const, icon: Sparkles };
+  }, [current, latest, t]);
 
   // Format the docker pull command
   const dockerCommand = useMemo(() => {
@@ -72,7 +82,7 @@ export function UpdateDialog({ open, onOpenChange, version }: UpdateDialogProps)
           <div className="flex items-center gap-2">
             <DialogTitle className="flex items-center gap-2">
               <updateType.icon className="h-5 w-5 text-green-500" />
-              Update Available
+              {t('settings:update.title')}
             </DialogTitle>
             <Badge variant={updateType.variant} className="text-xs">
               {updateType.label}
@@ -95,7 +105,7 @@ export function UpdateDialog({ open, onOpenChange, version }: UpdateDialogProps)
           {latest.releaseNotes && (
             <div className="space-y-2">
               <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Release Notes
+                {t('settings:update.releaseNotes')}
               </div>
               <ScrollArea className="h-48 rounded-md border p-3">
                 <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
@@ -110,25 +120,23 @@ export function UpdateDialog({ open, onOpenChange, version }: UpdateDialogProps)
           {/* Update command */}
           <div className="space-y-2">
             <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              Update Command
+              {t('settings:update.updateCommand')}
             </div>
             <div className="bg-muted flex items-center gap-2 rounded-md p-3 font-mono text-sm">
               <Terminal className="text-muted-foreground h-4 w-4 shrink-0" />
               <code className="flex-1 select-all">{dockerCommand}</code>
             </div>
-            <p className="text-muted-foreground text-xs">
-              After pulling, restart your container to apply the update.
-            </p>
+            <p className="text-muted-foreground text-xs">{t('settings:update.pullInstructions')}</p>
           </div>
 
           {/* Action buttons */}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Later
+              {t('common:actions.later')}
             </Button>
             <Button asChild className="gap-2">
               <a href={latest.releaseUrl} target="_blank" rel="noopener noreferrer">
-                View on GitHub
+                {t('common:actions.viewOnGithub')}
                 <ExternalLink className="h-4 w-4" />
               </a>
             </Button>

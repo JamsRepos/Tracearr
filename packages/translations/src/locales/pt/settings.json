@@ -1,11 +1,14 @@
 {
+  "_TODO": "New keys added - translate: tabs.jobs, tabs.accessControl, import.processed through import.errors, update.*, serverHealth.*",
   "tabs": {
     "general": "Geral",
     "servers": "Servidores",
     "notifications": "Notificações",
     "mobile": "Aplicação móvel",
     "import": "Importar",
-    "advanced": "Avançadas"
+    "advanced": "Avançadas",
+    "jobs": "Jobs",
+    "accessControl": "Access Control"
   },
   "general": {
     "title": "Definições gerais",
@@ -61,7 +64,13 @@
     "tautulli": "Importar do Tautulli",
     "importProgress": "Progresso da importação",
     "importComplete": "Importação concluída",
-    "importFailed": "Falha na importação"
+    "importFailed": "Falha na importação",
+    "processed": "Processed",
+    "page": "Page",
+    "imported": "Imported",
+    "skipped": "Skipped",
+    "enriched": "Enriched",
+    "errors": "Errors"
   },
   "plex": {
     "linkedAccounts": "Contas Plex ligadas",
@@ -87,5 +96,19 @@
     "useLocalAccount": "Utilize a conta local em vez disso",
     "useJellyfinAccount": "Utilize a conta Jellyfin em vez disso",
     "waitingForPlex": "A aguardar autorização do Plex..."
+  },
+  "update": {
+    "title": "Update Available",
+    "releaseNotes": "Release Notes",
+    "updateCommand": "Update Command",
+    "pullInstructions": "After pulling, restart your container to apply the update.",
+    "stableRelease": "Stable Release",
+    "betaUpdate": "Beta Update",
+    "newVersion": "New Version",
+    "versionAvailable": "{{version}} available"
+  },
+  "serverHealth": {
+    "unreachable": "{{serverName}} is unreachable",
+    "multipleUnreachable": "{{count}} servers unreachable: {{serverNames}}"
   }
 }

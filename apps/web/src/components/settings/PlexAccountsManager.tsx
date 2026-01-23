@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,6 +32,7 @@ export function PlexAccountsManager({
   compact = false,
   onAccountLinked,
 }: PlexAccountsManagerProps) {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   const queryClient = useQueryClient();
   const [showManageDialog, setShowManageDialog] = useState(false);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState<string | null>(null);
@@ -53,14 +55,14 @@ export function PlexAccountsManager({
   const unlinkMutation = useMutation({
     mutationFn: (id: string) => api.auth.unlinkPlexAccount(id),
     onSuccess: () => {
-      toast.success('Plex Account Unlinked', {
-        description: 'The Plex account has been removed.',
+      toast.success(t('toast.success.plexAccountUnlinked.title'), {
+        description: t('toast.success.plexAccountUnlinked.message'),
       });
       void refetch();
       setShowUnlinkConfirm(null);
     },
     onError: (error: Error) => {
-      toast.error('Failed to Unlink', {
+      toast.error(t('toast.error.plexUnlinkFailed'), {
         description: error.message,
       });
     },
@@ -125,8 +127,8 @@ export function PlexAccountsManager({
               // Now link the account via our API
               try {
                 await api.auth.linkPlexAccount(pinData.id.toString());
-                toast.success('Plex Account Linked', {
-                  description: 'You can now add servers from this Plex account.',
+                toast.success(t('toast.success.plexAccountLinked.title'), {
+                  description: t('toast.success.plexAccountLinked.message'),
                 });
                 await refetch();
                 await queryClient.invalidateQueries({ queryKey: ['plex-accounts'] });
@@ -170,11 +172,11 @@ export function PlexAccountsManager({
       <div className="flex items-center gap-3">
         <span className="text-muted-foreground text-sm">
           {accounts.length === 0
-            ? 'No Plex accounts linked'
-            : `${accounts.length} Plex account${accounts.length !== 1 ? 's' : ''} linked`}
+            ? t('pages:settings.plex.noAccountsLinkedShort')
+            : t('pages:settings.plex.accountsLinked', { count: accounts.length })}
         </span>
         <Button variant="outline" size="sm" onClick={() => setShowManageDialog(true)}>
-          Manage
+          {t('common:actions.edit')}
         </Button>
         <ManageDialog
           open={showManageDialog}
@@ -189,9 +191,9 @@ export function PlexAccountsManager({
         <ConfirmDialog
           open={!!showUnlinkConfirm}
           onOpenChange={() => setShowUnlinkConfirm(null)}
-          title="Unlink Plex Account"
-          description="Are you sure you want to unlink this Plex account? You won't be able to add servers from this account until you link it again."
-          confirmLabel="Unlink"
+          title={t('pages:settings.plex.unlinkPlexAccount')}
+          description={t('pages:settings.plex.unlinkConfirm')}
+          confirmLabel={t('common:actions.disconnect')}
           onConfirm={() => showUnlinkConfirm && unlinkMutation.mutate(showUnlinkConfirm)}
           isLoading={unlinkMutation.isPending}
         />
@@ -215,21 +217,21 @@ export function PlexAccountsManager({
         <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center">
           <Link2 className="text-muted-foreground h-8 w-8" />
           <div>
-            <p className="font-medium">No Plex Accounts Linked</p>
+            <p className="font-medium">{t('pages:settings.plex.noAccountsLinked')}</p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Link a Plex account to add Plex servers to Tracearr.
+              {t('pages:settings.plex.noAccountsLinkedHint')}
             </p>
           </div>
           <Button onClick={startPlexOAuth} disabled={isLinking}>
             {isLinking ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Linking...
+                {t('pages:settings.plex.linking')}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                Link Plex Account
+                {t('pages:settings.plex.linkPlexAccount')}
               </>
             )}
           </Button>
@@ -255,12 +257,12 @@ export function PlexAccountsManager({
             {isLinking ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Linking...
+                {t('pages:settings.plex.linking')}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                Link Another Plex Account
+                {t('pages:settings.plex.linkAnotherAccount')}
               </>
             )}
           </Button>
@@ -276,9 +278,9 @@ export function PlexAccountsManager({
       <ConfirmDialog
         open={!!showUnlinkConfirm}
         onOpenChange={() => setShowUnlinkConfirm(null)}
-        title="Unlink Plex Account"
-        description="Are you sure you want to unlink this Plex account? You won't be able to add servers from this account until you link it again."
-        confirmLabel="Unlink"
+        title={t('pages:settings.plex.unlinkPlexAccount')}
+        description={t('pages:settings.plex.unlinkConfirm')}
+        confirmLabel={t('common:actions.disconnect')}
         onConfirm={() => showUnlinkConfirm && unlinkMutation.mutate(showUnlinkConfirm)}
         isLoading={unlinkMutation.isPending}
       />
@@ -287,6 +289,7 @@ export function PlexAccountsManager({
 }
 
 function PlexAccountCard({ account, onUnlink }: { account: PlexAccount; onUnlink: () => void }) {
+  const { t } = useTranslation(['pages', 'common']);
   const canUnlink = account.serverCount === 0;
 
   return (
@@ -303,15 +306,13 @@ function PlexAccountCard({ account, onUnlink }: { account: PlexAccount; onUnlink
             </span>
             {account.allowLogin && (
               <Badge variant="secondary" className="text-xs">
-                Login Enabled
+                {t('pages:settings.plex.loginEnabled')}
               </Badge>
             )}
           </div>
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <Server className="h-3 w-3" />
-            <span>
-              {account.serverCount} server{account.serverCount !== 1 ? 's' : ''} connected
-            </span>
+            <span>{t('pages:settings.plex.serversConnected', { count: account.serverCount })}</span>
           </div>
         </div>
       </div>
@@ -322,8 +323,8 @@ function PlexAccountCard({ account, onUnlink }: { account: PlexAccount; onUnlink
         disabled={!canUnlink}
         title={
           canUnlink
-            ? 'Unlink this Plex account'
-            : 'Delete connected servers first to unlink this account'
+            ? t('pages:settings.plex.unlinkAccount')
+            : t('pages:settings.plex.deleteServersFirst')
         }
       >
         <Unlink className="h-4 w-4" />
@@ -351,12 +352,13 @@ function ManageDialog({
   onLink: () => void;
   onUnlink: (id: string) => void;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Linked Plex Accounts</DialogTitle>
-          <DialogDescription>Manage the Plex accounts you can add servers from.</DialogDescription>
+          <DialogTitle>{t('pages:settings.plex.linkedAccounts')}</DialogTitle>
+          <DialogDescription>{t('pages:settings.plex.linkedAccountsDesc')}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[400px] space-y-3 overflow-y-auto py-4">
           {isLoading ? (
@@ -367,7 +369,9 @@ function ManageDialog({
           ) : accounts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center">
               <Link2 className="text-muted-foreground h-8 w-8" />
-              <p className="text-muted-foreground text-sm">No Plex accounts linked yet.</p>
+              <p className="text-muted-foreground text-sm">
+                {t('pages:settings.plex.noAccountsYet')}
+              </p>
             </div>
           ) : (
             accounts.map((account) => (
@@ -387,18 +391,18 @@ function ManageDialog({
         )}
         <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t('common:actions.close')}
           </Button>
           <Button onClick={onLink} disabled={isLinking}>
             {isLinking ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Linking...
+                {t('pages:settings.plex.linking')}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                Link Plex Account
+                {t('pages:settings.plex.linkPlexAccount')}
               </>
             )}
           </Button>

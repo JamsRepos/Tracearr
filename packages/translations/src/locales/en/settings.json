@@ -5,7 +5,9 @@
     "notifications": "Notifications",
     "mobile": "Mobile App",
     "import": "Import",
-    "advanced": "Advanced"
+    "advanced": "Advanced",
+    "jobs": "Jobs",
+    "accessControl": "Access Control"
   },
   "general": {
     "title": "General Settings",
@@ -61,7 +63,13 @@
     "tautulli": "Import from Tautulli",
     "importProgress": "Import Progress",
     "importComplete": "Import Complete",
-    "importFailed": "Import Failed"
+    "importFailed": "Import Failed",
+    "processed": "Processed",
+    "page": "Page",
+    "imported": "Imported",
+    "skipped": "Skipped",
+    "enriched": "Enriched",
+    "errors": "Errors"
   },
   "plex": {
     "linkedAccounts": "Linked Plex Accounts",
@@ -87,5 +95,19 @@
     "useLocalAccount": "Use local account instead",
     "useJellyfinAccount": "Use Jellyfin account instead",
     "waitingForPlex": "Waiting for Plex authorization..."
+  },
+  "update": {
+    "title": "Update Available",
+    "releaseNotes": "Release Notes",
+    "updateCommand": "Update Command",
+    "pullInstructions": "After pulling, restart your container to apply the update.",
+    "stableRelease": "Stable Release",
+    "betaUpdate": "Beta Update",
+    "newVersion": "New Version",
+    "versionAvailable": "{{version}} available"
+  },
+  "serverHealth": {
+    "unreachable": "{{serverName}} is unreachable",
+    "multipleUnreachable": "{{count}} servers unreachable: {{serverNames}}"
   }
 }

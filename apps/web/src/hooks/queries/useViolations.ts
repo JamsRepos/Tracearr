@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type {
   ViolationWithDetails,
   PaginatedResponse,
@@ -28,6 +29,7 @@ export function useViolations(params: ViolationsParams = {}) {
 }
 
 export function useAcknowledgeViolation() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -61,19 +63,20 @@ export function useAcknowledgeViolation() {
           queryClient.setQueryData(queryKey, data);
         }
       }
-      toast.error('Failed to Acknowledge', { description: err.message });
+      toast.error(t('toast.error.acknowledgeFailed'), { description: err.message });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['violations'] });
       void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
-      toast.success('Violation Acknowledged', {
-        description: 'The violation has been marked as acknowledged.',
+      toast.success(t('toast.success.violationAcknowledged.title'), {
+        description: t('toast.success.violationAcknowledged.message'),
       });
     },
   });
 }
 
 export function useDismissViolation() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -81,10 +84,12 @@ export function useDismissViolation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['violations'] });
       void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
-      toast.success('Violation Dismissed', { description: 'The violation has been dismissed.' });
+      toast.success(t('toast.success.violationDismissed.title'), {
+        description: t('toast.success.violationDismissed.message'),
+      });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Dismiss', { description: error.message });
+      toast.error(t('toast.error.dismissFailed'), { description: error.message });
     },
   });
 }
@@ -100,6 +105,7 @@ export interface BulkViolationParams {
 }
 
 export function useBulkAcknowledgeViolations() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -107,17 +113,20 @@ export function useBulkAcknowledgeViolations() {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['violations'] });
       void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
-      toast.success('Violations Acknowledged', {
-        description: `${data.acknowledged} violation${data.acknowledged !== 1 ? 's' : ''} acknowledged.`,
+      toast.success(t('toast.success.violationsAcknowledged.title'), {
+        description: t('toast.success.violationsAcknowledged.message', {
+          count: data.acknowledged,
+        }),
       });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Acknowledge', { description: error.message });
+      toast.error(t('toast.error.acknowledgeFailed'), { description: error.message });
     },
   });
 }
 
 export function useBulkDismissViolations() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -125,12 +134,12 @@ export function useBulkDismissViolations() {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['violations'] });
       void queryClient.invalidateQueries({ queryKey: ['stats', 'dashboard'] });
-      toast.success('Violations Dismissed', {
-        description: `${data.dismissed} violation${data.dismissed !== 1 ? 's' : ''} dismissed.`,
+      toast.success(t('toast.success.violationsDismissed.title'), {
+        description: t('toast.success.violationsDismissed.message', { count: data.dismissed }),
       });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Dismiss', { description: error.message });
+      toast.error(t('toast.error.dismissFailed'), { description: error.message });
     },
   });
 }

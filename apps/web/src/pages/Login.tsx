@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { Loader2, ExternalLink, User, KeyRound } from 'lucide-react';
 import { MediaServerIcon } from '@/components/icons/MediaServerIcon';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ type AuthStep = 'initial' | 'plex-waiting' | 'server-select';
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation(['pages', 'common', 'settings', 'notifications']);
   const { isAuthenticated, isLoading: authLoading, refetch } = useAuth();
 
   // Setup status - default to false (Sign In mode) since most users are returning
@@ -125,13 +127,15 @@ export function Login() {
         // User authenticated (returning or no servers)
         tokenStorage.setTokens(result.accessToken, result.refreshToken);
         void refetch();
-        toast.success('Success', { description: 'Logged in successfully!' });
+        toast.success(t('notifications:toast.success.loggedIn.title'), {
+          description: t('notifications:toast.success.loggedIn.message'),
+        });
         void navigate('/');
       }
     } catch (error) {
       resetPlexAuth();
-      toast.error('Authentication failed', {
-        description: error instanceof Error ? error.message : 'Plex authentication failed',
+      toast.error(t('notifications:toast.error.authFailed'), {
+        description: error instanceof Error ? error.message : t('pages:login.plexAuthFailed'),
       });
     }
   };
@@ -160,8 +164,8 @@ export function Login() {
     } catch (error) {
       closePlexPopup();
       setAuthStep('initial');
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to start Plex login',
+      toast.error(t('common:errors.generic'), {
+        description: error instanceof Error ? error.message : t('pages:login.plexStartFailed'),
       });
     }
   };
@@ -187,12 +191,14 @@ export function Login() {
       if (result.accessToken && result.refreshToken) {
         tokenStorage.setTokens(result.accessToken, result.refreshToken);
         await refetch();
-        toast.success('Success', { description: `Connected to ${serverName}` });
+        toast.success(t('notifications:toast.success.loggedIn.title'), {
+          description: t('pages:login.connectedTo', { name: serverName }),
+        });
         void navigate('/');
       }
     } catch (error) {
-      toast.error('Connection failed', {
-        description: error instanceof Error ? error.message : 'Failed to connect to server',
+      toast.error(t('common:errors.connectionFailed'), {
+        description: error instanceof Error ? error.message : t('pages:login.serverConnectFailed'),
       });
     } finally {
       setConnectingToServer(null);
@@ -228,12 +234,14 @@ export function Login() {
       if (result.accessToken && result.refreshToken) {
         tokenStorage.setTokens(result.accessToken, result.refreshToken);
         void refetch();
-        toast.success('Success', { description: 'Account created successfully!' });
+        toast.success(t('notifications:toast.success.loggedIn.title'), {
+          description: t('pages:login.accountCreated'),
+        });
         void navigate('/');
       }
     } catch (error) {
-      toast.error('Signup failed', {
-        description: error instanceof Error ? error.message : 'Failed to create account',
+      toast.error(t('pages:login.signupFailed'), {
+        description: error instanceof Error ? error.message : t('pages:login.createAccountFailed'),
       });
     } finally {
       setLocalLoading(false);
@@ -254,12 +262,14 @@ export function Login() {
       if (result.accessToken && result.refreshToken) {
         tokenStorage.setTokens(result.accessToken, result.refreshToken);
         void refetch();
-        toast.success('Success', { description: 'Logged in successfully!' });
+        toast.success(t('notifications:toast.success.loggedIn.title'), {
+          description: t('notifications:toast.success.loggedIn.message'),
+        });
         void navigate('/');
       }
     } catch (error) {
-      toast.error('Login failed', {
-        description: error instanceof Error ? error.message : 'Invalid email or password',
+      toast.error(t('pages:login.loginFailed'), {
+        description: error instanceof Error ? error.message : t('pages:login.invalidCredentials'),
       });
     } finally {
       setLocalLoading(false);
@@ -282,15 +292,15 @@ export function Login() {
         setJellyfinUsername('');
         setJellyfinPassword('');
         void refetch();
-        toast.success('Success', { description: 'Logged in successfully!' });
+        toast.success(t('notifications:toast.success.loggedIn.title'), {
+          description: t('notifications:toast.success.loggedIn.message'),
+        });
         void navigate('/');
       }
     } catch (error) {
-      toast.error('Login failed', {
+      toast.error(t('pages:login.loginFailed'), {
         description:
-          error instanceof Error
-            ? error.message
-            : 'Invalid username or password, or user is not an administrator',
+          error instanceof Error ? error.message : t('pages:login.jellyfinInvalidCredentials'),
       });
     } finally {
       setJellyfinLoading(false);
@@ -313,14 +323,14 @@ export function Login() {
       <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
         <div className="mb-8 flex flex-col items-center text-center">
           <LogoIcon className="mb-4 h-20 w-20" />
-          <h1 className="text-4xl font-bold tracking-tight">Tracearr</h1>
-          <p className="text-muted-foreground mt-2">Select your Plex server</p>
+          <h1 className="text-4xl font-bold tracking-tight">{t('pages:login.title')}</h1>
+          <p className="text-muted-foreground mt-2">{t('pages:login.selectPlexServer')}</p>
         </div>
 
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Select Server</CardTitle>
-            <CardDescription>Choose which Plex Media Server to monitor</CardDescription>
+            <CardTitle>{t('settings:plex.selectServer')}</CardTitle>
+            <CardDescription>{t('settings:plex.chooseServer')}</CardDescription>
           </CardHeader>
           <CardContent>
             <PlexServerSelector
@@ -340,19 +350,21 @@ export function Login() {
     <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
       <div className="mb-8 flex flex-col items-center text-center">
         <LogoIcon className="mb-4 h-20 w-20" />
-        <h1 className="text-4xl font-bold tracking-tight">Tracearr</h1>
+        <h1 className="text-4xl font-bold tracking-tight">{t('pages:login.title')}</h1>
         <p className="text-muted-foreground mt-2">
-          {needsSetup ? 'Create your account to get started' : 'Sign in to your account'}
+          {needsSetup ? t('pages:login.createAccountHeading') : t('pages:login.signInHeading')}
         </p>
       </div>
 
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{needsSetup ? 'Create Account' : 'Sign In'}</CardTitle>
+          <CardTitle>
+            {needsSetup ? t('settings:account.createAccount') : t('settings:account.signIn')}
+          </CardTitle>
           <CardDescription>
             {needsSetup
-              ? 'Create an account to manage your media servers'
-              : 'Sign in to access your dashboard'}
+              ? t('pages:login.createAccountDescription')
+              : t('pages:login.signInDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -361,9 +373,9 @@ export function Login() {
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 text-center">
                 <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#E5A00D]" />
-                <p className="text-sm font-medium">Waiting for Plex authorization...</p>
+                <p className="text-sm font-medium">{t('pages:login.waitingForPlex')}</p>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  Complete sign-in in the popup window
+                  {t('pages:login.completeInPopup')}
                 </p>
                 {plexAuthUrl && (
                   <Button
@@ -374,12 +386,12 @@ export function Login() {
                     className="mt-2 h-auto gap-1 p-0"
                   >
                     <ExternalLink className="h-3 w-3" />
-                    Reopen Plex Login
+                    {t('pages:login.reopenPlexLogin')}
                   </Button>
                 )}
               </div>
               <Button variant="ghost" className="w-full" onClick={resetPlexAuth}>
-                Cancel
+                {t('common:actions.cancel')}
               </Button>
             </div>
           ) : (
@@ -387,7 +399,7 @@ export function Login() {
               {/* Plex Login Button - Always Available */}
               <Button className={`w-full ${PLEX_COLOR} text-white`} onClick={handlePlexLogin}>
                 <MediaServerIcon type="plex" className="mr-2 h-4 w-4" />
-                {needsSetup ? 'Sign up with Plex' : 'Sign in with Plex'}
+                {needsSetup ? t('settings:plex.signUpWithPlex') : t('settings:plex.signInWithPlex')}
               </Button>
 
               {/* Divider between Plex and other auth methods */}
@@ -397,7 +409,7 @@ export function Login() {
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card text-muted-foreground px-2">or</span>
+                    <span className="bg-card text-muted-foreground px-2">{t('common:or')}</span>
                   </div>
                 </div>
               )}
@@ -413,11 +425,13 @@ export function Login() {
                     >
                       <form onSubmit={handleJellyfinLogin} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="jellyfin-username">Jellyfin Username</Label>
+                          <Label htmlFor="jellyfin-username">
+                            {t('settings:jellyfin.username')}
+                          </Label>
                           <Input
                             id="jellyfin-username"
                             type="text"
-                            placeholder="Your Jellyfin username"
+                            placeholder={t('pages:login.jellyfinUsernamePlaceholder')}
                             value={jellyfinUsername}
                             onChange={(e) => setJellyfinUsername(e.target.value)}
                             required
@@ -425,18 +439,20 @@ export function Login() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="jellyfin-password">Jellyfin Password</Label>
+                          <Label htmlFor="jellyfin-password">
+                            {t('settings:jellyfin.password')}
+                          </Label>
                           <Input
                             id="jellyfin-password"
                             type="password"
-                            placeholder="Your Jellyfin password"
+                            placeholder={t('pages:login.jellyfinPasswordPlaceholder')}
                             value={jellyfinPassword}
                             onChange={(e) => setJellyfinPassword(e.target.value)}
                             required
                             disabled={jellyfinLoading}
                           />
                           <p className="text-muted-foreground text-xs">
-                            Must be an administrator on a configured Jellyfin server
+                            {t('pages:login.jellyfinAdminNote')}
                           </p>
                         </div>
                         <Button type="submit" className="w-full" disabled={jellyfinLoading}>
@@ -445,7 +461,7 @@ export function Login() {
                           ) : (
                             <MediaServerIcon type="jellyfin" className="mr-2 h-4 w-4" />
                           )}
-                          Sign in with Jellyfin
+                          {t('settings:jellyfin.signInWithJellyfin')}
                         </Button>
                       </form>
 
@@ -457,7 +473,7 @@ export function Login() {
                           className="text-muted-foreground hover:text-foreground mt-4 w-full text-sm transition-colors"
                           onClick={() => setShowJellyfinForm(false)}
                         >
-                          Use local account instead
+                          {t('settings:account.useLocalAccount')}
                         </Button>
                       )}
                     </div>
@@ -472,22 +488,22 @@ export function Login() {
                       {needsSetup ? (
                         <form onSubmit={handleLocalSignup} className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">{t('settings:account.email')}</Label>
                             <Input
                               id="email"
                               type="email"
-                              placeholder="your@email.com"
+                              placeholder={t('pages:login.emailPlaceholder')}
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               required
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="username">Display Name</Label>
+                            <Label htmlFor="username">{t('settings:account.displayName')}</Label>
                             <Input
                               id="username"
                               type="text"
-                              placeholder="Choose a display name"
+                              placeholder={t('pages:login.displayNamePlaceholder')}
                               value={username}
                               onChange={(e) => setUsername(e.target.value)}
                               required
@@ -496,11 +512,11 @@ export function Login() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">{t('settings:account.password')}</Label>
                             <Input
                               id="password"
                               type="password"
-                              placeholder="At least 8 characters"
+                              placeholder={t('pages:login.passwordPlaceholder')}
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               required
@@ -513,28 +529,28 @@ export function Login() {
                             ) : (
                               <User className="mr-2 h-4 w-4" />
                             )}
-                            Create Account
+                            {t('settings:account.createAccount')}
                           </Button>
                         </form>
                       ) : (
                         <form onSubmit={handleLocalLogin} className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">{t('settings:account.email')}</Label>
                             <Input
                               id="email"
                               type="email"
-                              placeholder="your@email.com"
+                              placeholder={t('pages:login.emailPlaceholder')}
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               required
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">{t('settings:account.password')}</Label>
                             <Input
                               id="password"
                               type="password"
-                              placeholder="Your password"
+                              placeholder={t('pages:login.yourPasswordPlaceholder')}
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               required
@@ -546,7 +562,7 @@ export function Login() {
                             ) : (
                               <KeyRound className="mr-2 h-4 w-4" />
                             )}
-                            Sign In
+                            {t('settings:account.signIn')}
                           </Button>
                         </form>
                       )}
@@ -559,7 +575,7 @@ export function Login() {
                           className="text-muted-foreground hover:text-foreground mt-4 w-full text-sm transition-colors"
                           onClick={() => setShowJellyfinForm(true)}
                         >
-                          Use Jellyfin account instead
+                          {t('settings:account.useJellyfinAccount')}
                         </Button>
                       )}
                     </div>
@@ -572,15 +588,7 @@ export function Login() {
       </Card>
 
       <p className="text-muted-foreground mt-6 text-center text-xs">
-        {needsSetup ? (
-          <>
-            After creating your account, you'll add your
-            <br />
-            Plex or Jellyfin servers from Settings.
-          </>
-        ) : (
-          'Tracearr • Stream access management'
-        )}
+        {needsSetup ? t('pages:login.setupNote') : t('pages:login.tagline')}
       </p>
     </div>
   );

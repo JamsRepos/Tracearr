@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Monitor,
   Wifi,
@@ -109,6 +110,7 @@ export function PlexServerSelector({
   showCancel = true,
   className,
 }: PlexServerSelectorProps) {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   // Track which servers have expanded connection lists
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
   // Track servers showing all connections (bypassing filtering)
@@ -150,9 +152,8 @@ export function PlexServerSelector({
     }
 
     if (url.includes('plex.direct')) {
-      toast.error('Invalid URL', {
-        description:
-          'plex.direct URLs are relay addresses that cannot be used here. Please use a direct IP address or hostname instead.',
+      toast.error(t('toast.error.invalidUrl'), {
+        description: t('toast.error.plexDirectUrl'),
       });
       return;
     }
@@ -182,8 +183,8 @@ export function PlexServerSelector({
     return (
       <div className={cn('text-muted-foreground py-8 text-center', className)}>
         <Monitor className="mx-auto mb-3 h-12 w-12 opacity-50" />
-        <p>No Plex servers found</p>
-        <p className="mt-1 text-sm">Make sure you own at least one Plex server</p>
+        <p>{t('pages:settings.plex.noServersFound')}</p>
+        <p className="mt-1 text-sm">{t('pages:settings.plex.noServersFoundHint')}</p>
       </div>
     );
   }
@@ -231,17 +232,19 @@ export function PlexServerSelector({
                   {isConnecting ? (
                     <>
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      Connecting...
+                      {t('common:states.connecting')}
                     </>
                   ) : (
-                    'Connect'
+                    t('common:actions.connect')
                   )}
                 </Button>
               )}
 
               {/* No recommended - need to select manually */}
               {isDiscovered && !hasRecommended && (
-                <span className="text-muted-foreground text-xs">No reachable connections</span>
+                <span className="text-muted-foreground text-xs">
+                  {t('pages:settings.plex.noReachableConnections')}
+                </span>
               )}
             </div>
 
@@ -250,8 +253,10 @@ export function PlexServerSelector({
               <div className="mt-3 flex items-center gap-2 text-sm">
                 <Check className="h-4 w-4 text-green-500" />
                 <span className="text-muted-foreground">
-                  {recommendedConn.local ? 'Local' : 'Remote'}: {recommendedConn.address}:
-                  {recommendedConn.port}
+                  {recommendedConn.local
+                    ? t('pages:settings.plex.local')
+                    : t('pages:settings.plex.remote')}
+                  : {recommendedConn.address}:{recommendedConn.port}
                 </span>
                 {recommendedConn.latencyMs !== null && (
                   <span className="text-muted-foreground text-xs">
@@ -273,8 +278,21 @@ export function PlexServerSelector({
                 ) : (
                   <ChevronRight className="h-3 w-3" />
                 )}
-                {reachableCount} of {server.connections.length} connections
-                {isDiscovered ? ' reachable' : ' available'}
+                {reachableCount} / {server.connections.length}{' '}
+                {isDiscovered
+                  ? t('pages:settings.plex.connectionsReachable', {
+                      reachable: reachableCount,
+                      total: server.connections.length,
+                    })
+                      .split(' ')
+                      .slice(2)
+                      .join(' ')
+                  : t('pages:settings.plex.connectionsAvailable', {
+                      count: server.connections.length,
+                    })
+                      .split(' ')
+                      .slice(1)
+                      .join(' ')}
               </button>
 
               {/* Show all toggle (for discovered servers with filtered connections) */}
@@ -289,7 +307,9 @@ export function PlexServerSelector({
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  {showingAll ? 'Hide filtered' : 'Show all'}
+                  {showingAll
+                    ? t('pages:settings.plex.hideFiltered')
+                    : t('pages:settings.plex.showAll')}
                 </button>
               )}
 
@@ -312,7 +332,7 @@ export function PlexServerSelector({
                 )}
               >
                 <Edit3 className="h-3 w-3" />
-                Custom URL
+                {t('pages:settings.plex.customUrl')}
               </button>
             </div>
 
@@ -341,7 +361,7 @@ export function PlexServerSelector({
                   onClick={() => handleCustomUrlSubmit(server)}
                   disabled={connecting || !customUrl.trim()}
                 >
-                  Connect
+                  {t('common:actions.connect')}
                 </Button>
               </div>
             )}
@@ -387,14 +407,17 @@ export function PlexServerSelector({
 
                         {/* Connection details */}
                         <span className="truncate">
-                          {conn.local ? 'Local' : 'Remote'}: {conn.address}:{conn.port}
+                          {conn.local
+                            ? t('pages:settings.plex.local')
+                            : t('pages:settings.plex.remote')}
+                          : {conn.address}:{conn.port}
                         </span>
 
                         {/* Secure badge for HTTPS */}
                         {conn.uri.startsWith('https://') && (
                           <span className="inline-flex flex-shrink-0 items-center gap-0.5 text-xs font-medium text-green-600 dark:text-green-500">
                             <Lock className="h-3 w-3" />
-                            Secure
+                            {t('pages:settings.plex.secure')}
                           </span>
                         )}
 
@@ -402,14 +425,14 @@ export function PlexServerSelector({
                         {!isReachable && showingAll && (
                           <span className="inline-flex flex-shrink-0 items-center gap-0.5 text-xs font-medium text-amber-600 dark:text-amber-500">
                             <AlertTriangle className="h-3 w-3" />
-                            May not connect
+                            {t('pages:settings.plex.mayNotConnect')}
                           </span>
                         )}
 
                         {/* Recommended badge */}
                         {isRecommended && (
                           <span className="text-primary flex-shrink-0 text-xs font-medium">
-                            Recommended
+                            {t('pages:settings.plex.recommended')}
                           </span>
                         )}
                       </div>
@@ -445,12 +468,15 @@ export function PlexServerSelector({
                         <Globe className="h-3 w-3 text-blue-500" />
                       )}
                       <span className="text-xs">
-                        {conn.local ? 'Local' : 'Remote'}: {conn.address}:{conn.port}
+                        {conn.local
+                          ? t('pages:settings.plex.local')
+                          : t('pages:settings.plex.remote')}
+                        : {conn.address}:{conn.port}
                       </span>
                       {conn.uri.startsWith('https://') && (
                         <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-600 dark:text-green-500">
                           <Lock className="h-3 w-3" />
-                          Secure
+                          {t('pages:settings.plex.secure')}
                         </span>
                       )}
                     </div>
@@ -463,7 +489,9 @@ export function PlexServerSelector({
                     onClick={() => toggleExpanded(clientId)}
                     className="text-muted-foreground hover:text-foreground w-full py-1 text-xs"
                   >
-                    +{server.connections.length - 2} more connections
+                    {t('pages:settings.plex.moreConnections', {
+                      count: server.connections.length - 2,
+                    })}
                   </button>
                 )}
               </div>
@@ -476,14 +504,14 @@ export function PlexServerSelector({
       {connectingToServer && (
         <div className="text-muted-foreground flex items-center justify-center gap-2 py-3 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to {connectingToServer}...
+          {t('pages:settings.plex.connectingTo', { name: connectingToServer })}
         </div>
       )}
 
       {/* Cancel button */}
       {showCancel && onCancel && (
         <Button variant="ghost" className="w-full" onClick={onCancel} disabled={connecting}>
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
       )}
     </div>

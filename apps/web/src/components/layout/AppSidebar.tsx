@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, ArrowUpCircle } from 'lucide-react';
 import {
   Sidebar,
@@ -27,6 +28,7 @@ import { useVersion } from '@/hooks/queries';
 
 function NavMenuItem({ item }: { item: NavItem }) {
   const { setOpenMobile } = useSidebar();
+  const { t } = useTranslation('nav');
 
   return (
     <SidebarMenuItem>
@@ -40,7 +42,7 @@ function NavMenuItem({ item }: { item: NavItem }) {
           }
         >
           <item.icon className="size-4" />
-          <span>{item.name}</span>
+          <span>{t(item.nameKey)}</span>
         </NavLink>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -50,6 +52,7 @@ function NavMenuItem({ item }: { item: NavItem }) {
 function NavMenuGroup({ group }: { group: NavGroup }) {
   const location = useLocation();
   const { setOpenMobile } = useSidebar();
+  const { t } = useTranslation('nav');
   const isActive = group.children.some((child) => location.pathname.startsWith(child.href));
 
   return (
@@ -58,7 +61,7 @@ function NavMenuGroup({ group }: { group: NavGroup }) {
         <CollapsibleTrigger asChild>
           <SidebarMenuButton className={cn(isActive && 'font-medium')}>
             <group.icon className="size-4" />
-            <span>{group.name}</span>
+            <span>{t(group.nameKey)}</span>
             <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
@@ -75,7 +78,7 @@ function NavMenuGroup({ group }: { group: NavGroup }) {
                     }
                   >
                     <child.icon className="size-4" />
-                    <span>{child.name}</span>
+                    <span>{t(child.nameKey)}</span>
                   </NavLink>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
@@ -89,24 +92,24 @@ function NavMenuGroup({ group }: { group: NavGroup }) {
 
 function VersionDisplay() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { t } = useTranslation(['common', 'settings']);
   const { data: version, isLoading } = useVersion();
 
   if (isLoading || !version) {
-    return <div className="text-muted-foreground text-xs">Loading...</div>;
+    return <div className="text-muted-foreground text-xs">{t('common:states.loading')}</div>;
   }
 
   const displayVersion = version.current.tag ?? `v${version.current.version}`;
 
-  // Determine the update type label for the badge
   const getUpdateLabel = () => {
-    if (!version.latest) return 'Update';
+    if (!version.latest) return t('settings:update.title');
     if (version.current.isPrerelease && !version.latest.isPrerelease) {
-      return 'Stable';
+      return t('settings:update.stableRelease');
     }
     if (version.current.isPrerelease && version.latest.isPrerelease) {
-      return 'Beta';
+      return t('settings:update.betaUpdate');
     }
-    return 'Update';
+    return t('settings:update.title');
   };
 
   return (
@@ -116,7 +119,7 @@ function VersionDisplay() {
           <span className="text-muted-foreground text-xs">
             {displayVersion}
             {version.current.isPrerelease && (
-              <span className="text-muted-foreground/60 ml-1">(beta)</span>
+              <span className="text-muted-foreground/60 ml-1">({t('common:beta')})</span>
             )}
           </span>
           {version.updateAvailable && version.latest && (
@@ -135,9 +138,7 @@ function VersionDisplay() {
             onClick={() => setDialogOpen(true)}
             className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-left text-[10px] transition-colors"
           >
-            <span>
-              {version.latest.isPrerelease ? 'Beta' : 'Stable'} {version.latest.tag} available
-            </span>
+            <span>{t('settings:update.versionAvailable', { version: version.latest.tag })}</span>
           </button>
         )}
       </div>
@@ -164,7 +165,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navigation.map((entry) => {
                 if (isNavGroup(entry)) {
-                  return <NavMenuGroup key={entry.name} group={entry} />;
+                  return <NavMenuGroup key={entry.nameKey} group={entry} />;
                 }
                 return <NavMenuItem key={entry.href} item={entry} />;
               })}

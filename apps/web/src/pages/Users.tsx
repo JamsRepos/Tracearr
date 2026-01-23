@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
@@ -17,73 +18,9 @@ import { useUsers, useBulkResetTrust } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
 import { useRowSelection } from '@/hooks/useRowSelection';
 
-const userColumns: ColumnDef<ServerUserWithIdentity>[] = [
-  {
-    accessorKey: 'username',
-    header: 'User',
-    cell: ({ row }) => {
-      const user = row.original;
-      const avatarUrl = getAvatarUrl(user.serverId, user.thumbUrl, 40);
-      return (
-        <div className="flex items-center gap-3">
-          <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={user.username}
-                className="h-10 w-10 rounded-full object-cover"
-              />
-            ) : (
-              <UserIcon className="text-muted-foreground h-5 w-5" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{user.identityName ?? user.username}</span>
-              {user.role === 'owner' && (
-                <span title="Server Owner">
-                  <Crown className="h-4 w-4 text-yellow-500" />
-                </span>
-              )}
-            </div>
-            <p className="text-muted-foreground text-xs">@{user.username}</p>
-          </div>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'trustScore',
-    header: 'Trust Score',
-    cell: ({ row }) => <TrustScoreBadge score={row.original.trustScore} showLabel />,
-  },
-  {
-    accessorKey: 'joinedAt',
-    header: 'Joined',
-    cell: ({ row }) => (
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Clock className="h-4 w-4" />
-        {row.original.joinedAt
-          ? formatDistanceToNow(new Date(row.original.joinedAt), { addSuffix: true })
-          : 'Unknown'}
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'lastActivityAt',
-    header: 'Last Activity',
-    cell: ({ row }) => (
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Clock className="h-4 w-4" />
-        {row.original.lastActivityAt
-          ? formatDistanceToNow(new Date(row.original.lastActivityAt), { addSuffix: true })
-          : 'Never'}
-      </div>
-    ),
-  },
-];
-
 export function Users() {
+  const { t } = useTranslation(['pages', 'common']);
+  // Using common namespace for shared labels
   const navigate = useNavigate();
   const [searchFilter, setSearchFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -97,6 +34,76 @@ export function Users() {
   const users = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+
+  // Define columns with translations
+  const userColumns: ColumnDef<ServerUserWithIdentity>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'username',
+        header: t('common:labels.user'),
+        cell: ({ row }) => {
+          const user = row.original;
+          const avatarUrl = getAvatarUrl(user.serverId, user.thumbUrl, 40);
+          return (
+            <div className="flex items-center gap-3">
+              <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={user.username}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <UserIcon className="text-muted-foreground h-5 w-5" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{user.identityName ?? user.username}</span>
+                  {user.role === 'owner' && (
+                    <span title={t('common:labels.serverOwner')}>
+                      <Crown className="h-4 w-4 text-yellow-500" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">@{user.username}</p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'trustScore',
+        header: t('common:labels.trustScore'),
+        cell: ({ row }) => <TrustScoreBadge score={row.original.trustScore} showLabel />,
+      },
+      {
+        accessorKey: 'joinedAt',
+        header: t('common:labels.joined'),
+        cell: ({ row }) => (
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4" />
+            {row.original.joinedAt
+              ? formatDistanceToNow(new Date(row.original.joinedAt), { addSuffix: true })
+              : t('common:labels.unknown')}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'lastActivityAt',
+        header: t('common:labels.lastActivity'),
+        cell: ({ row }) => (
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4" />
+            {row.original.lastActivityAt
+              ? formatDistanceToNow(new Date(row.original.lastActivityAt), { addSuffix: true })
+              : t('common:labels.never')}
+          </div>
+        ),
+      },
+    ],
+    [t]
+  );
 
   // Row selection
   const {
@@ -128,7 +135,7 @@ export function Users() {
   const bulkActions: BulkAction[] = [
     {
       key: 'reset-trust',
-      label: 'Reset Trust Score',
+      label: t('pages:users.resetTrustScore'),
       icon: <RotateCcw className="h-4 w-4" />,
       variant: 'default',
       onClick: () => setResetTrustConfirmOpen(true),
@@ -139,29 +146,29 @@ export function Users() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Users</h1>
+        <h1 className="text-3xl font-bold">{t('pages:users.title')}</h1>
         <div className="flex items-center gap-4">
           <div className="relative w-64">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
-              placeholder="Search users..."
+              placeholder={t('pages:users.searchPlaceholder')}
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               className="pl-9"
             />
           </div>
           <p className="text-muted-foreground text-sm">
-            {total} user{total !== 1 ? 's' : ''}
+            {t('common:count.user', { count: total })}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>All Users</CardTitle>
+          <CardTitle>{t('pages:users.allUsers')}</CardTitle>
           {selectedCount > 0 && !selectAllMode && total > selectedCount && (
             <Button variant="link" size="sm" onClick={selectAll} className="text-sm">
-              Select all {total} users
+              {t('pages:users.selectAllUsers', { count: total })}
             </Button>
           )}
         </CardHeader>
@@ -191,7 +198,7 @@ export function Users() {
               onRowClick={(user) => {
                 void navigate(`/users/${user.id}`);
               }}
-              emptyMessage="No users found."
+              emptyMessage={t('pages:users.noUsersFound')}
               selectable
               getRowId={(row) => row.id}
               selectedIds={selectedIds}
@@ -218,9 +225,9 @@ export function Users() {
       <ConfirmDialog
         open={resetTrustConfirmOpen}
         onOpenChange={setResetTrustConfirmOpen}
-        title={`Reset Trust Score for ${selectedCount} User${selectedCount !== 1 ? 's' : ''}`}
-        description={`Are you sure you want to reset the trust score to 100 for ${selectedCount} user${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
-        confirmLabel="Reset Trust Score"
+        title={t('pages:users.resetTrustScoreTitle', { count: selectedCount })}
+        description={t('pages:users.resetTrustScoreConfirm', { count: selectedCount })}
+        confirmLabel={t('pages:users.resetTrustScore')}
         onConfirm={handleBulkResetTrust}
         isLoading={bulkResetTrust.isPending}
       />

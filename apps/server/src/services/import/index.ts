@@ -10,6 +10,7 @@ export {
   type ExistingSession,
   type DeduplicationResult,
   type DeduplicationConfig,
+  type TimeBounds,
   queryExistingByExternalIds,
   queryExistingByTimeKeys,
   createTimeKey,

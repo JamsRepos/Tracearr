@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useInView } from 'react-intersection-observer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trash2 } from 'lucide-react';
@@ -174,6 +175,7 @@ function filtersToUrlParams(filters: HistoryFilters): URLSearchParams {
 }
 
 export function History() {
+  const { t } = useTranslation(['pages', 'common']);
   const [searchParams, setSearchParams] = useSearchParams();
   const { selectedServerId } = useServer();
   const [selectedSession, setSelectedSession] = useState<SessionWithDetails | null>(null);
@@ -255,7 +257,7 @@ export function History() {
   const bulkActions: BulkAction[] = [
     {
       key: 'delete',
-      label: 'Delete',
+      label: t('common:actions.delete'),
       icon: <Trash2 className="h-4 w-4" />,
       variant: 'destructive',
       onClick: () => setBulkDeleteConfirmOpen(true),
@@ -307,10 +309,8 @@ export function History() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold">History</h1>
-        <p className="text-muted-foreground">
-          Browse all streaming sessions with powerful filtering
-        </p>
+        <h1 className="text-3xl font-bold">{t('pages:history.title')}</h1>
+        <p className="text-muted-foreground">{t('pages:history.description')}</p>
       </div>
 
       {/* Aggregates Summary */}
@@ -356,14 +356,16 @@ export function History() {
               ref={loadMoreRef}
               className="text-muted-foreground flex justify-center py-4 text-sm"
             >
-              {isFetchingNextPage ? 'Loading more...' : 'Scroll for more'}
+              {isFetchingNextPage
+                ? t('pages:history.loadingMore')
+                : t('pages:history.scrollForMore')}
             </div>
           )}
 
           {/* End of results indicator */}
           {!hasNextPage && sessions.length > 0 && (
             <div className="text-muted-foreground flex justify-center py-4 text-sm">
-              Showing all {total?.toLocaleString()} results
+              {t('pages:history.showingAllResults', { total: total?.toLocaleString() })}
             </div>
           )}
         </CardContent>
@@ -387,9 +389,9 @@ export function History() {
       <ConfirmDialog
         open={bulkDeleteConfirmOpen}
         onOpenChange={setBulkDeleteConfirmOpen}
-        title={`Delete ${selectedCount} Sessions`}
-        description={`Are you sure you want to delete ${selectedCount} session${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('pages:history.deleteSession', { count: selectedCount })}
+        description={t('pages:history.deleteSessionsConfirm')}
+        confirmLabel={t('common:actions.delete')}
         onConfirm={handleBulkDelete}
         isLoading={bulkDeleteSessions.isPending}
       />

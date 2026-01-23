@@ -1,4 +1,5 @@
 {
+  "_TODO": "New keys added - translate: overview, quality, storage, watch, performance, devices, bandwidth, jobs, accessControl",
   "dashboard": "Dashboard",
   "map": "Karte",
   "history": "Verlauf",
@@ -9,5 +10,14 @@
   "rules": "Regeln",
   "violations": "Verstöße",
   "alerts": "Warnungen",
-  "settings": "Einstellungen"
+  "settings": "Einstellungen",
+  "overview": "Overview",
+  "quality": "Quality",
+  "storage": "Storage",
+  "watch": "Watch",
+  "performance": "Performance",
+  "devices": "Devices",
+  "bandwidth": "Bandwidth",
+  "jobs": "Jobs",
+  "accessControl": "Access Control"
 }

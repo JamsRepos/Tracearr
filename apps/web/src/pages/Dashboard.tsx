@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Play, Clock, AlertTriangle, Tv, MapPin, Calendar, Users, Activity } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
@@ -12,6 +13,7 @@ import { useServer } from '@/hooks/useServer';
 import type { ActiveSession } from '@tracearr/shared';
 
 export function Dashboard() {
+  const { t } = useTranslation(['pages', 'common']);
   const { selectedServerId, selectedServer } = useServer();
   const { data: stats, isLoading: statsLoading } = useDashboardStats(selectedServerId);
   const { data: sessions } = useActiveSessions(selectedServerId);
@@ -39,38 +41,38 @@ export function Dashboard() {
       <section>
         <div className="mb-4 flex items-center gap-2">
           <Calendar className="text-primary h-5 w-5" />
-          <h2 className="text-lg font-semibold">Today</h2>
+          <h2 className="text-lg font-semibold">{t('common:time.today')}</h2>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
             icon={AlertTriangle}
-            label="Alerts"
+            label={t('dashboard.alerts')}
             value={stats?.alertsLast24h ?? 0}
             isLoading={statsLoading}
             href="/violations"
           />
           <StatCard
             icon={Play}
-            label="Plays"
+            label={t('dashboard.plays')}
             value={stats?.todayPlays ?? 0}
             isLoading={statsLoading}
             href="/history"
             subValue={
               stats?.todaySessions && stats.todaySessions > stats.todayPlays
-                ? `${stats.todaySessions} sessions`
+                ? t('common:count.session', { count: stats.todaySessions })
                 : undefined
             }
           />
           <StatCard
             icon={Clock}
-            label="Watch Time"
+            label={t('dashboard.watchTime')}
             value={`${stats?.watchTimeHours ?? 0}h`}
             isLoading={statsLoading}
             href="/stats/activity"
           />
           <StatCard
             icon={Users}
-            label="Active Users"
+            label={t('dashboard.activeUsers')}
             value={stats?.activeUsersToday ?? 0}
             isLoading={statsLoading}
             href="/stats/users"
@@ -82,10 +84,10 @@ export function Dashboard() {
       <section>
         <div className="mb-4 flex items-center gap-2">
           <Tv className="text-primary h-5 w-5" />
-          <h2 className="text-lg font-semibold">Now Playing</h2>
+          <h2 className="text-lg font-semibold">{t('dashboard.nowPlaying')}</h2>
           {hasActiveStreams && (
             <span className="bg-muted text-foreground rounded-full px-2 py-0.5 text-xs font-medium">
-              {activeCount} {activeCount === 1 ? 'stream' : 'streams'}
+              {t('common:count.stream', { count: activeCount })}
             </span>
           )}
         </div>
@@ -96,9 +98,9 @@ export function Dashboard() {
               <div className="bg-muted rounded-full p-4">
                 <Tv className="text-muted-foreground h-8 w-8" />
               </div>
-              <h3 className="mt-4 font-semibold">No active streams</h3>
+              <h3 className="mt-4 font-semibold">{t('dashboard.noActiveStreams')}</h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Active streams will appear here when users start watching
+                {t('dashboard.streamsAppearHere')}
               </p>
             </CardContent>
           </Card>
@@ -123,7 +125,7 @@ export function Dashboard() {
         <section>
           <div className="mb-4 flex items-center gap-2">
             <MapPin className="text-primary h-5 w-5" />
-            <h2 className="text-lg font-semibold">Stream Locations</h2>
+            <h2 className="text-lg font-semibold">{t('dashboard.streamLocations')}</h2>
           </div>
           <Card className="overflow-hidden">
             <StreamCard sessions={sessions} height={320} />
@@ -136,7 +138,7 @@ export function Dashboard() {
         <section>
           <div className="mb-4 flex items-center gap-2">
             <Activity className="text-primary h-5 w-5" />
-            <h2 className="text-lg font-semibold">Server Resources</h2>
+            <h2 className="text-lg font-semibold">{t('dashboard.serverResources')}</h2>
           </div>
           <ServerResourceCharts
             data={serverStats?.data}

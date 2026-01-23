@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { TrustScoreBadge } from '@/components/users/TrustScoreBadge';
@@ -53,209 +54,11 @@ function formatDuration(ms: number | null): string {
   return `${seconds}s`;
 }
 
-const sessionColumns: ColumnDef<Session>[] = [
-  {
-    accessorKey: 'mediaTitle',
-    header: 'Media',
-    cell: ({ row }) => {
-      const { title, subtitle } = getMediaDisplay(row.original);
-      return (
-        <div className="max-w-[200px]">
-          <p className="truncate font-medium">{title}</p>
-          {subtitle ? (
-            <p className="text-muted-foreground text-xs">{subtitle}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'state',
-    header: 'Status',
-    cell: ({ row }) => <ActiveSessionBadge state={row.original.state} />,
-  },
-  {
-    accessorKey: 'durationMs',
-    header: 'Duration',
-    cell: ({ row }) => <span className="text-sm">{formatDuration(row.original.durationMs)}</span>,
-  },
-  {
-    accessorKey: 'platform',
-    header: 'Platform',
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2 text-sm">
-        <Tv className="text-muted-foreground h-4 w-4" />
-        <span>{row.original.platform ?? 'Unknown'}</span>
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'ipAddress',
-    header: 'IP Address',
-    cell: ({ row }) => <span className="text-sm">{row.original.ipAddress ?? 'Unknown'}</span>,
-  },
-  {
-    accessorKey: 'geoCity',
-    header: 'Location',
-    cell: ({ row }) => {
-      const session = row.original;
-      if (!session.geoCity && !session.geoCountry) {
-        return <span className="text-muted-foreground">—</span>;
-      }
-      return (
-        <div className="flex items-center gap-2 text-sm">
-          <Globe className="text-muted-foreground h-4 w-4" />
-          <span>
-            {session.geoCity && `${session.geoCity}, `}
-            {getCountryName(session.geoCountry) ?? ''}
-          </span>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'startedAt',
-    header: 'Started',
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2 text-sm">
-        <Clock className="text-muted-foreground h-4 w-4" />
-        <span>{formatDistanceToNow(new Date(row.original.startedAt), { addSuffix: true })}</span>
-      </div>
-    ),
-  },
-];
-
 // Union type for violations - aggregate returns ViolationSummary, paginated returns ViolationWithDetails
 type ViolationRow = ViolationSummary | ViolationWithDetails;
 
-const violationColumns: ColumnDef<ViolationRow>[] = [
-  {
-    accessorKey: 'rule.name',
-    header: 'Rule',
-    cell: ({ row }) => (
-      <div>
-        <p className="font-medium">{row.original.rule.name}</p>
-        <p className="text-muted-foreground text-xs capitalize">
-          {row.original.rule.type.replace(/_/g, ' ')}
-        </p>
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'severity',
-    header: 'Severity',
-    cell: ({ row }) => (
-      <SeverityBadge severity={row.original.severity as 'low' | 'warning' | 'high'} />
-    ),
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'When',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-sm">
-        {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'acknowledgedAt',
-    header: 'Status',
-    cell: ({ row }) => (
-      <span
-        className={
-          row.original.acknowledgedAt ? 'text-muted-foreground' : 'font-medium text-yellow-500'
-        }
-      >
-        {row.original.acknowledgedAt ? 'Acknowledged' : 'Pending'}
-      </span>
-    ),
-  },
-];
-
-const terminationColumns: ColumnDef<TerminationLogWithDetails>[] = [
-  {
-    accessorKey: 'trigger',
-    header: 'Type',
-    cell: ({ row }) => (
-      <Badge variant={row.original.trigger === 'manual' ? 'default' : 'secondary'}>
-        {row.original.trigger === 'manual' ? (
-          <>
-            <UserIcon className="mr-1 h-3 w-3" />
-            Manual
-          </>
-        ) : (
-          <>
-            <Bot className="mr-1 h-3 w-3" />
-            Rule
-          </>
-        )}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'mediaTitle',
-    header: 'Media',
-    cell: ({ row }) => {
-      const { title, subtitle } = getMediaDisplay(row.original);
-      return (
-        <div className="max-w-[200px]">
-          <p className="truncate font-medium">{title || '—'}</p>
-          {subtitle ? (
-            <p className="text-muted-foreground text-xs">{subtitle}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs capitalize">
-              {row.original.mediaType ?? 'unknown'}
-            </p>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'When',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-sm">
-        {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'triggeredByUsername',
-    header: 'By / Rule',
-    cell: ({ row }) => {
-      const log = row.original;
-      if (log.trigger === 'manual') {
-        return <span className="text-sm">@{log.triggeredByUsername ?? 'Unknown'}</span>;
-      }
-      return (
-        <span className="text-muted-foreground text-sm">{log.ruleName ?? 'Unknown rule'}</span>
-      );
-    },
-  },
-  {
-    accessorKey: 'reason',
-    header: 'Reason',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground block max-w-[150px] truncate text-sm">
-        {row.original.reason ?? '—'}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'success',
-    header: 'Status',
-    cell: ({ row }) => (
-      <span className={row.original.success ? 'text-green-500' : 'font-medium text-red-500'}>
-        {row.original.success ? 'Success' : 'Failed'}
-      </span>
-    ),
-  },
-];
-
 export function UserDetail() {
+  const { t } = useTranslation(['pages', 'common']);
   const { id } = useParams<{ id: string }>();
   const [sessionsPage, setSessionsPage] = useState(1);
   const [violationsPage, setViolationsPage] = useState(1);
@@ -265,6 +68,229 @@ export function UserDetail() {
   const { selectedServerId } = useServer();
   const { user: authUser } = useAuth();
   const isOwner = authUser?.role === 'owner';
+
+  // Column definitions with translations
+  const sessionColumns: ColumnDef<Session>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'mediaTitle',
+        header: t('common:labels.media'),
+        cell: ({ row }) => {
+          const { title, subtitle } = getMediaDisplay(row.original);
+          return (
+            <div className="max-w-[200px]">
+              <p className="truncate font-medium">{title}</p>
+              {subtitle ? (
+                <p className="text-muted-foreground text-xs">{subtitle}</p>
+              ) : (
+                <p className="text-muted-foreground text-xs capitalize">{row.original.mediaType}</p>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'state',
+        header: t('common:labels.status'),
+        cell: ({ row }) => <ActiveSessionBadge state={row.original.state} />,
+      },
+      {
+        accessorKey: 'durationMs',
+        header: t('common:labels.duration'),
+        cell: ({ row }) => (
+          <span className="text-sm">{formatDuration(row.original.durationMs)}</span>
+        ),
+      },
+      {
+        accessorKey: 'platform',
+        header: t('common:labels.platform'),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 text-sm">
+            <Tv className="text-muted-foreground h-4 w-4" />
+            <span>{row.original.platform ?? t('common:labels.unknown')}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'ipAddress',
+        header: t('common:labels.ipAddress'),
+        cell: ({ row }) => (
+          <span className="text-sm">{row.original.ipAddress ?? t('common:labels.unknown')}</span>
+        ),
+      },
+      {
+        accessorKey: 'geoCity',
+        header: t('common:labels.location'),
+        cell: ({ row }) => {
+          const session = row.original;
+          if (!session.geoCity && !session.geoCountry) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <div className="flex items-center gap-2 text-sm">
+              <Globe className="text-muted-foreground h-4 w-4" />
+              <span>
+                {session.geoCity && `${session.geoCity}, `}
+                {getCountryName(session.geoCountry) ?? ''}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'startedAt',
+        header: t('common:labels.started'),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 text-sm">
+            <Clock className="text-muted-foreground h-4 w-4" />
+            <span>
+              {formatDistanceToNow(new Date(row.original.startedAt), { addSuffix: true })}
+            </span>
+          </div>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const violationColumns: ColumnDef<ViolationRow>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'rule.name',
+        header: t('common:labels.rule'),
+        cell: ({ row }) => (
+          <div>
+            <p className="font-medium">{row.original.rule.name}</p>
+            <p className="text-muted-foreground text-xs capitalize">
+              {row.original.rule.type.replace(/_/g, ' ')}
+            </p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'severity',
+        header: t('common:labels.severity'),
+        cell: ({ row }) => (
+          <SeverityBadge severity={row.original.severity as 'low' | 'warning' | 'high'} />
+        ),
+      },
+      {
+        accessorKey: 'createdAt',
+        header: t('common:labels.when'),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-sm">
+            {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'acknowledgedAt',
+        header: t('common:labels.status'),
+        cell: ({ row }) => (
+          <span
+            className={
+              row.original.acknowledgedAt ? 'text-muted-foreground' : 'font-medium text-yellow-500'
+            }
+          >
+            {row.original.acknowledgedAt
+              ? t('common:states.acknowledged')
+              : t('common:states.pending')}
+          </span>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const terminationColumns: ColumnDef<TerminationLogWithDetails>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'trigger',
+        header: t('common:labels.type'),
+        cell: ({ row }) => (
+          <Badge variant={row.original.trigger === 'manual' ? 'default' : 'secondary'}>
+            {row.original.trigger === 'manual' ? (
+              <>
+                <UserIcon className="mr-1 h-3 w-3" />
+                {t('pages:userDetail.manual')}
+              </>
+            ) : (
+              <>
+                <Bot className="mr-1 h-3 w-3" />
+                {t('common:labels.rule')}
+              </>
+            )}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'mediaTitle',
+        header: t('common:labels.media'),
+        cell: ({ row }) => {
+          const { title, subtitle } = getMediaDisplay(row.original);
+          return (
+            <div className="max-w-[200px]">
+              <p className="truncate font-medium">{title || '—'}</p>
+              {subtitle ? (
+                <p className="text-muted-foreground text-xs">{subtitle}</p>
+              ) : (
+                <p className="text-muted-foreground text-xs capitalize">
+                  {row.original.mediaType ?? t('common:labels.unknown').toLowerCase()}
+                </p>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'createdAt',
+        header: t('common:labels.when'),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-sm">
+            {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'triggeredByUsername',
+        header: t('pages:userDetail.byRule'),
+        cell: ({ row }) => {
+          const log = row.original;
+          if (log.trigger === 'manual') {
+            return (
+              <span className="text-sm">
+                @{log.triggeredByUsername ?? t('common:labels.unknown')}
+              </span>
+            );
+          }
+          return (
+            <span className="text-muted-foreground text-sm">
+              {log.ruleName ?? t('pages:userDetail.unknownRule')}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'reason',
+        header: t('common:labels.reason'),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground block max-w-[150px] truncate text-sm">
+            {row.original.reason ?? '—'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'success',
+        header: t('common:labels.status'),
+        cell: ({ row }) => (
+          <span className={row.original.success ? 'text-green-500' : 'font-medium text-red-500'}>
+            {row.original.success ? t('common:states.success') : t('common:states.failed')}
+          </span>
+        ),
+      },
+    ],
+    [t]
+  );
 
   // Use the aggregate endpoint for initial load (1 request instead of 6)
   const { data: fullData, isLoading } = useUserFull(id!);
@@ -360,12 +386,12 @@ export function UserDetail() {
         <Link to="/users">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Users
+            {t('userDetail.backToUsers')}
           </Button>
         </Link>
         <Card>
           <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">User not found</p>
+            <p className="text-muted-foreground">{t('userDetail.userNotFound')}</p>
           </CardContent>
         </Card>
       </div>
@@ -378,7 +404,7 @@ export function UserDetail() {
         <Link to="/users">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            {t('common:actions.back')}
           </Button>
         </Link>
         <h1 className="text-3xl font-bold">{user.identityName ?? user.username}</h1>
@@ -388,7 +414,7 @@ export function UserDetail() {
         {/* User Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>User Info</CardTitle>
+            <CardTitle>{t('userDetail.userInfo')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-4">
@@ -421,7 +447,7 @@ export function UserDetail() {
                       </Button>
                     )}
                     {user.role === 'owner' && (
-                      <span title="Server Owner">
+                      <span title={t('common:labels.serverOwner')}>
                         <Crown className="h-5 w-5 text-yellow-500" />
                       </span>
                     )}
@@ -435,12 +461,14 @@ export function UserDetail() {
                 <div className="text-muted-foreground flex flex-col gap-2 text-right text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <span className="text-foreground font-medium">Joined</span>
+                    <span className="text-foreground font-medium">{t('common:labels.joined')}</span>
                     <span>{format(new Date(user.joinedAt ?? user.createdAt), 'MMM d, yyyy')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <span className="text-foreground font-medium">Last Activity</span>
+                    <span className="text-foreground font-medium">
+                      {t('common:labels.lastActivity')}
+                    </span>
                     <span>
                       {user.lastActivityAt
                         ? format(new Date(user.lastActivityAt), 'MMM d, yyyy')
@@ -456,27 +484,33 @@ export function UserDetail() {
         {/* Stats Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Statistics</CardTitle>
+            <CardTitle>{t('pages:userDetail.statistics')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2">
                   <Play className="text-muted-foreground h-4 w-4" />
-                  <span className="text-muted-foreground text-sm">Sessions</span>
+                  <span className="text-muted-foreground text-sm">
+                    {t('pages:userDetail.sessions')}
+                  </span>
                 </div>
                 <p className="mt-1 text-2xl font-bold">{user.stats.totalSessions}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="text-muted-foreground h-4 w-4" />
-                  <span className="text-muted-foreground text-sm">Violations</span>
+                  <span className="text-muted-foreground text-sm">
+                    {t('pages:userDetail.violations')}
+                  </span>
                 </div>
                 <p className="mt-1 text-2xl font-bold">{violationsTotal}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">Trust Score</span>
+                  <span className="text-muted-foreground text-sm">
+                    {t('common:labels.trustScore')}
+                  </span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="text-2xl font-bold">{user.trustScore}</span>
@@ -501,7 +535,7 @@ export function UserDetail() {
       {/* Recent Sessions */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Sessions</CardTitle>
+          <CardTitle>{t('common:labels.recentSessions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -513,7 +547,7 @@ export function UserDetail() {
             onPageChange={setSessionsPage}
             isLoading={sessionsLoading}
             isServerFiltered
-            emptyMessage="No sessions found for this user."
+            emptyMessage={t('userDetail.noSessionsFound')}
           />
         </CardContent>
       </Card>
@@ -521,7 +555,7 @@ export function UserDetail() {
       {/* Violations */}
       <Card>
         <CardHeader>
-          <CardTitle>Violations</CardTitle>
+          <CardTitle>{t('userDetail.violations')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -533,7 +567,7 @@ export function UserDetail() {
             onPageChange={setViolationsPage}
             isLoading={violationsLoading}
             isServerFiltered
-            emptyMessage="No violations for this user."
+            emptyMessage={t('userDetail.noViolationsFound')}
           />
         </CardContent>
       </Card>
@@ -543,7 +577,7 @@ export function UserDetail() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <XCircle className="h-5 w-5" />
-            Termination History
+            {t('userDetail.terminationHistory')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -556,7 +590,7 @@ export function UserDetail() {
             onPageChange={setTerminationsPage}
             isLoading={terminationsLoading}
             isServerFiltered
-            emptyMessage="No stream terminations for this user."
+            emptyMessage={t('userDetail.noTerminationsFound')}
           />
         </CardContent>
       </Card>

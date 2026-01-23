@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, type SortingState } from '@/components/ui/data-table';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ const columnToSortField: Record<string, ViolationSortField> = {
 };
 
 export function Violations() {
+  const { t } = useTranslation(['pages', 'common']);
   const [page, setPage] = useState(1);
   const [sorting, setSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }]);
   const [severityFilter, setSeverityFilter] = useState<ViolationSeverity | 'all'>('all');
@@ -187,7 +189,7 @@ export function Violations() {
   const bulkActions: BulkAction[] = [
     {
       key: 'acknowledge',
-      label: 'Acknowledge',
+      label: t('common:actions.acknowledge'),
       icon: <Check className="h-4 w-4" />,
       variant: 'default',
       onClick: handleBulkAcknowledge,
@@ -195,7 +197,7 @@ export function Violations() {
     },
     {
       key: 'dismiss',
-      label: 'Dismiss',
+      label: t('common:actions.dismiss'),
       icon: <Trash2 className="h-4 w-4" />,
       variant: 'destructive',
       onClick: () => setBulkDismissConfirmOpen(true),
@@ -203,136 +205,139 @@ export function Violations() {
     },
   ];
 
-  const violationColumns: ColumnDef<ViolationWithDetails>[] = [
-    {
-      accessorKey: 'user',
-      header: 'User',
-      cell: ({ row }) => {
-        const violation = row.original;
-        const avatarUrl = getAvatarUrl(violation.user.serverId, violation.user.thumbUrl, 40);
-        return (
-          <Link
-            to={`/users/${violation.user.id}`}
-            className="flex items-center gap-3 hover:underline"
+  const violationColumns: ColumnDef<ViolationWithDetails>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'user',
+        header: t('common:labels.user'),
+        cell: ({ row }) => {
+          const violation = row.original;
+          const avatarUrl = getAvatarUrl(violation.user.serverId, violation.user.thumbUrl, 40);
+          return (
+            <Link
+              to={`/users/${violation.user.id}`}
+              className="flex items-center gap-3 hover:underline"
+            >
+              <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={violation.user.username}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="text-muted-foreground h-5 w-5" />
+                )}
+              </div>
+              <span className="font-medium">
+                {violation.user.identityName ?? violation.user.username}
+              </span>
+            </Link>
+          );
+        },
+      },
+      {
+        accessorKey: 'rule',
+        header: t('common:labels.rule'),
+        cell: ({ row }) => {
+          const violation = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <div className="bg-muted flex h-8 w-8 items-center justify-center rounded">
+                {ruleIcons[violation.rule.type] ?? <AlertTriangle className="h-4 w-4" />}
+              </div>
+              <div>
+                <p className="font-medium">{violation.rule.name}</p>
+                <p className="text-muted-foreground text-xs capitalize">
+                  {violation.rule.type.replace(/_/g, ' ')}
+                </p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'severity',
+        header: t('common:labels.severity'),
+        cell: ({ row }) => <SeverityBadge severity={row.original.severity} />,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: t('common:labels.when'),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-sm">
+            {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: t('common:labels.status'),
+        cell: ({ row }) => (
+          <span
+            className={
+              row.original.acknowledgedAt ? 'text-muted-foreground' : 'font-medium text-yellow-500'
+            }
           >
-            <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={violation.user.username}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              ) : (
-                <User className="text-muted-foreground h-5 w-5" />
+            {row.original.acknowledgedAt
+              ? t('common:states.acknowledged')
+              : t('common:states.pending')}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => {
+          const violation = row.original;
+          return (
+            <div
+              className="flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              {!violation.acknowledgedAt && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAcknowledge(violation.id);
+                  }}
+                  disabled={acknowledgeViolation.isPending}
+                  className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
+                >
+                  <Check className="mr-1 h-4 w-4" />
+                  {t('common:actions.acknowledge')}
+                </Button>
               )}
-            </div>
-            <span className="font-medium">
-              {violation.user.identityName ?? violation.user.username}
-            </span>
-          </Link>
-        );
-      },
-    },
-    {
-      accessorKey: 'rule',
-      header: 'Rule',
-      cell: ({ row }) => {
-        const violation = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <div className="bg-muted flex h-8 w-8 items-center justify-center rounded">
-              {ruleIcons[violation.rule.type] ?? <AlertTriangle className="h-4 w-4" />}
-            </div>
-            <div>
-              <p className="font-medium">{violation.rule.name}</p>
-              <p className="text-muted-foreground text-xs capitalize">
-                {violation.rule.type.replace(/_/g, ' ')}
-              </p>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'severity',
-      header: 'Severity',
-      cell: ({ row }) => <SeverityBadge severity={row.original.severity} />,
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'When',
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {formatDistanceToNow(new Date(row.original.createdAt), { addSuffix: true })}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <span
-          className={
-            row.original.acknowledgedAt ? 'text-muted-foreground' : 'font-medium text-yellow-500'
-          }
-        >
-          {row.original.acknowledgedAt ? 'Acknowledged' : 'Pending'}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => {
-        const violation = row.original;
-        return (
-          <div
-            className="flex items-center gap-2"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            {!violation.acknowledgedAt && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleAcknowledge(violation.id);
+                  setDismissId(violation.id);
                 }}
-                disabled={acknowledgeViolation.isPending}
-                className="text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
+                className="text-destructive hover:text-destructive"
               >
-                <Check className="mr-1 h-4 w-4" />
-                Acknowledge
+                <X className="mr-1 h-4 w-4" />
+                {t('common:actions.dismiss')}
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDismissId(violation.id);
-              }}
-              className="text-destructive hover:text-destructive"
-            >
-              <X className="mr-1 h-4 w-4" />
-              Dismiss
-            </Button>
-          </div>
-        );
+            </div>
+          );
+        },
       },
-    },
-  ];
+    ],
+    [t, handleAcknowledge, acknowledgeViolation.isPending]
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Violations</h1>
-          <p className="text-muted-foreground">
-            {total} violation{total !== 1 ? 's' : ''} total
-          </p>
+          <h1 className="text-3xl font-bold">{t('violations.title')}</h1>
+          <p className="text-muted-foreground">{t('common:count.violation', { count: total })}</p>
         </div>
       </div>
 
@@ -341,13 +346,13 @@ export function Violations() {
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="h-4 w-4" />
-            Filters
+            {t('common:labels.filters')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="space-y-2">
-              <label className="text-muted-foreground text-sm">Severity</label>
+              <label className="text-muted-foreground text-sm">{t('common:labels.severity')}</label>
               <Select
                 value={severityFilter}
                 onValueChange={(value) => {
@@ -360,15 +365,15 @@ export function Violations() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Severities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="warning">Warning</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="all">{t('pages:violations.allSeverities')}</SelectItem>
+                  <SelectItem value="high">{t('common:severity.high')}</SelectItem>
+                  <SelectItem value="warning">{t('common:severity.warning')}</SelectItem>
+                  <SelectItem value="low">{t('common:severity.low')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-muted-foreground text-sm">Status</label>
+              <label className="text-muted-foreground text-sm">{t('common:labels.status')}</label>
               <Select
                 value={acknowledgedFilter}
                 onValueChange={(value) => {
@@ -381,9 +386,9 @@ export function Violations() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="acknowledged">Acknowledged</SelectItem>
+                  <SelectItem value="all">{t('pages:violations.allStatuses')}</SelectItem>
+                  <SelectItem value="pending">{t('common:states.pending')}</SelectItem>
+                  <SelectItem value="acknowledged">{t('common:states.acknowledged')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -394,10 +399,10 @@ export function Violations() {
       {/* Violations Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Violation Log</CardTitle>
+          <CardTitle>{t('violations.violationLog')}</CardTitle>
           {selectedCount > 0 && !selectAllMode && total > selectedCount && (
             <Button variant="link" size="sm" onClick={selectAll} className="text-sm">
-              Select all {total} violations matching filters
+              {t('violations.selectAllViolations', { count: total })}
             </Button>
           )}
         </CardHeader>
@@ -418,11 +423,11 @@ export function Violations() {
             <div className="flex h-64 flex-col items-center justify-center gap-4">
               <AlertTriangle className="text-muted-foreground h-12 w-12" />
               <div className="text-center">
-                <h3 className="font-semibold">No violations found</h3>
+                <h3 className="font-semibold">{t('violations.noViolationsFound')}</h3>
                 <p className="text-muted-foreground text-sm">
                   {severityFilter !== 'all' || acknowledgedFilter !== 'all'
-                    ? 'Try adjusting your filters.'
-                    : 'No violations have been recorded yet.'}
+                    ? t('violations.tryAdjustingFilters')
+                    : t('violations.noViolationsRecorded')}
                 </p>
               </div>
             </div>
@@ -440,7 +445,7 @@ export function Violations() {
               onRowClick={(violation) => {
                 setSelectedViolation(violation);
               }}
-              emptyMessage="No violations found."
+              emptyMessage={t('violations.noViolationsFound')}
               selectable
               getRowId={(row) => row.id}
               selectedIds={selectedIds}
@@ -487,11 +492,8 @@ export function Violations() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Dismiss Violation</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to dismiss this violation? This will remove it from the
-              violation log permanently.
-            </DialogDescription>
+            <DialogTitle>{t('pages:violations.dismissViolation')}</DialogTitle>
+            <DialogDescription>{t('pages:violations.dismissViolationConfirm')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -500,14 +502,16 @@ export function Violations() {
                 setDismissId(null);
               }}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={() => handleDismiss()}
               disabled={dismissViolation.isPending}
             >
-              {dismissViolation.isPending ? 'Dismissing...' : 'Dismiss'}
+              {dismissViolation.isPending
+                ? t('common:states.dismissing')
+                : t('common:actions.dismiss')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -517,16 +521,16 @@ export function Violations() {
       <Dialog open={bulkDismissConfirmOpen} onOpenChange={setBulkDismissConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Dismiss {selectAllMode ? total : selectedCount} Violations</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to dismiss {selectAllMode ? `all ${total}` : selectedCount}{' '}
-              violation{(selectAllMode ? total : selectedCount) !== 1 ? 's' : ''}? This will remove
-              them from the violation log permanently and restore associated trust scores.
-            </DialogDescription>
+            <DialogTitle>
+              {t('pages:violations.dismissViolation', {
+                count: selectAllMode ? total : selectedCount,
+              })}
+            </DialogTitle>
+            <DialogDescription>{t('pages:violations.dismissViolationsConfirm')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkDismissConfirmOpen(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -534,8 +538,10 @@ export function Violations() {
               disabled={bulkDismiss.isPending}
             >
               {bulkDismiss.isPending
-                ? 'Dismissing...'
-                : `Dismiss ${selectAllMode ? total : selectedCount} Violations`}
+                ? t('common:states.dismissing')
+                : t('pages:violations.dismissViolation', {
+                    count: selectAllMode ? total : selectedCount,
+                  })}
             </Button>
           </DialogFooter>
         </DialogContent>

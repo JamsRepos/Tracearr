@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import '@tracearr/shared';
 import { api } from '@/lib/api';
@@ -38,6 +39,7 @@ export function useSession(id: string) {
 }
 
 export function useBulkDeleteSessions() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -45,12 +47,12 @@ export function useBulkDeleteSessions() {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
       void queryClient.invalidateQueries({ queryKey: ['history'] });
-      toast.success('Sessions Deleted', {
-        description: `${data.deleted} session${data.deleted !== 1 ? 's' : ''} deleted.`,
+      toast.success(t('toast.success.sessionsDeleted.title'), {
+        description: t('toast.success.sessionsDeleted.message', { count: data.deleted }),
       });
     },
     onError: (error: Error) => {
-      toast.error('Failed to Delete Sessions', { description: error.message });
+      toast.error(t('toast.error.sessionsDeleteFailed'), { description: error.message });
     },
   });
 }

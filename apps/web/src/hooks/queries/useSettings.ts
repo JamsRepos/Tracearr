@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { Settings } from '@tracearr/shared';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -13,16 +14,19 @@ export function useApiKey() {
 }
 
 export function useRegenerateApiKey() {
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: api.settings.regenerateApiKey,
     onSuccess: (data) => {
       queryClient.setQueryData(['apiKey'], data);
-      toast.success('API Key Generated', { description: 'Your new API key is ready to use.' });
+      toast.success(t('toast.success.apiKeyGenerated.title'), {
+        description: t('toast.success.apiKeyGenerated.message'),
+      });
     },
     onError: (err) => {
-      toast.error('Failed to Generate API Key', { description: err.message });
+      toast.error(t('toast.error.apiKeyGenerateFailed'), { description: err.message });
     },
   });
 }
@@ -41,6 +45,7 @@ interface UpdateSettingsOptions {
 
 export function useUpdateSettings(options: UpdateSettingsOptions = {}) {
   const { silent = false } = options;
+  const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -65,13 +70,15 @@ export function useUpdateSettings(options: UpdateSettingsOptions = {}) {
         queryClient.setQueryData(['settings'], context.previousSettings);
       }
       if (!silent) {
-        toast.error('Failed to Update Settings', { description: err.message });
+        toast.error(t('toast.error.settingsUpdateFailed'), { description: err.message });
       }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['settings'] });
       if (!silent) {
-        toast.success('Settings Updated', { description: 'Your settings have been saved.' });
+        toast.success(t('toast.success.settingsUpdated.title'), {
+          description: t('toast.success.settingsUpdated.message'),
+        });
       }
     },
   });

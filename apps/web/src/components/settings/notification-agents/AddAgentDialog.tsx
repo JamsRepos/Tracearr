@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Settings } from '@tracearr/shared';
 import { Loader2, ChevronRight, Lock } from 'lucide-react';
 import {
@@ -91,6 +92,7 @@ export function AddAgentDialog({
   activeWebhookAgent,
   settings,
 }: AddAgentDialogProps) {
+  const { t } = useTranslation(['notifications', 'pages', 'common']);
   const updateSettings = useUpdateSettings({ silent: true });
   const [selectedType, setSelectedType] = useState<NotificationAgentType | null>(null);
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -216,12 +218,12 @@ export function AddAgentDialog({
 
     try {
       await updateSettings.mutateAsync(update);
-      toast.success(`${selectedConfig.name} Added`, {
-        description: 'Notification agent has been configured.',
+      toast.success(t('toast.success.agentAdded.title'), {
+        description: t('toast.success.agentAdded.message'),
       });
       onOpenChange(false);
     } catch {
-      toast.error('Failed to Add Agent');
+      toast.error(t('toast.error.agentAddFailed'));
     }
   };
 
@@ -229,8 +231,8 @@ export function AddAgentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Notification Agent</DialogTitle>
-          <DialogDescription>Choose a notification service and configure it.</DialogDescription>
+          <DialogTitle>{t('pages:settings.notifications.addAgent')}</DialogTitle>
+          <DialogDescription>{t('pages:settings.notifications.addAgentDesc')}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
@@ -250,17 +252,16 @@ export function AddAgentDialog({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                      Webhook Agents
+                      {t('pages:settings.notifications.webhookAgents')}
                     </span>
                     <div className="bg-border h-px flex-1" />
                   </div>
                   {activeWebhookAgent && (
                     <p className="text-muted-foreground text-xs">
-                      Only one webhook agent can be active at a time.{' '}
-                      <span className="text-foreground font-medium">
-                        {AGENT_CONFIGS[activeWebhookAgent].name}
-                      </span>{' '}
-                      is currently configured.
+                      {t('pages:settings.notifications.oneWebhookLimit')}{' '}
+                      {t('pages:settings.notifications.currentlyConfigured', {
+                        name: AGENT_CONFIGS[activeWebhookAgent].name,
+                      })}
                     </p>
                   )}
                   <div className="space-y-2">
@@ -278,7 +279,7 @@ export function AddAgentDialog({
               {/* Empty state */}
               {!discord && webhookAgents.length === 0 && (
                 <p className="text-muted-foreground py-4 text-center text-sm">
-                  All notification agents are already configured.
+                  {t('pages:settings.notifications.allAgentsConfigured')}
                 </p>
               )}
             </div>
@@ -294,7 +295,7 @@ export function AddAgentDialog({
                   onClick={() => setSelectedType(null)}
                   className="h-8"
                 >
-                  ← Back
+                  ← {t('common:actions.back')}
                 </Button>
                 <div className="flex items-center gap-2">
                   <div className="h-6 w-6 overflow-hidden rounded">
@@ -317,7 +318,7 @@ export function AddAgentDialog({
 
               {selectedConfig.fields.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  No configuration needed for this agent.
+                  {t('pages:settings.notifications.noConfigNeeded')}
                 </p>
               ) : (
                 selectedConfig.fields.map((field) => {
@@ -348,17 +349,17 @@ export function AddAgentDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           {selectedType && (
             <Button onClick={handleSave} disabled={!canSave() || updateSettings.isPending}>
               {updateSettings.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('common:states.saving')}
                 </>
               ) : (
-                'Add Agent'
+                t('pages:settings.notifications.saveAgent')
               )}
             </Button>
           )}

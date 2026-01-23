@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TimeRangePicker } from '@/components/ui/time-range-picker';
 import {
@@ -23,6 +24,7 @@ import { useServer } from '@/hooks/useServer';
 import { useTimeRange } from '@/hooks/useTimeRange';
 
 export function StatsActivity() {
+  const { t } = useTranslation('pages');
   const { value: timeRange, setValue: setTimeRange, apiParams } = useTimeRange();
   const { selectedServerId } = useServer();
 
@@ -46,10 +48,8 @@ export function StatsActivity() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Activity</h1>
-          <p className="text-muted-foreground text-sm">
-            Play trends, patterns, and streaming behavior
-          </p>
+          <h1 className="text-2xl font-bold">{t('activity.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('activity.description')}</p>
         </div>
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>
@@ -59,7 +59,7 @@ export function StatsActivity() {
         {/* Plays Over Time */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Plays Over Time</CardTitle>
+            <CardTitle className="text-base font-medium">{t('activity.playsOverTime')}</CardTitle>
           </CardHeader>
           <CardContent>
             <PlaysChart
@@ -74,7 +74,9 @@ export function StatsActivity() {
         {/* Concurrent Streams */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Concurrent Streams</CardTitle>
+            <CardTitle className="text-base font-medium">
+              {t('activity.concurrentStreams')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ConcurrentChart
@@ -89,8 +91,10 @@ export function StatsActivity() {
         {/* Engagement Breakdown */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Engagement Breakdown</CardTitle>
-            <CardDescription>How users engage with content</CardDescription>
+            <CardTitle className="text-base font-medium">
+              {t('activity.engagementBreakdown')}
+            </CardTitle>
+            <CardDescription>{t('activity.howUsersEngage')}</CardDescription>
           </CardHeader>
           <CardContent>
             <EngagementBreakdownChart
@@ -104,8 +108,8 @@ export function StatsActivity() {
         {/* Plays vs Sessions */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Plays vs Sessions</CardTitle>
-            <CardDescription>Validated plays vs raw session count</CardDescription>
+            <CardTitle className="text-base font-medium">{t('activity.playsVsSessions')}</CardTitle>
+            <CardDescription>{t('activity.playsVsSessionsDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <PlaysVsSessionsChart
@@ -120,7 +124,9 @@ export function StatsActivity() {
         {/* Day of Week */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Activity by Day of Week</CardTitle>
+            <CardTitle className="text-base font-medium">
+              {t('activity.activityByDayOfWeek')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <DayOfWeekChart data={dayOfWeek.data} isLoading={dayOfWeek.isLoading} height={250} />
@@ -130,7 +136,9 @@ export function StatsActivity() {
         {/* Hour of Day */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Activity by Hour of Day</CardTitle>
+            <CardTitle className="text-base font-medium">
+              {t('activity.activityByHourOfDay')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <HourOfDayChart data={hourOfDay.data} isLoading={hourOfDay.isLoading} height={250} />
@@ -140,7 +148,7 @@ export function StatsActivity() {
         {/* Platforms */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Platforms</CardTitle>
+            <CardTitle className="text-base font-medium">{t('activity.platforms')}</CardTitle>
           </CardHeader>
           <CardContent>
             <PlatformChart data={platformData} isLoading={platforms.isLoading} height={250} />
@@ -150,7 +158,7 @@ export function StatsActivity() {
         {/* Stream Quality */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Stream Quality</CardTitle>
+            <CardTitle className="text-base font-medium">{t('activity.streamQuality')}</CardTitle>
           </CardHeader>
           <CardContent>
             <QualityChart data={quality.data} isLoading={quality.isLoading} height={250} />

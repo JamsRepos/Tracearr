@@ -1,0 +1,60 @@
+{
+  "pair": {
+    "welcome": "",
+    "addServer": "",
+    "connectToServer": "",
+    "enterServerDetails": "",
+    "serverUrl": "",
+    "accessToken": "",
+    "scanQrCodeInstead": "",
+    "enterManually": "",
+    "cameraPermissionRequired": "",
+    "scanQrInstructions": ""
+  },
+  "errors": {
+    "missingFields": "",
+    "pleaseEnterBothFields": "",
+    "invalidUrl": "",
+    "serverUrlMustStartWith": "",
+    "pleaseEnterValidUrl": "",
+    "pairingFailed": "",
+    "invalidQrCode": "",
+    "invalidQrCodeMissingData": "",
+    "invalidQrCodeFormat": "",
+    "invalidQrCodeMissingUrl": "",
+    "invalidQrCodeMissingToken": "",
+    "invalidServerUrlInQr": "",
+    "tooManyPairingAttempts": "",
+    "invalidOrExpiredToken": "",
+    "invalidPairingRequest": ""
+  },
+  "settings": {
+    "preferences": "",
+    "community": "",
+    "discord": "",
+    "joinCommunity": "",
+    "github": "",
+    "viewSourceCode": "",
+    "account": "",
+    "disconnectServer": "",
+    "disconnectConfirm": "",
+    "disconnectConfirmGeneric": "",
+    "currentlyConnected": ""
+  },
+  "navigation": {
+    "selectServer": "",
+    "server": "",
+    "navigation": ""
+  },
+  "resources": {
+    "cpu": "",
+    "ram": ""
+  },
+  "notifications": {
+    "testSent": "",
+    "testFailed": "",
+    "failedToSendTest": "",
+    "loadingPreferences": "",
+    "unableToLoadPreferences": ""
+  }
+}
