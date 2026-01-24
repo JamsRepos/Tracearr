@@ -508,7 +508,9 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Check if all IPs are the same
-    const uniqueIps = distinctIps.map((row) => row.ipAddress);
+    const uniqueIps = distinctIps
+      .map((row) => row.ipAddress)
+      .filter((ip): ip is string => ip !== null);
     const allSameIp = uniqueIps.length === 1;
 
     // Check if all IPs are private/local
