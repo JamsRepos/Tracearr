@@ -490,7 +490,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
    * GET /settings/ip-warning - Check if IP configuration warning should be shown
    * Returns whether all users have the same IP or all have local/private IPs
    */
-  app.get('/ip-warning', { preHandler: [app.authenticate] }, async (request, _reply) => {
+  app.get('/ip-warning', { preHandler: [app.authenticate] }, async (_request, _reply) => {
     // Get distinct IPs from recent sessions (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
