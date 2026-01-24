@@ -25,9 +25,12 @@ export function ServerHealthBanner() {
         });
 
   return (
-    <Alert variant="destructive" className="bg-destructive/15 rounded-none border-x-0 border-t-0">
+    <Alert
+      variant="destructive"
+      className="bg-destructive/15 flex items-center rounded-none border-x-0 border-t-0 [&>svg]:!top-1/2 [&>svg]:!-translate-y-1/2 [&>svg+div]:!translate-y-0"
+    >
       <AlertTriangle className="h-4 w-4" />
-      <AlertDescription className="ml-2">{message}</AlertDescription>
+      <AlertDescription className="ml-2 flex-1">{message}</AlertDescription>
     </Alert>
   );
 }

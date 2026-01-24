@@ -3,11 +3,12 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { updateSettingsSchema, type Settings, type WebhookFormat } from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { settings, users } from '../db/schema.js';
+import { settings, users, sessions } from '../db/schema.js';
+import { geoipService } from '../services/geoip.js';
 
 // API token format: trr_pub_<32 random bytes as base64url>
 const API_TOKEN_PREFIX = 'trr_pub_';
@@ -483,6 +484,53 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       .where(eq(users.id, authUser.userId));
 
     return { token: newToken };
+  });
+
+  /**
+   * GET /settings/ip-warning - Check if IP configuration warning should be shown
+   * Returns whether all users have the same IP or all have local/private IPs
+   */
+  app.get('/ip-warning', { preHandler: [app.authenticate] }, async (_request, _reply) => {
+    // Get distinct IPs from recent sessions (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const distinctIps = await db
+      .selectDistinct({
+        ipAddress: sessions.ipAddress,
+      })
+      .from(sessions)
+      .where(sql`${sessions.startedAt} >= ${thirtyDaysAgo}`);
+
+    // If no sessions, don't show warning
+    if (distinctIps.length === 0) {
+      return { showWarning: false, stateHash: 'no-sessions' };
+    }
+
+    // Check if all IPs are the same
+    const uniqueIps = distinctIps
+      .map((row) => row.ipAddress)
+      .filter((ip): ip is string => ip !== null);
+    const allSameIp = uniqueIps.length === 1;
+
+    // Check if all IPs are private/local
+    const allPrivate = uniqueIps.every((ip) => geoipService.isPrivateIP(ip));
+
+    const showWarning = allSameIp || allPrivate;
+
+    // Generate stateHash based on the situation
+    let stateHash: string;
+    if (allSameIp && allPrivate) {
+      stateHash = 'single-private-ip';
+    } else if (allSameIp) {
+      stateHash = 'single-ip';
+    } else if (allPrivate) {
+      stateHash = 'all-private';
+    } else {
+      stateHash = 'normal';
+    }
+
+    return { showWarning, stateHash };
   });
 };
 
