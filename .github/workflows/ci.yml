@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Check translations
+        run: pnpm --filter @tracearr/translations check
+
   test:
     name: Test (${{ matrix.group }})
     runs-on: ubuntu-latest

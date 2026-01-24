@@ -11,13 +11,13 @@
   "violations": "Verstöße",
   "alerts": "Warnungen",
   "settings": "Einstellungen",
-  "overview": "Overview",
-  "quality": "Quality",
-  "storage": "Storage",
-  "watch": "Watch",
-  "performance": "Performance",
-  "devices": "Devices",
-  "bandwidth": "Bandwidth",
-  "jobs": "Jobs",
-  "accessControl": "Access Control"
+  "overview": "Übersicht",
+  "quality": "Qualität",
+  "storage": "Speicher",
+  "watch": "Gesehen",
+  "performance": "Leistung",
+  "devices": "Geräze",
+  "bandwidth": "Bandbreite",
+  "jobs": "Aufträge",
+  "accessControl": "Zugangs kontrolle"
 }

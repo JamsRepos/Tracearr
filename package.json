@@ -28,6 +28,8 @@
     "test:unit:coverage": "turbo test:unit:coverage",
     "test:services:coverage": "turbo test:services:coverage",
     "test:routes:coverage": "turbo test:routes:coverage",
+    "translations:check": "pnpm --filter @tracearr/translations check",
+    "translations:fix": "pnpm --filter @tracearr/translations check -- --fix",
     "clean": "turbo clean && rm -rf node_modules",
     "prepare": "husky"
   },
@@ -45,6 +47,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "shadcn": "^3.7.0",
     "turbo": "^2.7.5",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.53.1",

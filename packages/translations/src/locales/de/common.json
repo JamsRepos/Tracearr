@@ -23,12 +23,12 @@
     "expand": "Erweitern",
     "export": "Exportieren",
     "filter": "Filtern",
-    "goHome": "Go Home",
-    "grantPermission": "Grant Permission",
+    "goHome": "Zum Dashboard",
+    "grantPermission": "Berechtigung erteilen",
     "import": "Importieren",
-    "later": "Later",
+    "later": "Später",
     "next": "Weiter",
-    "openSettings": "Open Settings",
+    "openSettings": "Einstellungen öffnen",
     "refresh": "Neu laden",
     "remove": "Entfernen",
     "reset": "Zurücksetzen",
@@ -47,13 +47,13 @@
     "sync": "Synchronisieren",
     "terminate": "Beenden",
     "test": "Testen",
-    "tryAgain": "Try Again",
+    "tryAgain": "Wiederholen",
     "update": "Aktualisieren",
     "upload": "Hochladen",
     "view": "Anzeigen",
     "viewAll": "Alle anzeigen",
-    "viewOnGithub": "View on GitHub",
-    "viewProfile": "View Profile"
+    "viewOnGithub": "Auf GitHub anschauen",
+    "viewProfile": "Profil anzeigen"
   },
   "beta": "beta",
   "confirmations": {
@@ -113,23 +113,23 @@
   },
   "errors": {
     "badRequest": "Ungültige Anfrage",
-    "cannotReachServer": "Cannot reach server. Check URL and network connection.",
+    "cannotReachServer": "Server nicht gefunden. Überprüfe URL und Netzwerkverbindung.",
     "conflict": "Ein Konflikt ist aufgetreten",
-    "connectionFailed": "Connection failed",
-    "connectionTimedOut": "Connection timed out. Check your server URL.",
-    "failedToLoad": "Failed to load {{item}}",
+    "connectionFailed": "Verbindung fehlgeschlagen",
+    "connectionTimedOut": "Zeitüberschreitung. Überprüfe deine Server URL.",
+    "failedToLoad": "Fehler beim laden {{item}}",
     "forbidden": "Zugriff verweigert",
     "generic": "Ein Fehler ist aufgetreten",
     "networkError": "Netzwerkfehler",
     "notFound": "Nicht gefunden",
-    "pageNotFound": "Page Not Found",
-    "pageNotFoundDesc": "The page you're looking for doesn't exist or has been moved.",
+    "pageNotFound": "Seite nicht gefunden",
+    "pageNotFoundDesc": "Die Seite, die du suchst, existiert nicht oder wurde verschoben.",
     "rateLimited": "Zu viele Anfragen. Bitte später erneut versuchen",
     "serverError": "Serverfehler",
-    "somethingWentWrong": "Something went wrong",
+    "somethingWentWrong": "Etwas ist schief gelaufen",
     "timeout": "Zeitüberschreitung",
     "unauthorized": "Keine Berechtigung",
-    "unexpectedError": "An unexpected error occurred. Please try again."
+    "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
   },
   "labels": {
     "actions": "Aktionen",
@@ -180,11 +180,11 @@
   },
   "or": "or",
   "periods": {
-    "byDay": "By Day",
-    "byHour": "By Hour",
-    "last30Days": "Last 30 Days",
-    "last7Days": "Last 7 Days",
-    "lastYear": "Last Year"
+    "byDay": "Nach Tag",
+    "byHour": "Nach Stunde",
+    "last30Days": "Letzten 30 Tage",
+    "last7Days": "Letzten 7 Tage",
+    "lastYear": "Letzte Jahr"
   },
   "relativeTime": {
     "day_one": "vor {{count}} Tag",
@@ -204,9 +204,9 @@
     "year_other": "vor {{count}} Jahren"
   },
   "search": {
-    "placeholder": "Search...",
-    "searchTitles": "Search titles, users...",
-    "searchUsers": "Search users..."
+    "placeholder": "Suchen...",
+    "searchTitles": "Suche Titel, Benutzer...",
+    "searchUsers": "Suche Benutzer..."
   },
   "servers": {
     "emby": "Emby",
@@ -247,9 +247,9 @@
     "transcode": "Transcode"
   },
   "table": {
-    "selectAllOnPage": "Select all on page",
-    "selectAllTotal": "Select all {{total}} items",
-    "selectRow": "Select row"
+    "selectAllOnPage": "Seite komplett auswählen",
+    "selectAllTotal": "Alle {{total}} Elemente auswählen",
+    "selectRow": "Zeile auswählen"
   },
   "time": {
     "allTime": "Gesamte Zeit",

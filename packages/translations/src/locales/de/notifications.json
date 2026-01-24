@@ -213,8 +213,8 @@
     "streamEnded": "Stream beendet",
     "serverDown": "Serververbindung verloren",
     "serverUp": "Server wieder online",
-    "newDevice": "New Device",
-    "trustScoreChanged": "Trust Score Changed"
+    "newDevice": "Neues Gerät",
+    "trustScoreChanged": "Vertrauenswert geändert"
   },
   "settings": {
     "title": "Benachrichtigungseinstellungen",
@@ -225,21 +225,21 @@
     "rateLimit": "Aktueller Anfragelimit-Status",
     "perMinute": "Pro Minute",
     "perHour": "Pro Stunde",
-    "enablePushNotifications": "Enable Push Notifications",
-    "notificationEvents": "Notification Events",
-    "violationDetected": "Violation Detected",
-    "streamStarted": "Stream Started",
-    "streamStopped": "Stream Stopped",
-    "concurrentStreams": "Concurrent Streams",
-    "newDevice": "New Device",
-    "trustScoreChanged": "Trust Score Changed",
+    "enablePushNotifications": "Push-Benachrichtigungen aktivieren",
+    "notificationEvents": "Benachrichtigungsereignisse",
+    "violationDetected": "Verstoß erkannt",
+    "streamStarted": "Stream gestartet",
+    "streamStopped": "Stream gestoppt",
+    "concurrentStreams": "Gleichzeitige Streams",
+    "newDevice": "Neues Gerät",
+    "trustScoreChanged": "Vertrauenswert geändert",
     "serverDown": "Server Down",
     "serverUp": "Server Up",
-    "violationFilters": "Violation Filters",
-    "minimumSeverity": "Minimum Severity",
-    "quietHours": "Quiet Hours",
-    "enableQuietHours": "Enable Quiet Hours",
-    "overrideForCritical": "Override for Critical",
-    "rateLimiting": "Rate Limiting"
+    "violationFilters": "Verstoßfilter",
+    "minimumSeverity": "Mindestschweregrad",
+    "quietHours": "Ruhezeiten",
+    "enableQuietHours": "Erlaube Ruhezeiten",
+    "overrideForCritical": "Überschreibung für Kritisch",
+    "rateLimiting": "Ratenbegrenzung"
   }
 }
