@@ -48,7 +48,7 @@ export function LibraryEmptyState({ onComplete }: LibraryEmptyStateProps) {
       setBackfillProgress(progress);
 
       if (progress.status === 'complete') {
-        queryClient.invalidateQueries({ queryKey: ['library'] });
+        void queryClient.invalidateQueries({ queryKey: ['library'] });
         onComplete?.();
         toast.success('Backfill complete', {
           description: progress.message,
@@ -84,7 +84,7 @@ export function LibraryEmptyState({ onComplete }: LibraryEmptyStateProps) {
 
       // Invalidate queries after a short delay
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['library'] });
+        void queryClient.invalidateQueries({ queryKey: ['library'] });
         onComplete?.();
       }, 2000);
     } catch (err) {
@@ -103,7 +103,7 @@ export function LibraryEmptyState({ onComplete }: LibraryEmptyStateProps) {
       toast.success('Backfill started', {
         description: 'Historical snapshots are being generated.',
       });
-      queryClient.invalidateQueries({ queryKey: ['library', 'status'] });
+      void queryClient.invalidateQueries({ queryKey: ['library', 'status'] });
     } catch (err) {
       toast.error('Failed to start backfill', {
         description: err instanceof Error ? err.message : 'Please try again.',

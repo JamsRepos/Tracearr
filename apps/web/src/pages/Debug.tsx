@@ -290,7 +290,7 @@ export function Debug() {
     });
   };
 
-  const toggleAllSnapshots = () => {
+  const _toggleAllSnapshots = () => {
     if (selectedSnapshots.size === snapshots.length) {
       setSelectedSnapshots(new Set());
     } else {

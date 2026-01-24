@@ -97,10 +97,28 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.ts', '**/*.test.tsx', '**/test/**/*.ts'],
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/test/**/*.ts',
+      '**/__tests__/**/*.ts',
+      'packages/test-utils/**/*.ts',
+    ],
     rules: {
       // Unbound method warnings in tests are false positives when passing to mock callbacks
       '@typescript-eslint/unbound-method': 'off',
+      // Non-null assertions are practical in tests where setup guarantees values exist
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Mocking libraries return `any` types - fighting this provides little value in tests
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      // Sometimes needed for dynamic test data or complex mocks
+      '@typescript-eslint/no-explicit-any': 'off',
+      // Generic type parameter precision is less important in test utilities
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
     },
   }
 );
