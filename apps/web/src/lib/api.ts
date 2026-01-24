@@ -1125,6 +1125,8 @@ class ApiClient {
     getApiKey: () => this.request<{ token: string | null }>('/settings/api-key'),
     regenerateApiKey: () =>
       this.request<{ token: string }>('/settings/api-key/regenerate', { method: 'POST' }),
+    getIpWarning: () =>
+      this.request<{ showWarning: boolean; stateHash: string }>('/settings/ip-warning'),
   };
 
   // Channel Routing

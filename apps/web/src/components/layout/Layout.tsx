@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AppSidebar } from './AppSidebar';
 import { Header } from './Header';
 import { ServerHealthBanner } from './ServerHealthBanner';
+import { IpWarningBanner } from './IpWarningBanner';
 
 export function Layout() {
   return (
@@ -12,6 +13,7 @@ export function Layout() {
       <SidebarInset>
         <Header />
         <ServerHealthBanner />
+        <IpWarningBanner />
         <ScrollArea className="flex-1">
           <main className="p-6">
             <Outlet />

@@ -110,5 +110,9 @@
   "serverHealth": {
     "unreachable": "{{serverName}} is unreachable",
     "multipleUnreachable": "{{count}} servers unreachable: {{serverNames}}"
+  },
+  "ipWarning": {
+    "message": "All users appear to be using the same IP address or local network IPs. This may affect rule-based logic for location or IP addresses.",
+    "acknowledge": "Got it"
   }
 }
