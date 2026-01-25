@@ -424,7 +424,7 @@ export class LibrarySyncService {
       };
     }
 
-    // Create snapshot
+    // Create snapshot (may return null if data is invalid - e.g., no file sizes)
     const snapshot = await this.createSnapshot(serverId, libraryId, allItems);
 
     return {
@@ -434,7 +434,7 @@ export class LibrarySyncService {
       itemsProcessed: processedItems,
       itemsAdded: addedKeys.length,
       itemsRemoved: removedKeys.length,
-      snapshotId: snapshot.id,
+      snapshotId: snapshot?.id ?? null,
     };
   }
 
@@ -512,13 +512,19 @@ export class LibrarySyncService {
   }
 
   /**
-   * Create a snapshot record with aggregate statistics
+   * Create a snapshot record with aggregate statistics.
+   * Snapshots are only created if they would be valid (has items AND has storage size).
+   * See snapshotValidation.ts for validity criteria.
    */
   async createSnapshot(
     serverId: string,
     libraryId: string,
     items: MediaLibraryItem[]
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: string } | null> {
+    // Don't create snapshots for empty libraries
+    if (items.length === 0) {
+      return null;
+    }
     // Calculate quality distribution
     let count4k = 0;
     let count1080p = 0;
@@ -584,6 +590,11 @@ export class LibrarySyncService {
           musicCount++;
           break;
       }
+    }
+
+    // Don't create snapshots with no storage size (invalid per snapshotValidation.ts)
+    if (totalSize === 0) {
+      return null;
     }
 
     // Check for existing snapshot today for this library

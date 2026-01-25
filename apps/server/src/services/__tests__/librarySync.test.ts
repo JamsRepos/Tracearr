@@ -391,7 +391,8 @@ describe('LibrarySyncService', () => {
 
       const result = await service.createSnapshot(serverId, libraryId, items);
 
-      expect(result.id).toBe(snapshotId);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(snapshotId);
       expect(insertChain.values).toHaveBeenCalledWith(
         expect.objectContaining({
           serverId,

@@ -18,6 +18,7 @@ import { servers } from '../db/schema.js';
 import { librarySyncService } from '../services/librarySync.js';
 import { getPubSubService } from '../services/cache.js';
 import { enqueueMaintenanceJob } from './maintenanceQueue.js';
+import { VALID_LIBRARY_ITEM_CONDITION } from '../utils/snapshotValidation.js';
 
 // Job data interface
 export interface LibrarySyncJobData {
@@ -229,15 +230,18 @@ export function startLibrarySyncWorker(): void {
 
 /**
  * Check if library snapshots need backfilling and trigger if so.
- * Compares earliest library_items.created_at with earliest snapshot_time.
+ * Compares earliest library_items.created_at (with valid size) with earliest snapshot_time.
+ * Only considers items with file_size since those without can't produce meaningful snapshots.
  * Runs non-blocking - errors are logged but don't affect other operations.
  */
 async function checkAndTriggerSnapshotBackfill(): Promise<void> {
   try {
-    // Get earliest item date and earliest snapshot date
+    // Get earliest item date (only items with valid size) and earliest snapshot date
+    // See snapshotValidation.ts for why we filter on file_size
     const result = await db.execute(sql`
       SELECT
-        (SELECT MIN(created_at)::date FROM library_items) AS earliest_item,
+        (SELECT MIN(created_at)::date FROM library_items
+         WHERE ${VALID_LIBRARY_ITEM_CONDITION}) AS earliest_item,
         (SELECT MIN(snapshot_time)::date FROM library_snapshots) AS earliest_snapshot,
         (SELECT COUNT(*) FROM library_items) AS item_count,
         (SELECT COUNT(*) FROM library_snapshots) AS snapshot_count

@@ -9,6 +9,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { isMaintenanceJobRunning } from '../../jobs/maintenanceQueue.js';
 import { getLibrarySyncStatus } from '../../jobs/librarySyncQueue.js';
+import { validLibraryItemCondition } from '../../utils/snapshotValidation.js';
 
 /** Library status response shape */
 interface LibraryStatusResponse {
@@ -48,15 +49,19 @@ export const libraryStatusRoute: FastifyPluginAsync = async (app) => {
       const { serverId } = request.query;
 
       // Build WHERE clause for server filtering
-      const serverFilter = serverId ? sql`WHERE li.server_id = ${serverId}::uuid` : sql``;
+      const serverFilter = serverId ? sql`AND li.server_id = ${serverId}::uuid` : sql``;
+      const serverFilterWhere = serverId ? sql`WHERE li.server_id = ${serverId}::uuid` : sql``;
       const snapshotServerFilter = serverId ? sql`WHERE ls.server_id = ${serverId}::uuid` : sql``;
 
       // Get library status in a single query
+      // Note: earliest_item only considers items with valid file_size since items without
+      // size data can't produce meaningful snapshots (see snapshotValidation.ts)
       const result = await db.execute(sql`
         SELECT
-          (SELECT MIN(li.created_at)::date FROM library_items li ${serverFilter}) AS earliest_item,
+          (SELECT MIN(li.created_at)::date FROM library_items li
+           WHERE ${validLibraryItemCondition('li')} ${serverFilter}) AS earliest_item,
           (SELECT MIN(ls.snapshot_time)::date FROM library_snapshots ls ${snapshotServerFilter}) AS earliest_snapshot,
-          (SELECT COUNT(*)::int FROM library_items li ${serverFilter}) AS item_count,
+          (SELECT COUNT(*)::int FROM library_items li ${serverFilterWhere}) AS item_count,
           (SELECT COUNT(*)::int FROM library_snapshots ls ${snapshotServerFilter}) AS snapshot_count
       `);
 
