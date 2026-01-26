@@ -28,8 +28,10 @@ export const maintenanceRoutes: FastifyPluginAsync = async (app) => {
     // Return list of available maintenance jobs with descriptions
     return {
       jobs: [
+        // Normalization jobs - standardize data formats
         {
           type: 'normalize_players',
+          category: 'normalization',
           name: 'Normalize Player Names',
           description:
             'Run this if you see inconsistent device names like "AndroidTv" and "Android TV", ' +
@@ -37,20 +39,49 @@ export const maintenanceRoutes: FastifyPluginAsync = async (app) => {
         },
         {
           type: 'normalize_countries',
+          category: 'normalization',
           name: 'Normalize Country Codes',
           description:
             'Run this if you see both "US" and "United States" in your history, ' +
             "or if geo restriction rules aren't matching older sessions correctly.",
         },
         {
+          type: 'normalize_codecs',
+          category: 'normalization',
+          name: 'Normalize Codec Names',
+          description:
+            'Converts all codec names to uppercase for consistency. ' +
+            'Run this if you see duplicate codecs in the Compatibility Matrix (e.g., "h264" and "H264").',
+        },
+        // Backfill jobs - fill in missing historical data
+        {
           type: 'fix_imported_progress',
+          category: 'backfill',
           name: 'Fix Imported Session Progress',
           description:
             'Run this if imported sessions from Tautulli show "0%" progress despite having watch time. ' +
             'This recalculates progress values for sessions that were imported before this was fixed.',
         },
         {
+          type: 'backfill_user_dates',
+          category: 'backfill',
+          name: 'Backfill User Activity Dates',
+          description:
+            'Populates joinedAt and lastActivityAt for users from session history. ' +
+            'Run this if users show "Unknown" join dates or missing last activity timestamps.',
+        },
+        {
+          type: 'backfill_library_snapshots',
+          category: 'backfill',
+          name: 'Backfill Library Snapshots',
+          description:
+            'Creates historical library snapshots from library_items.created_at for proper deletion/upgrade tracking. ' +
+            'Run this once after upgrading to enable accurate Storage Trend and Quality Evolution charts.',
+        },
+        // Cleanup jobs - database maintenance and optimization
+        {
           type: 'rebuild_timescale_views',
+          category: 'cleanup',
           name: 'Rebuild TimescaleDB Views',
           description:
             'Recreates all TimescaleDB continuous aggregates and engagement views. ' +
@@ -68,25 +99,12 @@ export const maintenanceRoutes: FastifyPluginAsync = async (app) => {
           ],
         },
         {
-          type: 'normalize_codecs',
-          name: 'Normalize Codec Names',
+          type: 'cleanup_old_chunks',
+          category: 'cleanup',
+          name: 'Cleanup Old Chunks',
           description:
-            'Converts all codec names to uppercase for consistency. ' +
-            'Run this if you see duplicate codecs in the Compatibility Matrix (e.g., "h264" and "H264").',
-        },
-        {
-          type: 'backfill_user_dates',
-          name: 'Backfill User Activity Dates',
-          description:
-            'Populates joinedAt and lastActivityAt for users from session history. ' +
-            'Run this if users show "Unknown" join dates or missing last activity timestamps.',
-        },
-        {
-          type: 'backfill_library_snapshots',
-          name: 'Backfill Library Snapshots',
-          description:
-            'Creates historical library snapshots from library_items.created_at for proper deletion/upgrade tracking. ' +
-            'Run this once after upgrading to enable accurate Storage Trend and Quality Evolution charts.',
+            'Drops old TimescaleDB chunks beyond the retention period (90 days). ' +
+            'Run this if the automatic retention job fails with "out of shared memory" errors.',
         },
       ],
     };
@@ -119,6 +137,7 @@ export const maintenanceRoutes: FastifyPluginAsync = async (app) => {
         'normalize_codecs',
         'backfill_user_dates',
         'backfill_library_snapshots',
+        'cleanup_old_chunks',
       ];
       if (!validTypes.includes(type as MaintenanceJobType)) {
         return reply.badRequest(`Invalid job type: ${type}`);

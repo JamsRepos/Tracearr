@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Wrench,
   Play,
@@ -20,6 +21,11 @@ import {
   RefreshCw,
   Globe,
   Calendar,
+  Library,
+  Trash2,
+  CaseSensitive,
+  History,
+  HardDrive,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
@@ -44,8 +50,11 @@ interface JobOption {
   default: boolean;
 }
 
+type JobCategory = 'normalization' | 'backfill' | 'cleanup';
+
 interface JobDefinition {
   type: string;
+  category: JobCategory;
   name: string;
   description: string;
   options?: JobOption[];
@@ -73,10 +82,18 @@ interface JobHistoryItem {
 const JOB_ICONS: Record<string, typeof Database> = {
   normalize_players: Database,
   normalize_countries: Globe,
-  fix_imported_progress: RefreshCw,
-  rebuild_timescale_views: Database,
   normalize_codecs: ArrowUpDown,
+  fix_imported_progress: RefreshCw,
   backfill_user_dates: Calendar,
+  backfill_library_snapshots: Library,
+  rebuild_timescale_views: HardDrive,
+  cleanup_old_chunks: Trash2,
+};
+
+const CATEGORY_CONFIG: Record<JobCategory, { icon: typeof Database; label: string }> = {
+  normalization: { icon: CaseSensitive, label: 'Normalization' },
+  backfill: { icon: History, label: 'Backfill' },
+  cleanup: { icon: HardDrive, label: 'Cleanup' },
 };
 
 function formatDuration(ms: number): string {
@@ -97,7 +114,13 @@ export function JobsSettings() {
   const [progress, setProgress] = useState<MaintenanceJobProgress | null>(null);
   const [confirmJob, setConfirmJob] = useState<JobDefinition | null>(null);
   const [jobOptions, setJobOptions] = useState<Record<string, boolean>>({});
+  const [activeCategory, setActiveCategory] = useState<JobCategory>('normalization');
   const { socket } = useSocket();
+
+  const filteredJobs = useMemo(
+    () => jobs.filter((job) => job.category === activeCategory),
+    [jobs, activeCategory]
+  );
 
   // Reset options when confirm dialog opens
   const openConfirmDialog = useCallback((job: JobDefinition) => {
@@ -250,7 +273,7 @@ export function JobsSettings() {
     <div className="space-y-4">
       {/* Available Jobs */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             Maintenance Jobs
@@ -260,7 +283,30 @@ export function JobsSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {jobs.map((job) => {
+          <Tabs
+            value={activeCategory}
+            onValueChange={(v) => setActiveCategory(v as JobCategory)}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-3">
+              {(Object.keys(CATEGORY_CONFIG) as JobCategory[]).map((category) => {
+                const config = CATEGORY_CONFIG[category];
+                const CategoryIcon = config.icon;
+                const jobCount = jobs.filter((j) => j.category === category).length;
+                return (
+                  <TabsTrigger key={category} value={category} className="gap-1.5">
+                    <CategoryIcon className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{config.label}</span>
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                      {jobCount}
+                    </Badge>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+
+          {filteredJobs.map((job) => {
             const JobIcon = JOB_ICONS[job.type] || Wrench;
             const isRunning = runningJob === job.type;
 

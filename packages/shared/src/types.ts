@@ -144,7 +144,15 @@ export interface AuthUser {
 export type SessionState = 'playing' | 'paused' | 'stopped';
 
 /** Supported media types */
-export const MEDIA_TYPES = ['movie', 'episode', 'track', 'live', 'photo', 'trailer', 'unknown'] as const;
+export const MEDIA_TYPES = [
+  'movie',
+  'episode',
+  'track',
+  'live',
+  'photo',
+  'trailer',
+  'unknown',
+] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 // ============================================================================
@@ -1245,6 +1253,8 @@ export interface UnlinkPlexAccountResponse {
 // Maintenance Job Types
 // =============================================================================
 
+export type MaintenanceJobCategory = 'normalization' | 'backfill' | 'cleanup';
+
 export type MaintenanceJobType =
   | 'normalize_players'
   | 'normalize_countries'
@@ -1252,7 +1262,8 @@ export type MaintenanceJobType =
   | 'rebuild_timescale_views'
   | 'normalize_codecs'
   | 'backfill_user_dates'
-  | 'backfill_library_snapshots';
+  | 'backfill_library_snapshots'
+  | 'cleanup_old_chunks';
 
 export type MaintenanceJobStatus = 'idle' | 'running' | 'complete' | 'error';
 

@@ -180,6 +180,8 @@ async function processMaintenanceJob(job: Job<MaintenanceJobData>): Promise<Main
       return processBackfillUserDatesJob(job);
     case 'backfill_library_snapshots':
       return processBackfillLibrarySnapshotsJob(job);
+    case 'cleanup_old_chunks':
+      return processCleanupOldChunksJob(job);
     default:
       throw new Error(`Unknown maintenance job type: ${job.data.type}`);
   }
@@ -1610,6 +1612,23 @@ async function processBackfillLibrarySnapshotsJob(
       await db.execute(sql`
         CALL refresh_continuous_aggregate('library_stats_daily', ${earliestDate}::date, NOW()::date + INTERVAL '1 day')
       `);
+
+      // Verify the refresh succeeded by checking aggregate has data
+      const verifyResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM library_stats_daily
+        WHERE day >= ${earliestDate}::date
+      `);
+      const aggregateCount = (verifyResult.rows[0] as { count: number })?.count ?? 0;
+
+      if (aggregateCount === 0 && totalSnapshotsCreated > 0) {
+        console.warn(
+          `[Maintenance] Aggregate refresh may have failed - created ${totalSnapshotsCreated} snapshots but aggregate has no data from ${earliestDate}`
+        );
+      } else {
+        console.log(
+          `[Maintenance] Aggregate refresh verified - ${aggregateCount} days of data from ${earliestDate}`
+        );
+      }
     }
 
     const durationMs = Date.now() - startTime;
@@ -1631,6 +1650,210 @@ async function processBackfillLibrarySnapshotsJob(
       errors: totalErrors,
       durationMs,
       message: `Created ${totalSnapshotsCreated.toLocaleString()} snapshots for ${totalProcessed} libraries${totalCleanedUp > 0 ? `, cleaned up ${totalCleanedUp} invalid` : ''}`,
+    };
+  } catch (error) {
+    if (activeJobProgress) {
+      activeJobProgress.status = 'error';
+      activeJobProgress.message = error instanceof Error ? error.message : 'Unknown error';
+      await publishProgress();
+      activeJobProgress = null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Cleanup old TimescaleDB chunks in batches
+ *
+ * Drops old chunks from library_snapshots hypertable that are beyond the retention period.
+ * Uses batched approach to avoid exhausting PostgreSQL's lock table.
+ *
+ */
+async function processCleanupOldChunksJob(
+  job: Job<MaintenanceJobData>
+): Promise<MaintenanceJobResult> {
+  const startTime = Date.now();
+  const pubSubService = getPubSubService();
+
+  // 90 days retention for raw snapshots - matches TimescaleDB automatic retention policy.
+  // Aggregates (library_stats_daily) preserve summarized history indefinitely.
+  const RETENTION_DAYS = 90;
+  // Drop chunks in small batches to avoid lock exhaustion
+  const BATCH_INTERVAL_DAYS = 30;
+
+  // Initialize progress
+  activeJobProgress = {
+    type: 'cleanup_old_chunks',
+    status: 'running',
+    totalRecords: 0,
+    processedRecords: 0,
+    updatedRecords: 0,
+    skippedRecords: 0,
+    errorRecords: 0,
+    message: 'Analyzing chunks to clean up...',
+    startedAt: new Date().toISOString(),
+  };
+
+  const publishProgress = async () => {
+    if (pubSubService && activeJobProgress) {
+      await pubSubService.publish(WS_EVENTS.MAINTENANCE_PROGRESS, activeJobProgress);
+    }
+  };
+
+  try {
+    await publishProgress();
+
+    // Get count of chunks older than retention period
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM timescaledb_information.chunks
+      WHERE hypertable_name = 'library_snapshots'
+        AND range_end < NOW() - INTERVAL '${sql.raw(String(RETENTION_DAYS))} days'
+    `);
+
+    const totalChunks = Number((countResult.rows[0] as { count: string })?.count ?? 0);
+
+    if (totalChunks === 0) {
+      activeJobProgress.status = 'complete';
+      activeJobProgress.message = 'No old chunks to clean up';
+      activeJobProgress.completedAt = new Date().toISOString();
+      await publishProgress();
+      activeJobProgress = null;
+
+      return {
+        success: true,
+        type: 'cleanup_old_chunks',
+        processed: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+        durationMs: Date.now() - startTime,
+        message: 'No old chunks to clean up',
+      };
+    }
+
+    activeJobProgress.totalRecords = totalChunks;
+    activeJobProgress.message = `Found ${totalChunks} chunks to clean up...`;
+    await publishProgress();
+
+    // Calculate the cutoff date (retention period from now)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
+
+    // Get the oldest chunk date
+    const oldestResult = await db.execute(sql`
+      SELECT MIN(range_start)::date as oldest
+      FROM timescaledb_information.chunks
+      WHERE hypertable_name = 'library_snapshots'
+    `);
+    const oldestDate = new Date((oldestResult.rows[0] as { oldest: string })?.oldest ?? new Date());
+
+    // IMPORTANT: Refresh the aggregate BEFORE dropping chunks to ensure any
+    // un-aggregated data is materialized. Prevents data loss if backfill's
+    // refresh failed or data was inserted outside normal flow.
+    activeJobProgress.message = 'Refreshing aggregate before cleanup...';
+    await publishProgress();
+
+    try {
+      await db.execute(sql`
+        CALL refresh_continuous_aggregate(
+          'library_stats_daily',
+          ${oldestDate.toISOString()}::date,
+          ${cutoffDate.toISOString()}::date
+        )
+      `);
+      console.log(
+        `[Maintenance] Refreshed aggregate for ${oldestDate.toISOString().split('T')[0]} to ${cutoffDate.toISOString().split('T')[0]} before cleanup`
+      );
+    } catch (refreshError) {
+      // Log but continue - the aggregate may already be up-to-date
+      console.warn('[Maintenance] Failed to refresh aggregate before cleanup:', refreshError);
+    }
+
+    activeJobProgress.message = `Dropping ${totalChunks} old chunks...`;
+    await publishProgress();
+
+    let totalDropped = 0;
+    let totalErrors = 0;
+    let currentDate = new Date(oldestDate);
+
+    // Process in batches by date range
+    while (currentDate < cutoffDate) {
+      const batchEnd = new Date(currentDate);
+      batchEnd.setDate(batchEnd.getDate() + BATCH_INTERVAL_DAYS);
+
+      // Don't go past the cutoff
+      if (batchEnd > cutoffDate) {
+        batchEnd.setTime(cutoffDate.getTime());
+      }
+
+      try {
+        // Drop chunks in this date range
+        const dropResult = await db.execute(sql`
+          SELECT drop_chunks(
+            'library_snapshots',
+            older_than => ${batchEnd.toISOString()}::timestamptz,
+            newer_than => ${currentDate.toISOString()}::timestamptz
+          )
+        `);
+
+        // Count dropped chunks from result
+        const droppedCount = dropResult.rowCount ?? 0;
+        totalDropped += droppedCount;
+
+        activeJobProgress.processedRecords = totalDropped;
+        activeJobProgress.updatedRecords = totalDropped;
+        activeJobProgress.message = `Dropped ${totalDropped} of ~${totalChunks} chunks (processing ${currentDate.toISOString().split('T')[0]} to ${batchEnd.toISOString().split('T')[0]})...`;
+
+        const percent = Math.min(100, Math.round((totalDropped / totalChunks) * 100));
+        await job.updateProgress(percent);
+        await publishProgress();
+
+        // Extend lock
+        try {
+          await job.extendLock(job.token ?? '', 10 * 60 * 1000);
+        } catch {
+          console.warn(`[Maintenance] Failed to extend lock for job ${job.id}`);
+        }
+      } catch (error) {
+        console.error(
+          `[Maintenance] Error dropping chunks for ${currentDate.toISOString()} to ${batchEnd.toISOString()}:`,
+          error
+        );
+        totalErrors++;
+        activeJobProgress.errorRecords = totalErrors;
+
+        // If we get lock errors, try smaller batches or abort
+        if (error instanceof Error && error.message.includes('shared memory')) {
+          activeJobProgress.message = `Lock exhaustion at ${currentDate.toISOString().split('T')[0]}. Try increasing max_locks_per_transaction.`;
+          break;
+        }
+      }
+
+      // Move to next batch
+      currentDate = new Date(batchEnd);
+
+      // Small delay between batches to let other operations through
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    const durationMs = Date.now() - startTime;
+    activeJobProgress.status = totalErrors > 0 && totalDropped === 0 ? 'error' : 'complete';
+    activeJobProgress.message = `Completed! Dropped ${totalDropped} chunks in ${Math.round(durationMs / 1000)}s${totalErrors > 0 ? ` (${totalErrors} errors)` : ''}`;
+    activeJobProgress.completedAt = new Date().toISOString();
+    await publishProgress();
+
+    activeJobProgress = null;
+
+    return {
+      success: totalErrors === 0 || totalDropped > 0,
+      type: 'cleanup_old_chunks',
+      processed: totalChunks,
+      updated: totalDropped,
+      skipped: 0,
+      errors: totalErrors,
+      durationMs,
+      message: `Dropped ${totalDropped} old chunks${totalErrors > 0 ? ` with ${totalErrors} errors` : ''}`,
     };
   } catch (error) {
     if (activeJobProgress) {

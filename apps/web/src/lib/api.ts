@@ -1276,6 +1276,7 @@ class ApiClient {
       this.request<{
         jobs: Array<{
           type: string;
+          category: 'normalization' | 'backfill' | 'cleanup';
           name: string;
           description: string;
           options?: Array<{
