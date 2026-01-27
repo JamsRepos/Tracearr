@@ -181,11 +181,7 @@ describe('Maintenance Routes', () => {
       expect(body.status).toBe('queued');
       expect(body.jobId).toBe(jobId);
       expect(body.message).toContain('queued');
-      expect(enqueueMaintenanceJob).toHaveBeenCalledWith(
-        'normalize_players',
-        ownerUser.userId,
-        undefined
-      );
+      expect(enqueueMaintenanceJob).toHaveBeenCalledWith('normalize_players', ownerUser.userId);
     });
 
     it('starts normalize_countries job for owner', async () => {
@@ -200,11 +196,7 @@ describe('Maintenance Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(enqueueMaintenanceJob).toHaveBeenCalledWith(
-        'normalize_countries',
-        ownerUser.userId,
-        undefined
-      );
+      expect(enqueueMaintenanceJob).toHaveBeenCalledWith('normalize_countries', ownerUser.userId);
     });
 
     it('starts fix_imported_progress job for owner', async () => {
@@ -219,11 +211,7 @@ describe('Maintenance Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(enqueueMaintenanceJob).toHaveBeenCalledWith(
-        'fix_imported_progress',
-        ownerUser.userId,
-        undefined
-      );
+      expect(enqueueMaintenanceJob).toHaveBeenCalledWith('fix_imported_progress', ownerUser.userId);
     });
 
     it('starts rebuild_timescale_views job for owner', async () => {
@@ -240,8 +228,7 @@ describe('Maintenance Routes', () => {
       expect(response.statusCode).toBe(200);
       expect(enqueueMaintenanceJob).toHaveBeenCalledWith(
         'rebuild_timescale_views',
-        ownerUser.userId,
-        undefined
+        ownerUser.userId
       );
     });
 

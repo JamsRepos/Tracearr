@@ -541,10 +541,11 @@ describe('Debug Routes', () => {
       expect(db.execute).toHaveBeenCalledTimes(4);
     });
 
-    it('handles aggregate refresh failure gracefully', async () => {
+    it('handles individual aggregate refresh failure gracefully', async () => {
       app = await buildTestApp(ownerUser);
 
-      vi.mocked(db.execute).mockRejectedValue(new Error('Aggregates not configured'));
+      // Individual aggregate failures are caught silently, allowing other aggregates to proceed
+      vi.mocked(db.execute).mockRejectedValue(new Error('Aggregate not found'));
 
       const response = await app.inject({
         method: 'POST',
@@ -553,8 +554,9 @@ describe('Debug Routes', () => {
 
       expect(response.statusCode).toBe(200);
       const body = response.json();
-      expect(body.success).toBe(false);
-      expect(body.message).toContain('not configured or refresh failed');
+      // Still returns success because individual failures are handled gracefully
+      expect(body.success).toBe(true);
+      expect(body.message).toBe('Aggregates refreshed (last 7 days)');
     });
   });
 
