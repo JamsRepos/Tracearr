@@ -199,6 +199,9 @@ export abstract class BaseMediaServerClient
       ParentId: libraryId,
       Recursive: 'true',
       IncludeItemTypes: 'Movie,Series,Season,Episode,MusicArtist,MusicAlbum,Audio',
+      // IsMissing=false excludes "missing" episodes that Jellyfin knows about from metadata
+      // but the user doesn't have files for (fixes #240 - inflated episode counts)
+      IsMissing: 'false',
       Fields:
         'ProviderIds,Path,MediaSources,DateCreated,ProductionYear,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,Album,AlbumArtist,Artists',
       StartIndex: String(offset),
@@ -238,6 +241,8 @@ export abstract class BaseMediaServerClient
     const params = new URLSearchParams({
       Recursive: 'true',
       IncludeItemTypes: 'Movie,Episode',
+      // IsMissing=false excludes "missing" items (fixes #240)
+      IsMissing: 'false',
       Filters: 'IsPlayed',
       SortBy: 'DatePlayed',
       SortOrder: 'Descending',
