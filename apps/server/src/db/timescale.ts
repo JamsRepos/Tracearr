@@ -915,7 +915,11 @@ export interface AggregateRefreshProgress {
 
 /**
  * Get the date range of actual data in the database
+ * Clamps earliest date to MIN_VALID_YEAR to avoid processing bogus historical data
+ * (e.g., Emby sometimes returns dates like year 0001 for items with missing metadata)
  */
+const MIN_VALID_YEAR = 2015;
+
 async function getDataDateRange(): Promise<{ earliest: Date | null; latest: Date | null }> {
   const result = await db.execute(sql`
     SELECT
@@ -930,10 +934,20 @@ async function getDataDateRange(): Promise<{ earliest: Date | null; latest: Date
   `);
 
   const row = result.rows[0] as { earliest: string | null; latest: string | null };
-  return {
-    earliest: row.earliest ? new Date(row.earliest) : null,
-    latest: row.latest ? new Date(row.latest) : null,
-  };
+
+  let earliest: Date | null = row.earliest ? new Date(row.earliest) : null;
+  const latest: Date | null = row.latest ? new Date(row.latest) : null;
+
+  // Clamp earliest date to MIN_VALID_YEAR to avoid processing bogus data
+  // Bad dates (year 0001, 1970, etc.) would cause massive unnecessary batch processing
+  if (earliest && earliest.getFullYear() < MIN_VALID_YEAR) {
+    console.warn(
+      `[TimescaleDB] Earliest date ${earliest.toISOString()} is before ${MIN_VALID_YEAR}, clamping to Jan 1 ${MIN_VALID_YEAR}`
+    );
+    earliest = new Date(Date.UTC(MIN_VALID_YEAR, 0, 1));
+  }
+
+  return { earliest, latest };
 }
 
 /**
