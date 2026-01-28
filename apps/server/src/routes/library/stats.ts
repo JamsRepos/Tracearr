@@ -77,7 +77,10 @@ export const libraryStatsRoute: FastifyPluginAsync = async (app) => {
       const serverFilter = serverId
         ? sql`AND li.server_id = ${serverId}::uuid`
         : authUser.serverIds?.length
-          ? sql`AND li.server_id = ANY(${authUser.serverIds}::uuid[])`
+          ? sql`AND li.server_id IN (${sql.join(
+              authUser.serverIds.map((id: string) => sql`${id}::uuid`),
+              sql`, `
+            )})`
           : sql``;
 
       // Optional library filter
