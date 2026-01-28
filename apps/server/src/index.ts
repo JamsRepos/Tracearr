@@ -102,6 +102,7 @@ import {
   scheduleInactivityChecks,
   shutdownInactivityCheckQueue,
 } from './jobs/inactivityCheckQueue.js';
+import { initHeavyOpsLock } from './jobs/heavyOpsLock.js';
 import { initPushRateLimiter } from './services/pushRateLimiter.js';
 import { processPushReceipts } from './services/pushNotification.js';
 import { cleanupMobileTokens } from './jobs/cleanupMobileTokens.js';
@@ -314,6 +315,10 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     app.log.error({ err }, 'Failed to initialize maintenance queue');
     // Don't throw - maintenance jobs are non-critical
   }
+
+  // Initialize heavy operations lock (coordinates import + maintenance jobs)
+  await initHeavyOpsLock(app.redis);
+  app.log.info('Heavy operations lock initialized');
 
   // Initialize library sync queue (uses Redis for job storage)
   try {
