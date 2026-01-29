@@ -277,6 +277,10 @@ export {
   // Rule V2
   createRuleV2Schema,
   updateRuleV2Schema,
+  // Bulk operations
+  bulkUpdateRulesSchema,
+  bulkDeleteRulesSchema,
+  bulkMigrateRulesSchema,
   // Violation
   violationSortFieldSchema,
   violationQuerySchema,
@@ -333,6 +337,10 @@ export type {
   // Rule V2 types
   CreateRuleV2Input,
   UpdateRuleV2Input,
+  // Bulk operations types
+  BulkUpdateRulesInput,
+  BulkDeleteRulesInput,
+  BulkMigrateRulesInput,
   ViolationQueryInput,
   ViolationSortField,
   ServerIdFilterInput,

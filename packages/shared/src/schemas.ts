@@ -499,6 +499,20 @@ export const updateRuleV2Schema = z.object({
   actions: ruleActionsSchema.optional(),
 });
 
+// Bulk operations schemas
+export const bulkUpdateRulesSchema = z.object({
+  ids: z.array(uuidSchema).min(1, 'At least one rule ID is required'),
+  isActive: z.boolean(),
+});
+
+export const bulkDeleteRulesSchema = z.object({
+  ids: z.array(uuidSchema).min(1, 'At least one rule ID is required'),
+});
+
+export const bulkMigrateRulesSchema = z.object({
+  ids: z.array(uuidSchema).optional(),
+});
+
 // ============================================================================
 // Violation Schemas
 // ============================================================================
@@ -1016,6 +1030,9 @@ export type Action = z.infer<typeof actionSchema>;
 export type RuleActions = z.infer<typeof ruleActionsSchema>;
 export type CreateRuleV2Input = z.infer<typeof createRuleV2Schema>;
 export type UpdateRuleV2Input = z.infer<typeof updateRuleV2Schema>;
+export type BulkUpdateRulesInput = z.infer<typeof bulkUpdateRulesSchema>;
+export type BulkDeleteRulesInput = z.infer<typeof bulkDeleteRulesSchema>;
+export type BulkMigrateRulesInput = z.infer<typeof bulkMigrateRulesSchema>;
 
 export type ViolationQueryInput = z.infer<typeof violationQuerySchema>;
 export type ServerIdFilterInput = z.infer<typeof serverIdFilterSchema>;

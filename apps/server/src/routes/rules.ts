@@ -13,6 +13,9 @@ import {
   ruleIdParamSchema,
   createRuleV2Schema,
   updateRuleV2Schema,
+  bulkUpdateRulesSchema,
+  bulkDeleteRulesSchema,
+  bulkMigrateRulesSchema,
 } from '@tracearr/shared';
 import type { RuleConditions, RuleActions } from '@tracearr/shared';
 import { db } from '../db/client.js';
@@ -517,15 +520,11 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only owners can update rules');
     }
 
-    const body = request.body as { ids: string[]; isActive: boolean };
-
-    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
-      return reply.badRequest('ids array is required');
+    const parsed = bulkUpdateRulesSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.badRequest('Invalid request body');
     }
-
-    if (typeof body.isActive !== 'boolean') {
-      return reply.badRequest('isActive boolean is required');
-    }
+    const { ids, isActive } = parsed.data;
 
     // Get all requested rules with server info
     const ruleDetails = await db
@@ -536,7 +535,7 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       })
       .from(rules)
       .leftJoin(serverUsers, eq(rules.serverUserId, serverUsers.id))
-      .where(inArray(rules.id, body.ids));
+      .where(inArray(rules.id, ids));
 
     // Filter to only accessible rules
     // Global rules (serverUserId = null) are accessible to all owners
@@ -557,7 +556,7 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
     await db
       .update(rules)
       .set({
-        isActive: body.isActive,
+        isActive,
         updatedAt: new Date(),
       })
       .where(inArray(rules.id, accessibleIds));
@@ -577,11 +576,11 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only owners can delete rules');
     }
 
-    const body = request.body as { ids: string[] };
-
-    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
-      return reply.badRequest('ids array is required');
+    const parsed = bulkDeleteRulesSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.badRequest('Invalid request body');
     }
+    const { ids: deleteIds } = parsed.data;
 
     // Get all requested rules with server info
     const ruleDetails = await db
@@ -592,7 +591,7 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       })
       .from(rules)
       .leftJoin(serverUsers, eq(rules.serverUserId, serverUsers.id))
-      .where(inArray(rules.id, body.ids));
+      .where(inArray(rules.id, deleteIds));
 
     // Filter to only accessible rules
     const accessibleIds = ruleDetails
@@ -702,8 +701,11 @@ export const ruleRoutes: FastifyPluginAsync = async (app) => {
       return reply.forbidden('Only server owners can migrate rules');
     }
 
-    const body = request.body as { ids?: string[] };
-    const specificIds = body?.ids;
+    const parsed = bulkMigrateRulesSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.badRequest('Invalid request body');
+    }
+    const specificIds = parsed.data.ids;
 
     // Build WHERE conditions for legacy rules
     const baseCondition = and(
