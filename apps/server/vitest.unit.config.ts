@@ -21,6 +21,7 @@ export default mergeConfig(
         'src/utils/__tests__/*.test.ts',
         'src/test/schemas.test.ts',
         'src/services/mediaServer/__tests__/*.test.ts',
+        'src/services/rules/__tests__/*.test.ts',
       ],
       coverage: {
         provider: 'v8',
