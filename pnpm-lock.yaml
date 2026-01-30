@@ -134,6 +134,9 @@ importers:
       expo-font:
         specifier: ^55.0.3
         version: 55.0.3(expo@55.0.0-preview.7)(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0)
+      expo-glass-effect:
+        specifier: ~55.0.3
+        version: 55.0.3(expo@55.0.0-preview.7)(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0)
       expo-image:
         specifier: 55.0.3
         version: 55.0.3(expo@55.0.0-preview.7)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.0))(react@19.2.0))(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0)
@@ -5047,6 +5050,13 @@ packages:
 
   expo-font@55.0.3:
     resolution: {integrity: sha512-DSyh0gzbVii5+Nb/0pAP3bL+CrB9u1N3YeKTx4wXQT8KUnuOlI4A0sEHIO25MfFpjjtovDn0WGzAtimbPkvJmg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+
+  expo-glass-effect@55.0.3:
+    resolution: {integrity: sha512-MM4Somb+xDL1JCgjJk1Vmm5uJysVMv0RLo9U5MQJJ2y/xr3+ardtAOn4kWIiTywNxH00tnJmYzJKXHoO645zXw==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -14308,6 +14318,12 @@ snapshots:
     dependencies:
       expo: 55.0.0-preview.7(@babel/core@7.28.6)(@expo/dom-webview@0.2.8)(@expo/metro-runtime@55.0.3)(expo-router@55.0.0-beta.4)(graphql@16.12.0)(react-dom@19.2.3(react@19.2.0))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.0))(react@19.2.0))(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0)
       fontfaceobserver: 2.3.0
+      react: 19.2.0
+      react-native: 0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0)
+
+  expo-glass-effect@55.0.3(expo@55.0.0-preview.7)(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0):
+    dependencies:
+      expo: 55.0.0-preview.7(@babel/core@7.28.6)(@expo/dom-webview@0.2.8)(@expo/metro-runtime@55.0.3)(expo-router@55.0.0-beta.4)(graphql@16.12.0)(react-dom@19.2.3(react@19.2.0))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.0))(react@19.2.0))(react-native@0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0))(react@19.2.0)
       react: 19.2.0
       react-native: 0.83.1(@babel/core@7.28.6)(@types/react@19.2.9)(react@19.2.0)
 
