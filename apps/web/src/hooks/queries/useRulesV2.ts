@@ -112,9 +112,8 @@ export function useMigrateOneRule() {
  */
 export function isRuleV2(rule: Rule): boolean {
   return (
-    'conditions' in rule &&
     rule.conditions !== null &&
-    typeof rule.conditions === 'object' &&
-    'groups' in (rule.conditions as Record<string, unknown>)
+    rule.conditions !== undefined &&
+    Array.isArray(rule.conditions.groups)
   );
 }

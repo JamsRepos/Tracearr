@@ -56,7 +56,7 @@ import type {
   CreateRuleV2Input,
   UpdateRuleV2Input,
 } from '@tracearr/shared';
-import { RuleBuilderDialog } from '@/components/rules';
+import { RuleBuilderDialog, getRuleIcon, getRuleSummary, isV2Rule } from '@/components/rules';
 import {
   getSpeedUnit,
   getDistanceUnit,
@@ -574,6 +574,17 @@ function RuleCard({
   const ruleType = ruleTypes.find((rt) => rt.value === rule.type);
   const speedUnit = getSpeedUnit(unitSystem);
   const distanceUnit = getDistanceUnit(unitSystem);
+  const isV2 = isV2Rule(rule);
+
+  // Get icon: V2 rules infer from first condition, V1 uses type mapping
+  const icon = isV2
+    ? getRuleIcon(rule)
+    : ((rule.type ? RULE_TYPE_ICONS[rule.type] : null) ?? <Shield className="h-5 w-5" />);
+
+  // Get subtitle: V2 shows summary, V1 shows type label
+  const subtitle = isV2
+    ? getRuleSummary(rule)
+    : (ruleType?.label ?? rule.type?.replace(/_/g, ' ') ?? 'Unknown');
 
   return (
     <Card
@@ -590,7 +601,7 @@ function RuleCard({
               />
             )}
             <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-              {RULE_TYPE_ICONS[rule.type] ?? <Shield className="h-5 w-5" />}
+              {icon}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -599,79 +610,83 @@ function RuleCard({
                   <span className="text-muted-foreground text-xs">({t('rules.disable')}d)</span>
                 )}
               </div>
-              <p className="text-muted-foreground text-sm">
-                {ruleType?.label ?? rule.type.replace(/_/g, ' ')}
-              </p>
-              <div className="text-muted-foreground mt-2 text-xs">
-                {rule.type === 'impossible_travel' && (
-                  <span>
-                    {t('rules.maxSpeed', { unit: speedUnit })}:{' '}
-                    {Math.round(
-                      fromMetricDistance(
-                        (rule.params as { maxSpeedKmh: number }).maxSpeedKmh,
-                        unitSystem
-                      )
-                    )}{' '}
-                    {speedUnit}
-                  </span>
-                )}
-                {rule.type === 'simultaneous_locations' && (
-                  <span>
-                    {t('rules.minDistance', { unit: distanceUnit })}:{' '}
-                    {Math.round(
-                      fromMetricDistance(
-                        (rule.params as { minDistanceKm: number }).minDistanceKm,
-                        unitSystem
-                      )
-                    )}{' '}
-                    {distanceUnit}
-                  </span>
-                )}
-                {rule.type === 'device_velocity' && (
-                  <span>
-                    {t('rules.maxIps')}:{' '}
-                    {(rule.params as { maxIps: number; windowHours: number }).maxIps} /{' '}
-                    {(rule.params as { maxIps: number; windowHours: number }).windowHours}h
-                  </span>
-                )}
-                {rule.type === 'concurrent_streams' && (
-                  <span>
-                    {t('rules.maxStreams')}: {(rule.params as { maxStreams: number }).maxStreams}
-                  </span>
-                )}
-                {rule.type === 'geo_restriction' &&
-                  (() => {
-                    const p = rule.params as {
-                      mode?: string;
-                      countries?: string[];
-                      blockedCountries?: string[];
-                    };
-                    const mode = p.mode ?? 'blocklist';
-                    const countries = p.countries ?? p.blockedCountries ?? [];
-                    const countryNames = countries.map((c) => getCountryName(c) ?? c);
-                    return (
-                      <span>
-                        {mode === 'allowlist' ? t('rules.allowed') : t('rules.blocked')}:{' '}
-                        {countryNames.join(', ') || t('rules.none')}
-                      </span>
-                    );
-                  })()}
-                {rule.type === 'account_inactivity' &&
-                  (() => {
-                    const p = rule.params as {
-                      inactivityValue: number;
-                      inactivityUnit: string;
-                    };
-                    return (
-                      <span>
-                        {t('rules.inactiveFor', {
-                          value: p.inactivityValue,
-                          unit: p.inactivityUnit,
-                        })}
-                      </span>
-                    );
-                  })()}
-              </div>
+              {isV2 && rule.description && (
+                <p className="text-muted-foreground text-sm">{rule.description}</p>
+              )}
+              <p className="text-muted-foreground text-sm">{subtitle}</p>
+              {/* V1 rules: show parameter details */}
+              {!isV2 && (
+                <div className="text-muted-foreground mt-2 text-xs">
+                  {rule.type === 'impossible_travel' && (
+                    <span>
+                      {t('rules.maxSpeed', { unit: speedUnit })}:{' '}
+                      {Math.round(
+                        fromMetricDistance(
+                          (rule.params as { maxSpeedKmh: number }).maxSpeedKmh,
+                          unitSystem
+                        )
+                      )}{' '}
+                      {speedUnit}
+                    </span>
+                  )}
+                  {rule.type === 'simultaneous_locations' && (
+                    <span>
+                      {t('rules.minDistance', { unit: distanceUnit })}:{' '}
+                      {Math.round(
+                        fromMetricDistance(
+                          (rule.params as { minDistanceKm: number }).minDistanceKm,
+                          unitSystem
+                        )
+                      )}{' '}
+                      {distanceUnit}
+                    </span>
+                  )}
+                  {rule.type === 'device_velocity' && (
+                    <span>
+                      {t('rules.maxIps')}:{' '}
+                      {(rule.params as { maxIps: number; windowHours: number }).maxIps} /{' '}
+                      {(rule.params as { maxIps: number; windowHours: number }).windowHours}h
+                    </span>
+                  )}
+                  {rule.type === 'concurrent_streams' && (
+                    <span>
+                      {t('rules.maxStreams')}: {(rule.params as { maxStreams: number }).maxStreams}
+                    </span>
+                  )}
+                  {rule.type === 'geo_restriction' &&
+                    (() => {
+                      const p = rule.params as {
+                        mode?: string;
+                        countries?: string[];
+                        blockedCountries?: string[];
+                      };
+                      const mode = p.mode ?? 'blocklist';
+                      const countries = p.countries ?? p.blockedCountries ?? [];
+                      const countryNames = countries.map((c) => getCountryName(c) ?? c);
+                      return (
+                        <span>
+                          {mode === 'allowlist' ? t('rules.allowed') : t('rules.blocked')}:{' '}
+                          {countryNames.join(', ') || t('rules.none')}
+                        </span>
+                      );
+                    })()}
+                  {rule.type === 'account_inactivity' &&
+                    (() => {
+                      const p = rule.params as {
+                        inactivityValue: number;
+                        inactivityUnit: string;
+                      };
+                      return (
+                        <span>
+                          {t('rules.inactiveFor', {
+                            value: p.inactivityValue,
+                            unit: p.inactivityUnit,
+                          })}
+                        </span>
+                      );
+                    })()}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -822,11 +837,6 @@ export function Rules() {
     }
     setIsV2DialogOpen(false);
     setEditingV2Rule(undefined);
-  };
-
-  // Determine if a rule is V2 (has conditions/actions instead of type/params)
-  const isV2Rule = (rule: Rule): boolean => {
-    return 'conditions' in rule && rule.conditions !== null && rule.conditions !== undefined;
   };
 
   const bulkActions: BulkAction[] = [

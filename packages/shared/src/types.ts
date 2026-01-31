@@ -406,8 +406,15 @@ export type RuleParams =
 export interface Rule {
   id: string;
   name: string;
-  type: RuleType;
-  params: RuleParams;
+  // V1 fields (legacy, nullable for V2 rules)
+  type: RuleType | null;
+  params: RuleParams | null;
+  // V2 fields (nullable for V1 rules)
+  description?: string | null;
+  conditions?: RuleConditions | null;
+  actions?: RuleActions | null;
+  serverId?: string | null;
+  // Common fields
   serverUserId: string | null;
   isActive: boolean;
   createdAt: Date;
