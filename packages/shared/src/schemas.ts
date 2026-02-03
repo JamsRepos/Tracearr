@@ -674,6 +674,7 @@ export const updateSettingsSchema = z.object({
   trustProxy: z.boolean().optional(),
   // Authentication settings
   primaryAuthMethod: z.enum(['jellyfin', 'local']).optional(),
+  jellyfinOwnerId: z.string().max(255).nullable().optional(),
 });
 
 // ============================================================================

@@ -854,6 +854,8 @@ export interface Settings {
   mobileEnabled: boolean;
   // Authentication settings
   primaryAuthMethod: 'jellyfin' | 'local';
+  /** Jellyfin user ID designated as Tracearr owner (when primaryAuthMethod is jellyfin) */
+  jellyfinOwnerId: string | null;
 }
 
 // Heavy operations lock info (for "Waiting for X" display)

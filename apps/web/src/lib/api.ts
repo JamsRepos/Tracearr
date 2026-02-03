@@ -458,6 +458,10 @@ class ApiClient {
         body: JSON.stringify(data),
       }),
 
+    // List Jellyfin admins for owner dropdown (owner-only)
+    getJellyfinAdmins: () =>
+      this.request<{ id: string; username: string }[]>('/auth/jellyfin/admins'),
+
     // Emby server connection with API key (requires auth)
     connectEmbyWithApiKey: (data: { serverUrl: string; serverName: string; apiKey: string }) =>
       this.request<{

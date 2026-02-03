@@ -688,6 +688,7 @@ export const settings = pgTable('settings', {
     .$type<'jellyfin' | 'local'>()
     .notNull()
     .default('local'), // Default to local auth
+  jellyfinOwnerId: varchar('jellyfin_owner_id', { length: 255 }), // Jellyfin user ID of admin selected as Tracearr owner (when primaryAuthMethod is jellyfin)
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

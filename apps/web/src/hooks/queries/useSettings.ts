@@ -39,6 +39,16 @@ export function useSettings() {
   });
 }
 
+/** Jellyfin admins for owner dropdown (owner-only). Enable when primary auth is jellyfin. */
+export function useJellyfinAdmins(enabled: boolean) {
+  return useQuery({
+    queryKey: ['jellyfinAdmins'],
+    queryFn: api.auth.getJellyfinAdmins,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled,
+  });
+}
+
 interface UpdateSettingsOptions {
   silent?: boolean;
 }

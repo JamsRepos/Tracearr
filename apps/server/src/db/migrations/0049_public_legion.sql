@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "jellyfin_owner_id" varchar(255);

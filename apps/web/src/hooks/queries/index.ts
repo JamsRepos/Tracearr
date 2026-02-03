@@ -99,7 +99,13 @@ export {
 } from './useServers';
 
 // Settings hooks
-export { useSettings, useUpdateSettings, useApiKey, useRegenerateApiKey } from './useSettings';
+export {
+  useSettings,
+  useUpdateSettings,
+  useApiKey,
+  useRegenerateApiKey,
+  useJellyfinAdmins,
+} from './useSettings';
 
 // Channel Routing hooks
 export { useChannelRouting, useUpdateChannelRouting } from './useChannelRouting';

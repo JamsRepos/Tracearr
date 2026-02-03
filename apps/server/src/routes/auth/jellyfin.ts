@@ -9,7 +9,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { servers, users } from '../../db/schema.js';
+import { servers, users, settings } from '../../db/schema.js';
 import { JellyfinClient } from '../../services/mediaServer/index.js';
 // Token encryption removed - tokens now stored in plain text (DB is localhost-only)
 import { generateTokens } from './utils.js';
@@ -30,6 +30,40 @@ const jellyfinConnectApiKeySchema = z.object({
 });
 
 export const jellyfinRoutes: FastifyPluginAsync = async (app) => {
+  /**
+   * GET /jellyfin/admins - List Jellyfin server admins (for owner dropdown)
+   * Owner-only. Uses each configured Jellyfin server's API key to fetch users; returns admins only, deduped by username.
+   */
+  app.get('/jellyfin/admins', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can list Jellyfin admins');
+    }
+
+    const jellyfinServers = await db.select().from(servers).where(eq(servers.type, 'jellyfin'));
+    const byUsername = new Map<string, { id: string; username: string }>();
+
+    for (const server of jellyfinServers) {
+      if (!server.token) continue;
+      try {
+        const client = new JellyfinClient({ url: server.url, token: server.token });
+        const users = await client.getUsers();
+        for (const u of users) {
+          if (u.isAdmin && u.username) {
+            byUsername.set(u.username, { id: u.id, username: u.username });
+          }
+        }
+      } catch (error) {
+        app.log.debug({ error, serverId: server.id }, 'Failed to fetch Jellyfin users for server');
+      }
+    }
+
+    const admins = Array.from(byUsername.values()).sort((a, b) =>
+      a.username.localeCompare(b.username)
+    );
+    return admins;
+  });
+
   /**
    * POST /jellyfin/login - Login with Jellyfin username/password
    *
@@ -64,32 +98,41 @@ export const jellyfinRoutes: FastifyPluginAsync = async (app) => {
               'Jellyfin admin authentication successful'
             );
 
+            // Designated Jellyfin owner (from settings, by ID) gets Tracearr owner role; others get admin
+            const settingsRow = await db.select().from(settings).limit(1);
+            const jellyfinOwnerId =
+              settingsRow[0] && 'jellyfinOwnerId' in settingsRow[0]
+                ? settingsRow[0].jellyfinOwnerId
+                : null;
+            const roleToAssign =
+              jellyfinOwnerId != null && jellyfinOwnerId === authResult.id ? 'owner' : 'admin';
+
             // Check if user already exists
             let user = await getUserByUsername(username);
 
             if (!user) {
-              // Create new user with admin role
+              // Create new user with owner or admin role
               user = await createUser({
                 username,
-                role: 'admin',
+                role: roleToAssign,
                 email: undefined, // Jellyfin doesn't expose email in auth response
                 thumbnail: undefined, // Can be populated later via sync
               });
               app.log.info(
-                { userId: user.id, username },
+                { userId: user.id, username, role: user.role },
                 'Created new user from Jellyfin admin login'
               );
             } else {
-              // Update existing user role to admin if not already
-              if (user.role !== 'admin' && user.role !== 'owner') {
+              // Update existing user role if not already owner, or promote to owner when designated
+              if (user.role !== 'owner' && (user.role !== 'admin' || roleToAssign === 'owner')) {
                 await db
                   .update(users)
-                  .set({ role: 'admin', updatedAt: new Date() })
+                  .set({ role: roleToAssign, updatedAt: new Date() })
                   .where(eq(users.id, user.id));
-                user.role = 'admin';
+                user.role = roleToAssign;
                 app.log.info(
-                  { userId: user.id, username },
-                  'Updated user role to admin from Jellyfin login'
+                  { userId: user.id, username, role: user.role },
+                  'Updated user role from Jellyfin login'
                 );
               }
             }

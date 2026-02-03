@@ -116,6 +116,10 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
     if ('usePlexGeoip' in row && typeof row.usePlexGeoip === 'boolean') {
       usePlexGeoip = row.usePlexGeoip;
     }
+    let jellyfinOwnerId: string | null = null;
+    if ('jellyfinOwnerId' in row && typeof row.jellyfinOwnerId === 'string') {
+      jellyfinOwnerId = row.jellyfinOwnerId;
+    }
 
     const result: Settings = {
       allowGuestAccess: row.allowGuestAccess,
@@ -137,6 +141,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       trustProxy: row.trustProxy,
       mobileEnabled: row.mobileEnabled,
       primaryAuthMethod,
+      jellyfinOwnerId,
     };
 
     return result;
@@ -178,6 +183,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       basePath: string;
       trustProxy: boolean;
       primaryAuthMethod: 'jellyfin' | 'local';
+      jellyfinOwnerId: string | null;
       updatedAt: Date;
     }> = {
       updatedAt: new Date(),
@@ -263,6 +269,10 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       updateData.primaryAuthMethod = body.data.primaryAuthMethod;
     }
 
+    if (body.data.jellyfinOwnerId !== undefined) {
+      updateData.jellyfinOwnerId = body.data.jellyfinOwnerId;
+    }
+
     // Ensure settings row exists
     const existing = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
 
@@ -288,6 +298,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         basePath: updateData.basePath ?? '',
         trustProxy: updateData.trustProxy ?? false,
         primaryAuthMethod: updateData.primaryAuthMethod ?? 'local',
+        jellyfinOwnerId: updateData.jellyfinOwnerId ?? null,
       });
     } else {
       // Update existing
@@ -311,6 +322,10 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
     if ('usePlexGeoip' in row && typeof row.usePlexGeoip === 'boolean') {
       usePlexGeoip = row.usePlexGeoip;
     }
+    let jellyfinOwnerId: string | null = null;
+    if ('jellyfinOwnerId' in row && typeof row.jellyfinOwnerId === 'string') {
+      jellyfinOwnerId = row.jellyfinOwnerId;
+    }
 
     const result: Settings = {
       allowGuestAccess: row.allowGuestAccess,
@@ -332,6 +347,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       trustProxy: row.trustProxy,
       mobileEnabled: row.mobileEnabled,
       primaryAuthMethod,
+      jellyfinOwnerId,
     };
 
     return result;

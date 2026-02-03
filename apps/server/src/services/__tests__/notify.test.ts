@@ -55,6 +55,7 @@ describe('NotificationManager', () => {
     trustProxy: false,
     mobileEnabled: false,
     primaryAuthMethod: 'local',
+    jellyfinOwnerId: null,
     usePlexGeoip: false,
     ...overrides,
   });
