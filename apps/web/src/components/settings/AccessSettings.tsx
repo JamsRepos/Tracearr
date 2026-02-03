@@ -87,14 +87,21 @@ export function AccessSettings() {
 
         {showAuthMethodSelector && (
           <div className="bg-muted/30 space-y-5 rounded-lg border p-5">
-            <div>
-              <h3 className="text-sm font-medium">Select the owner</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Choose how the Tracearr owner signs in, then pick which account has full owner
-                access.
-              </p>
-            </div>
-            <div className="grid gap-5 sm:grid-cols-1 md:grid-cols-2">
+            {primaryIsJellyfin && (
+              <div>
+                <h3 className="text-sm font-medium">Owner account</h3>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Choose which Jellyfin admin has full owner access when signing in.
+                </p>
+              </div>
+            )}
+            <div
+              className={
+                primaryIsJellyfin
+                  ? 'grid gap-5 sm:grid-cols-1 md:grid-cols-2'
+                  : 'grid grid-cols-1 gap-5'
+              }
+            >
               <Field>
                 <div className="flex items-center justify-between">
                   <FieldLabel htmlFor="primaryAuthMethod">Default login method</FieldLabel>
@@ -182,7 +189,7 @@ export function AccessSettings() {
                       className="w-full"
                       aria-invalid={jellyfinOwnerIdField.status === 'error'}
                     >
-                      <SelectValue placeholder="Select the owner" />
+                      <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={JELLYFIN_OWNER_NONE}>
