@@ -26,7 +26,7 @@ import { getGeoIPSettings } from '../../routes/settings.js';
 import { sseManager } from '../../services/sseManager.js';
 
 import type { PollerConfig, ServerWithToken, ServerProcessingResult } from './types.js';
-import { mapMediaSession } from './sessionMapper.js';
+import { mapMediaSession, pickStreamDetailFields } from './sessionMapper.js';
 import { batchGetRecentUserSessions, getActiveRulesV2 } from './database.js';
 import {
   calculatePauseAccumulation,
@@ -631,20 +631,14 @@ async function processServerSessions(
         const newState = processed.state;
         const now = new Date();
 
-        const updatePayload: {
-          state: 'playing' | 'paused';
-          quality: string;
-          bitrate: number;
-          progressMs: number | null;
-          lastSeenAt: Date;
-          plexSessionId?: string | null;
-          lastPausedAt?: Date | null;
-          pausedDurationMs?: number;
-          watched?: boolean;
-          isTranscode: boolean;
-          videoDecision: string;
-          audioDecision: string;
-        } = {
+        // Check if transcode state changed (e.g., user changed quality mid-stream)
+        // If so, we need to update stream details which contain output dimensions
+        const transcodeStateChanged =
+          existingSession.videoDecision !== processed.videoDecision ||
+          existingSession.audioDecision !== processed.audioDecision;
+
+        // Build base update payload
+        const updatePayload: Partial<typeof sessions.$inferInsert> = {
           state: newState,
           quality: processed.quality,
           bitrate: processed.bitrate,
@@ -655,6 +649,13 @@ async function processServerSessions(
           videoDecision: processed.videoDecision,
           audioDecision: processed.audioDecision,
         };
+
+        // If transcode state changed, update stream details to get correct output dimensions
+        // This fixes issue #291 where mid-stream quality changes left stale dimensions
+        if (transcodeStateChanged) {
+          const streamDetails = pickStreamDetailFields(processed);
+          Object.assign(updatePayload, streamDetails);
+        }
 
         const pauseResult = calculatePauseAccumulation(
           previousState as SessionState,

@@ -343,10 +343,19 @@ function extractTranscodeInfo(
 
 /**
  * Extract stream video details (output after transcode)
+ *
+ * When video is being transcoded, Plex's TranscodeSession element may or may not have
+ * width/height attributes depending on the transcode type:
+ * - videoDecision="copy" (audio-only transcode): TranscodeSession HAS width/height (source dims)
+ * - videoDecision="transcode" (video transcode): TranscodeSession has NO width/height
+ *
+ * For actual video transcodes, we fall back to Media/Stream element dimensions which
+ * correctly show the transcoded output dimensions.
  */
 function extractStreamVideoDetails(
   transcodeSession: Record<string, unknown> | undefined,
-  sourceVideoDetails: SourceVideoDetails
+  sourceVideoDetails: SourceVideoDetails,
+  fallbackDimensions?: { width?: number; height?: number }
 ): { codec?: string; details: StreamVideoDetails } {
   if (!transcodeSession) {
     // Direct play - stream details match source
@@ -355,11 +364,13 @@ function extractStreamVideoDetails(
 
   const details: StreamVideoDetails = {};
 
-  // Transcode output dimensions
-  const width = parseOptionalNumber(transcodeSession.width);
+  // Transcode output dimensions - try TranscodeSession first, then fallback to Media/Stream
+  // TranscodeSession.width/height only exists for videoDecision="copy" (audio-only transcode)
+  // For actual video transcodes, use Media/Stream element dimensions (the transcoded output)
+  const width = parseOptionalNumber(transcodeSession.width) ?? fallbackDimensions?.width;
   if (width) details.width = width;
 
-  const height = parseOptionalNumber(transcodeSession.height);
+  const height = parseOptionalNumber(transcodeSession.height) ?? fallbackDimensions?.height;
   if (height) details.height = height;
 
   // If transcoding, framerate may change (rare but possible)
@@ -440,7 +451,14 @@ function extractStreamDetails(
   const sourceAudio = extractSourceAudioDetails(audioStream);
 
   // Extract stream (output) details
-  const streamVideo = extractStreamVideoDetails(transcodeSession, sourceVideo.details);
+  // Pass Media element dimensions as fallback for when TranscodeSession lacks width/height
+  // (which happens during actual video transcodes, not just audio-only transcodes)
+  const mediaWidth = parseOptionalNumber(selectedMedia?.width);
+  const mediaHeight = parseOptionalNumber(selectedMedia?.height);
+  const streamVideo = extractStreamVideoDetails(transcodeSession, sourceVideo.details, {
+    width: mediaWidth,
+    height: mediaHeight,
+  });
   const streamAudio = extractStreamAudioDetails(transcodeSession);
 
   // Extract transcode and subtitle info
@@ -706,9 +724,8 @@ export function parseSession(
       streamAudioCodec: sessionStreamDetails.streamAudioCodec,
       streamVideoDetails: {
         ...sessionStreamDetails.streamVideoDetails,
-        // Session's Media width/height during transcode IS the transcoded output
-        width: sessionVideoWidth,
-        height: sessionVideoHeight,
+        // TranscodeSession.width/height already extracted correctly by extractStreamVideoDetails
+        // Do NOT override with sessionVideoWidth/sessionVideoHeight (those are source dimensions)
         // Session's Stream[].bitrate during transcode IS the transcoded video bitrate
         bitrate: sessionStreamDetails.sourceVideoDetails?.bitrate,
       },
