@@ -160,6 +160,13 @@ export function parseSessionCore(
   const userImageTag = parseOptionalString(session.UserPrimaryImageTag);
   const primaryImageTag = imageTags?.Primary ? parseString(imageTags.Primary) : undefined;
 
+  // For music tracks, extract metadata early so we can use album artwork as fallback
+  const musicMetadata = mediaType === 'track' ? extractMusicMetadata(nowPlaying) : undefined;
+
+  // Build thumb path: use item's Primary image, or album artwork for music tracks
+  const itemThumbPath = buildItemImagePath(itemId, primaryImageTag);
+  const thumbPath = itemThumbPath ?? musicMetadata?.albumThumbPath;
+
   // Parse lastPausedDate only if the platform supports it (Jellyfin only)
   let lastPausedDate: Date | undefined;
   if (supportsLastPausedDate) {
@@ -180,7 +187,7 @@ export function parseSessionCore(
       type: mediaType,
       durationMs,
       year: parseOptionalNumber(nowPlaying.ProductionYear),
-      thumbPath: buildItemImagePath(itemId, primaryImageTag),
+      thumbPath,
     },
     playback: {
       state: playState?.IsPaused ? 'paused' : 'playing',
@@ -229,9 +236,9 @@ export function parseSessionCore(
     result.live = extractLiveTvMetadata(nowPlaying);
   }
 
-  // Add music track metadata if this is a track
-  if (mediaType === 'track') {
-    result.music = extractMusicMetadata(nowPlaying);
+  // Add music track metadata if this is a track (already extracted above for thumb fallback)
+  if (musicMetadata) {
+    result.music = musicMetadata;
   }
 
   return result;

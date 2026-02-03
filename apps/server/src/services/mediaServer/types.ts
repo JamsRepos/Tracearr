@@ -81,6 +81,8 @@ export interface MediaSession {
     trackNumber?: number;
     /** Disc number for multi-disc albums */
     discNumber?: number;
+    /** Album artwork path (fallback when track has no artwork) */
+    albumThumbPath?: string;
   };
 
   /** Playback state */

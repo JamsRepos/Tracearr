@@ -164,13 +164,14 @@ describe('extractLiveTvMetadata', () => {
 });
 
 describe('extractMusicMetadata', () => {
-  it('returns undefined artistName when no artist info available', () => {
+  it('returns undefined for all fields when no data available', () => {
     const result = extractMusicMetadata({});
     expect(result).toEqual({
       artistName: undefined,
       albumName: undefined,
       trackNumber: undefined,
       discNumber: undefined,
+      albumThumbPath: undefined,
     });
   });
 
@@ -240,6 +241,31 @@ describe('extractMusicMetadata', () => {
     });
     expect(result.trackNumber).toBeUndefined();
     expect(result.discNumber).toBeUndefined();
+  });
+
+  it('extracts album artwork path when AlbumId and AlbumPrimaryImageTag are present', () => {
+    const result = extractMusicMetadata({
+      AlbumArtist: 'Artist',
+      AlbumId: 'album-123',
+      AlbumPrimaryImageTag: 'tag-456',
+    });
+    expect(result.albumThumbPath).toBe('/Items/album-123/Images/Primary');
+  });
+
+  it('returns undefined albumThumbPath when AlbumId is missing', () => {
+    const result = extractMusicMetadata({
+      AlbumArtist: 'Artist',
+      AlbumPrimaryImageTag: 'tag-456',
+    });
+    expect(result.albumThumbPath).toBeUndefined();
+  });
+
+  it('returns undefined albumThumbPath when AlbumPrimaryImageTag is missing', () => {
+    const result = extractMusicMetadata({
+      AlbumArtist: 'Artist',
+      AlbumId: 'album-123',
+    });
+    expect(result.albumThumbPath).toBeUndefined();
   });
 });
 

@@ -356,12 +356,16 @@ export function extractLiveTvMetadata(
  *
  * Note: All fields are optional. When a field is not available, it's undefined
  * (stored as NULL in DB) rather than empty string for query consistency.
+ *
+ * Album artwork: Music tracks often don't have their own Primary image - the artwork
+ * is on the album. We extract AlbumId + AlbumPrimaryImageTag as a fallback.
  */
 export function extractMusicMetadata(nowPlaying: Record<string, unknown>): {
   artistName?: string;
   albumName?: string;
   trackNumber?: number;
   discNumber?: number;
+  albumThumbPath?: string;
 } {
   const artists = nowPlaying.Artists as string[] | undefined;
   const artistFromList = artists?.[0]?.slice(0, 255);
@@ -371,11 +375,17 @@ export function extractMusicMetadata(nowPlaying: Record<string, unknown>): {
   const isCompilation = albumArtist?.toLowerCase() === 'various artists';
   const artistName = isCompilation ? artistFromList || albumArtist : albumArtist || artistFromList;
 
+  // Extract album artwork path as fallback for tracks without their own image
+  const albumId = parseOptionalString(nowPlaying.AlbumId);
+  const albumImageTag = parseOptionalString(nowPlaying.AlbumPrimaryImageTag);
+  const albumThumbPath = buildItemImagePath(albumId ?? '', albumImageTag);
+
   return {
     artistName: artistName || undefined,
     albumName: parseOptionalBoundedString(nowPlaying.Album, 255),
     trackNumber: parseOptionalNumber(nowPlaying.IndexNumber),
     discNumber: parseOptionalNumber(nowPlaying.ParentIndexNumber),
+    albumThumbPath,
   };
 }
 

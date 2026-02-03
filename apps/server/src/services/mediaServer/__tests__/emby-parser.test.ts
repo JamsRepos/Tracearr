@@ -224,4 +224,46 @@ describe('Emby Parser - Edge Cases', () => {
     expect(session!.user.thumb).toBeUndefined();
     expect(session!.media.thumbPath).toBeUndefined();
   });
+
+  it('should use album artwork as fallback for music tracks without Primary image', () => {
+    const session = parseSession({
+      Id: 'session-1',
+      UserId: 'user-123',
+      NowPlayingItem: {
+        Id: 'track-123',
+        Name: 'Song Title',
+        Type: 'Audio',
+        ImageTags: {}, // No Primary image on track
+        AlbumId: 'album-456',
+        AlbumPrimaryImageTag: 'album-tag',
+        Album: 'Test Album',
+        AlbumArtist: 'Test Artist',
+      },
+    });
+
+    // Should fall back to album artwork
+    expect(session!.media.thumbPath).toBe('/Items/album-456/Images/Primary');
+    expect(session!.music?.albumThumbPath).toBe('/Items/album-456/Images/Primary');
+  });
+
+  it('should prefer track Primary image over album artwork for music tracks', () => {
+    const session = parseSession({
+      Id: 'session-1',
+      UserId: 'user-123',
+      NowPlayingItem: {
+        Id: 'track-123',
+        Name: 'Song Title',
+        Type: 'Audio',
+        ImageTags: { Primary: 'track-tag' }, // Track has its own image
+        AlbumId: 'album-456',
+        AlbumPrimaryImageTag: 'album-tag',
+        Album: 'Test Album',
+        AlbumArtist: 'Test Artist',
+      },
+    });
+
+    // Should use track's own image, not album
+    expect(session!.media.thumbPath).toBe('/Items/track-123/Images/Primary');
+    expect(session!.music?.albumThumbPath).toBe('/Items/album-456/Images/Primary');
+  });
 });
