@@ -767,6 +767,30 @@ export class TautulliService {
             continue;
           }
 
+          // Validate field lengths to prevent varchar overflow errors
+          // Check fields that map to varchar columns with limits
+          const fieldOverflows: string[] = [];
+          if (record.product && record.product.length > 255) fieldOverflows.push('product');
+          if (record.player && record.player.length > 255) fieldOverflows.push('player');
+          if (record.machine_id && record.machine_id.length > 255)
+            fieldOverflows.push('machine_id');
+          if (record.thumb && record.thumb.length > 500) fieldOverflows.push('thumb');
+          // For music tracks, artist/album names map to varchar(255)
+          if (record.media_type === 'track') {
+            if (record.grandparent_title && record.grandparent_title.length > 255)
+              fieldOverflows.push('grandparent_title(artistName)');
+            if (record.parent_title && record.parent_title.length > 255)
+              fieldOverflows.push('parent_title(albumName)');
+          }
+          if (fieldOverflows.length > 0) {
+            console.warn(
+              `[Tautulli] Skipping record ${referenceIdStr}: field overflow in ${fieldOverflows.join(', ')}`
+            );
+            skipped++;
+            progress.skippedRecords++;
+            continue;
+          }
+
           // Check if exists in database (per-page query result)
           const existingByRef = sessionByExternalId.get(referenceIdStr);
           if (existingByRef) {
