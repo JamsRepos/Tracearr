@@ -704,8 +704,7 @@ export function parseSession(
   let videoResolution: string | undefined;
 
   // Check if originalMedia has valid dimensions (not just that it exists)
-  const hasValidOriginalMedia =
-    originalMedia && originalMedia.videoWidth && originalMedia.videoHeight;
+  const hasValidOriginalMedia = originalMedia?.videoWidth && originalMedia?.videoHeight;
 
   if (isTranscode && hasValidOriginalMedia) {
     // Use original media for source, session data for stream output
