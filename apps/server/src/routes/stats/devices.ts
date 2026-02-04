@@ -293,7 +293,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
           COUNT(*) FILTER (WHERE video_decision = 'directplay')::int AS video_direct,
           COUNT(*) FILTER (WHERE audio_decision = 'directplay')::int AS audio_direct,
           COUNT(*) FILTER (WHERE video_decision = 'directplay' AND audio_decision = 'directplay')::int AS full_direct,
-          COUNT(*) FILTER (WHERE video_decision != 'directplay' OR audio_decision != 'directplay')::int AS transcode_count,
+          COUNT(*) FILTER (WHERE video_decision = 'transcode' OR audio_decision = 'transcode')::int AS transcode_count,
           ROUND(100.0 * COUNT(*) FILTER (WHERE video_decision = 'directplay' AND audio_decision = 'directplay') / NULLIF(COUNT(*), 0), 1) AS direct_play_pct
         FROM sessions
         ${baseWhere}
@@ -364,7 +364,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
           COALESCE(source_audio_codec, 'Unknown') AS audio_codec,
           COUNT(*)::int AS sessions,
           COUNT(*) FILTER (WHERE video_decision = 'directplay' AND audio_decision = 'directplay')::int AS direct_count,
-          COUNT(*) FILTER (WHERE video_decision != 'directplay' OR audio_decision != 'directplay')::int AS transcode_count,
+          COUNT(*) FILTER (WHERE video_decision = 'transcode' OR audio_decision = 'transcode')::int AS transcode_count,
           ROUND(100.0 * COUNT(*) FILTER (WHERE video_decision = 'directplay' AND audio_decision = 'directplay') / NULLIF(COUNT(*), 0), 1) AS direct_play_pct
         FROM sessions
         ${baseWhere}
@@ -372,7 +372,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
         ${period === 'custom' ? sql`AND started_at < ${dateRange.end}` : sql``}
         ${serverFilter}
         GROUP BY platform, source_video_codec, source_audio_codec
-        HAVING COUNT(*) FILTER (WHERE video_decision != 'directplay' OR audio_decision != 'directplay') > 0
+        HAVING COUNT(*) FILTER (WHERE video_decision = 'transcode' OR audio_decision = 'transcode') > 0
         ORDER BY transcode_count DESC
         LIMIT 10
       `);
@@ -446,7 +446,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
           su.thumb_url AS avatar,
           COUNT(*)::int AS total_sessions,
           COUNT(*) FILTER (WHERE s.video_decision = 'directplay' AND s.audio_decision = 'directplay')::int AS direct_play_count,
-          COUNT(*) FILTER (WHERE s.video_decision != 'directplay' OR s.audio_decision != 'directplay')::int AS transcode_count,
+          COUNT(*) FILTER (WHERE s.video_decision = 'transcode' OR s.audio_decision = 'transcode')::int AS transcode_count,
           ROUND(100.0 * COUNT(*) FILTER (WHERE s.video_decision = 'directplay' AND s.audio_decision = 'directplay') / NULLIF(COUNT(*), 0), 1) AS direct_play_pct
         FROM sessions s
         JOIN server_users su ON s.server_user_id = su.id
@@ -456,7 +456,7 @@ export const devicesRoutes: FastifyPluginAsync = async (app) => {
         ${period === 'custom' ? sql`AND s.started_at < ${dateRange.end}` : sql``}
         ${serverFilter}
         GROUP BY su.id, su.username, su.thumb_url, u.name
-        HAVING COUNT(*) FILTER (WHERE s.video_decision != 'directplay' OR s.audio_decision != 'directplay') > 0
+        HAVING COUNT(*) FILTER (WHERE s.video_decision = 'transcode' OR s.audio_decision = 'transcode') > 0
         ORDER BY transcode_count DESC
         LIMIT 10
       `);
