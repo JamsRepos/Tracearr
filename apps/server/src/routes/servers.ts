@@ -227,45 +227,48 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
         };
       }
 
-      // For Plex servers: Validate machineIdentifier if provided
-      if (server.type === 'plex' && clientIdentifier) {
-        if (server.machineIdentifier && server.machineIdentifier !== clientIdentifier) {
+      // Only verify when the URL is actually changing
+      if (server.url !== newUrl) {
+        // For Plex servers: Validate machineIdentifier if provided
+        if (server.type === 'plex' && clientIdentifier) {
+          if (server.machineIdentifier && server.machineIdentifier !== clientIdentifier) {
+            return reply.badRequest(
+              'Server mismatch: The selected connection belongs to a different server. ' +
+                'Please select a connection for the correct server.'
+            );
+          }
+        }
+
+        // Verify the new URL works with the existing token
+        try {
+          if (server.type === 'plex') {
+            const adminCheck = await PlexClient.verifyServerAdmin(server.token, newUrl);
+            if (!adminCheck.success) {
+              if (adminCheck.code === PlexClient.AdminVerifyError.CONNECTION_FAILED) {
+                return reply.serviceUnavailable(adminCheck.message);
+              }
+              return reply.forbidden(adminCheck.message);
+            }
+          } else if (server.type === 'jellyfin') {
+            const adminCheck = await JellyfinClient.verifyServerAdmin(server.token, newUrl);
+            if (!adminCheck.success) {
+              if (adminCheck.code === JellyfinClient.AdminVerifyError.CONNECTION_FAILED) {
+                return reply.serviceUnavailable(adminCheck.message);
+              }
+              return reply.forbidden(adminCheck.message);
+            }
+          } else if (server.type === 'emby') {
+            const isAdmin = await EmbyClient.verifyServerAdmin(server.token, newUrl);
+            if (!isAdmin) {
+              return reply.forbidden('Token does not have admin access at this URL');
+            }
+          }
+        } catch (error) {
+          app.log.error({ error, serverId: id, newUrl }, 'Failed to verify new server URL');
           return reply.badRequest(
-            'Server mismatch: The selected connection belongs to a different server. ' +
-              'Please select a connection for the correct server.'
+            'Failed to connect to server at new URL. Please verify the URL is correct.'
           );
         }
-      }
-
-      // Verify the new URL works with the existing token
-      try {
-        if (server.type === 'plex') {
-          const adminCheck = await PlexClient.verifyServerAdmin(server.token, newUrl);
-          if (!adminCheck.success) {
-            if (adminCheck.code === PlexClient.AdminVerifyError.CONNECTION_FAILED) {
-              return reply.serviceUnavailable(adminCheck.message);
-            }
-            return reply.forbidden(adminCheck.message);
-          }
-        } else if (server.type === 'jellyfin') {
-          const adminCheck = await JellyfinClient.verifyServerAdmin(server.token, newUrl);
-          if (!adminCheck.success) {
-            if (adminCheck.code === JellyfinClient.AdminVerifyError.CONNECTION_FAILED) {
-              return reply.serviceUnavailable(adminCheck.message);
-            }
-            return reply.forbidden(adminCheck.message);
-          }
-        } else if (server.type === 'emby') {
-          const isAdmin = await EmbyClient.verifyServerAdmin(server.token, newUrl);
-          if (!isAdmin) {
-            return reply.forbidden('Token does not have admin access at this URL');
-          }
-        }
-      } catch (error) {
-        app.log.error({ error, serverId: id, newUrl }, 'Failed to verify new server URL');
-        return reply.badRequest(
-          'Failed to connect to server at new URL. Please verify the URL is correct.'
-        );
       }
     } else if (newName !== undefined && server.name === newName) {
       // Name-only update but name unchanged

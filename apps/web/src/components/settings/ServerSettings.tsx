@@ -827,29 +827,12 @@ function EditServerDialog({
                   )}
                 </>
               ) : (
-                <>
-                  <Input
-                    id="edit-url"
-                    value={manualUrl}
-                    onChange={(e) => setManualUrl(e.target.value)}
-                    placeholder="http://192.168.1.100:32400"
-                  />
-                  <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSave} disabled={isUpdating || !canSave}>
-                      {isUpdating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        'Update'
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </>
+                <Input
+                  id="edit-url"
+                  value={manualUrl}
+                  onChange={(e) => setManualUrl(e.target.value)}
+                  placeholder="http://192.168.1.100:32400"
+                />
               )}
             </div>
           ) : (
