@@ -10,6 +10,10 @@ interface UseDebouncedSaveOptions {
   onError?: (error: Error) => void;
 }
 
+export interface SetValueOptions {
+  saveImmediately?: boolean;
+}
+
 /**
  * Hook for debounced auto-saving of settings fields.
  * Saves automatically after the specified delay (default 500ms) of inactivity.
@@ -138,9 +142,6 @@ export function useDebouncedSave<K extends keyof Settings>(
     };
   }, [value, delay, performSave]);
 
-  interface SetValueOptions {
-    saveImmediately?: boolean;
-  }
   const setValueWithTracking = useCallback(
     (newValue: Settings[K] | undefined, options?: SetValueOptions) => {
       userHasEditedRef.current = true;
