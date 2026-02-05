@@ -50,10 +50,38 @@ export function useDeleteServer() {
   });
 }
 
-export function useUpdateServerUrl() {
+export function useUpdateServer() {
   const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: ({
+      id,
+      name,
+      url,
+      clientIdentifier,
+    }: {
+      id: string;
+      name?: string;
+      url?: string;
+      clientIdentifier?: string;
+    }) => api.servers.update(id, { name, url, clientIdentifier }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
+      toast.success(t('toast.success.serverUpdated.title'), {
+        description: t('toast.success.serverUpdated.message'),
+      });
+    },
+    onError: (error: Error) => {
+      toast.error(t('toast.error.serverUpdateFailed'), { description: error.message });
+    },
+  });
+}
+
+/** @deprecated Use useUpdateServer */
+export function useUpdateServerUrl() {
+  const { t } = useTranslation('notifications');
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       id,
@@ -63,7 +91,7 @@ export function useUpdateServerUrl() {
       id: string;
       url: string;
       clientIdentifier?: string;
-    }) => api.servers.updateUrl(id, url, clientIdentifier),
+    }) => api.servers.update(id, { url, clientIdentifier }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['servers', 'list'] });
       toast.success(t('toast.success.serverUrlUpdated.title'), {

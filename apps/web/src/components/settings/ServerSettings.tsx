@@ -48,7 +48,7 @@ import {
   useServers,
   useDeleteServer,
   useSyncServer,
-  useUpdateServerUrl,
+  useUpdateServer,
   usePlexServerConnections,
   useReorderServers,
 } from '@/hooks/queries';
@@ -74,7 +74,7 @@ export function ServerSettings() {
   const { data: serversData, isLoading, refetch } = useServers();
   const deleteServer = useDeleteServer();
   const syncServer = useSyncServer();
-  const updateServerUrl = useUpdateServerUrl();
+  const updateServer = useUpdateServer();
   const reorderServers = useReorderServers();
   const queryClient = useQueryClient();
   const { refetch: refetchUser, user } = useAuth();
@@ -389,7 +389,7 @@ export function ServerSettings() {
                       onDelete={() => {
                         setDeleteId(server.id);
                       }}
-                      onEditUrl={() => {
+                      onEdit={() => {
                         setEditServer(server);
                       }}
                       isSyncing={syncServer.isPending}
@@ -703,16 +703,16 @@ export function ServerSettings() {
         isLoading={deleteServer.isPending}
       />
 
-      {/* Edit Server URL Dialog */}
-      <EditServerUrlDialog
+      {/* Edit Server Dialog */}
+      <EditServerDialog
         server={editServer}
         onClose={() => {
           setEditServer(null);
         }}
-        onUpdate={(url, clientIdentifier) => {
+        onUpdate={(name, url, clientIdentifier) => {
           if (editServer) {
-            updateServerUrl.mutate(
-              { id: editServer.id, url, clientIdentifier },
+            updateServer.mutate(
+              { id: editServer.id, name, url, clientIdentifier },
               {
                 onSuccess: () => {
                   setEditServer(null);
@@ -721,18 +721,17 @@ export function ServerSettings() {
             );
           }
         }}
-        isUpdating={updateServerUrl.isPending}
+        isUpdating={updateServer.isPending}
       />
     </>
   );
 }
 
 /**
- * Edit Server URL Dialog
- * For Plex servers: Shows PlexServerSelector with available connections
- * For Jellyfin/Emby: Shows simple URL input
+ * Edit Server Dialog
+ * Name and/or URL. For Plex servers: shows PlexServerSelector for URL; for Jellyfin/Emby: simple URL input.
  */
-function EditServerUrlDialog({
+function EditServerDialog({
   server,
   onClose,
   onUpdate,
@@ -740,9 +739,10 @@ function EditServerUrlDialog({
 }: {
   server: Server | null;
   onClose: () => void;
-  onUpdate: (url: string, clientIdentifier?: string) => void;
+  onUpdate: (name?: string, url?: string, clientIdentifier?: string) => void;
   isUpdating: boolean;
 }) {
+  const [editName, setEditName] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const isPlexServer = server?.type === 'plex';
 
@@ -751,15 +751,27 @@ function EditServerUrlDialog({
     isPlexServer ? server?.id : undefined
   );
 
-  // Reset manual URL when dialog opens
+  // Reset form when dialog opens
   useEffect(() => {
     if (server) {
+      setEditName(server.name);
       setManualUrl(server.url);
     }
   }, [server]);
 
   const handlePlexSelect = (uri: string, _name: string, clientIdentifier: string) => {
-    onUpdate(uri, clientIdentifier);
+    onUpdate(editName !== server?.name ? editName : undefined, uri, clientIdentifier);
+  };
+
+  const hasNameChange = server ? editName.trim() !== server.name : false;
+  const hasUrlChange = server ? manualUrl.trim() !== server.url : false;
+  const canSave = (hasNameChange || hasUrlChange) && editName.trim().length > 0;
+
+  const handleSave = () => {
+    onUpdate(
+      hasNameChange ? editName.trim() : undefined,
+      hasUrlChange ? manualUrl.trim() : undefined
+    );
   };
 
   if (!server) return null;
@@ -768,102 +780,107 @@ function EditServerUrlDialog({
     <Dialog open={!!server} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className={cn('max-w-md', isPlexServer && 'max-w-lg')}>
         <DialogHeader>
-          <DialogTitle>Edit Server URL</DialogTitle>
+          <DialogTitle>Edit Server</DialogTitle>
           <DialogDescription>
-            {isPlexServer
-              ? `Select a connection for ${server.name}, or enter a custom URL.`
-              : `Update the URL for ${server.name}. The existing API token will be tested against the new URL.`}
+            Update the server name and/or URL. The existing API token will be tested if you change
+            the URL.
           </DialogDescription>
         </DialogHeader>
 
-        {isPlexServer ? (
-          // Plex: Show server selector
-          <div className="py-4">
-            {isLoadingConnections ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="text-muted-foreground ml-2 text-sm">
-                  Discovering connections...
-                </span>
-              </div>
-            ) : connectionsData?.server ? (
-              <PlexServerSelector
-                servers={[connectionsData.server]}
-                onSelect={handlePlexSelect}
-                connecting={isUpdating}
-                connectingToServer={isUpdating ? server.name : null}
-                onCancel={onClose}
-                showCancel={true}
-              />
-            ) : (
-              <div className="space-y-4">
-                <p className="text-muted-foreground text-sm">
-                  Could not discover server connections. Enter a URL manually:
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-url">Server URL</Label>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-name">Server name</Label>
+            <Input
+              id="edit-name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="My Plex Server"
+              maxLength={100}
+            />
+          </div>
+
+          {isPlexServer ? (
+            // Plex: Show server selector for URL
+            <div className="space-y-2">
+              <Label>Server URL</Label>
+              {isLoadingConnections ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-muted-foreground ml-2 text-sm">
+                    Discovering connections...
+                  </span>
+                </div>
+              ) : connectionsData?.server ? (
+                <>
+                  <PlexServerSelector
+                    servers={[connectionsData.server]}
+                    onSelect={handlePlexSelect}
+                    connecting={isUpdating}
+                    connectingToServer={isUpdating ? server.name : null}
+                    onCancel={onClose}
+                    showCancel={true}
+                  />
+                  {hasNameChange && (
+                    <p className="text-muted-foreground text-sm">
+                      Or click Update below to save only the name change.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
                   <Input
                     id="edit-url"
                     value={manualUrl}
                     onChange={(e) => setManualUrl(e.target.value)}
                     placeholder="http://192.168.1.100:32400"
                   />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => onUpdate(manualUrl)}
-                    disabled={isUpdating || !manualUrl || manualUrl === server.url}
-                  >
-                    {isUpdating ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update URL'
-                    )}
-                  </Button>
-                </DialogFooter>
-              </div>
-            )}
-          </div>
-        ) : (
-          // Jellyfin/Emby: Simple URL input
-          <>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-url">Server URL</Label>
-                <Input
-                  id="edit-url"
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  placeholder="http://192.168.1.100:8096"
-                />
-              </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSave} disabled={isUpdating || !canSave}>
+                      {isUpdating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => onUpdate(manualUrl)}
-                disabled={isUpdating || !manualUrl || manualUrl === server.url}
-              >
-                {isUpdating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update URL'
-                )}
-              </Button>
-            </DialogFooter>
-          </>
-        )}
+          ) : (
+            // Jellyfin/Emby: URL input
+            <div className="space-y-2">
+              <Label htmlFor="edit-url">Server URL</Label>
+              <Input
+                id="edit-url"
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder="http://192.168.1.100:8096"
+              />
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isUpdating || !canSave}>
+            {isUpdating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update'
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -873,14 +890,14 @@ function SortableServerCard({
   server,
   onSync,
   onDelete,
-  onEditUrl,
+  onEdit,
   isSyncing,
   isDraggable,
 }: {
   server: Server;
   onSync: () => void;
   onDelete: () => void;
-  onEditUrl: () => void;
+  onEdit: () => void;
   isSyncing?: boolean;
   isDraggable?: boolean;
 }) {
@@ -919,12 +936,12 @@ function SortableServerCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold">{server.name}</h3>
+              <button onClick={onEdit} className="hover:text-primary" title="Edit server">
+                <Pencil className="h-3 w-3" />
+              </button>
             </div>
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <span>{server.url}</span>
-              <button onClick={onEditUrl} className="hover:text-primary" title="Edit URL">
-                <Pencil className="h-3 w-3" />
-              </button>
               <a
                 href={server.url}
                 target="_blank"

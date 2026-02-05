@@ -725,6 +725,107 @@ describe('Mobile Routes', () => {
     });
   });
 
+  describe('PATCH /mobile/sessions/:id', () => {
+    it('updates device name for owner', async () => {
+      app = await buildTestApp(ownerUser);
+
+      const sessionId = randomUUID();
+      const mockSession = createMockSession({ id: sessionId });
+      const updatedSession = {
+        ...mockSession,
+        deviceName: 'My iPhone',
+      };
+
+      vi.mocked(db.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([mockSession]),
+          }),
+        }),
+      } as never);
+
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([updatedSession]),
+      } as never);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/mobile/sessions/${sessionId}`,
+        payload: { deviceName: 'My iPhone' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data.deviceName).toBe('My iPhone');
+      expect(body.data.id).toBe(sessionId);
+      expect(db.update).toHaveBeenCalled();
+    });
+
+    it('returns 404 for non-existent session', async () => {
+      app = await buildTestApp(ownerUser);
+
+      const sessionId = randomUUID();
+
+      vi.mocked(db.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as never);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/mobile/sessions/${sessionId}`,
+        payload: { deviceName: 'New Name' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = response.json();
+      expect(body.message).toBe('Mobile session not found');
+    });
+
+    it('rejects invalid session ID format', async () => {
+      app = await buildTestApp(ownerUser);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: '/mobile/sessions/invalid-id',
+        payload: { deviceName: 'New Name' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toBe('Invalid session ID format');
+    });
+
+    it('rejects invalid body when deviceName missing', async () => {
+      app = await buildTestApp(ownerUser);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/mobile/sessions/${randomUUID()}`,
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('rejects non-owner access with 403', async () => {
+      app = await buildTestApp(viewerUser);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/mobile/sessions/${randomUUID()}`,
+        payload: { deviceName: 'New Name' },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().message).toContain('Only server owners');
+    });
+  });
+
   // ============================================
   // Auth endpoints (mobile app)
   // ============================================

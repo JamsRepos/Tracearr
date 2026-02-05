@@ -25,6 +25,7 @@ import {
   Clock,
   Info,
   CheckCircle2,
+  Pencil,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -34,6 +35,7 @@ import {
   useEnableMobile,
   useDisableMobile,
   useGeneratePairToken,
+  useUpdateMobileSession,
   useRevokeSession,
   useRevokeMobileSessions,
 } from '@/hooks/queries';
@@ -41,7 +43,10 @@ import type { MobileSession, MobileQRPayload } from '@tracearr/shared';
 
 function MobileSessionCard({ session }: { session: MobileSession }) {
   const revokeSession = useRevokeSession();
+  const updateSession = useUpdateMobileSession();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [editDeviceName, setEditDeviceName] = useState(session.deviceName);
 
   return (
     <>
@@ -53,6 +58,17 @@ function MobileSessionCard({ session }: { session: MobileSession }) {
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold">{session.deviceName}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditDeviceName(session.deviceName);
+                  setShowRenameDialog(true);
+                }}
+                className="hover:text-primary"
+                title="Rename device"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
               <span className="bg-muted rounded px-2 py-0.5 text-xs">
                 {session.platform === 'ios'
                   ? 'iOS'
@@ -73,6 +89,59 @@ function MobileSessionCard({ session }: { session: MobileSession }) {
           <Trash2 className="text-destructive h-4 w-4" />
         </Button>
       </div>
+
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Device</DialogTitle>
+            <DialogDescription>Enter a name to identify this device in the list.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="device-name">Device name</Label>
+              <Input
+                id="device-name"
+                value={editDeviceName}
+                onChange={(e) => setEditDeviceName(e.target.value)}
+                placeholder="e.g. iPhone 15"
+                maxLength={100}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const name = editDeviceName.trim();
+                if (name && name !== session.deviceName) {
+                  updateSession.mutate(
+                    { id: session.id, deviceName: name },
+                    {
+                      onSuccess: () => setShowRenameDialog(false),
+                    }
+                  );
+                }
+              }}
+              disabled={
+                updateSession.isPending ||
+                !editDeviceName.trim() ||
+                editDeviceName.trim() === session.deviceName
+              }
+            >
+              {updateSession.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={showDeleteConfirm}

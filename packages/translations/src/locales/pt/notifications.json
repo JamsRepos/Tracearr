@@ -34,6 +34,10 @@
         "title": "Dispositivo removido",
         "message": "O dispositivo foi removido"
       },
+      "deviceRenamed": {
+        "title": "Dispositivo renomeado",
+        "message": "O nome do dispositivo foi atualizado"
+      },
       "sessionsRevoked": {
         "title": "Sessões revogadas",
         "message": "Todas as sessões foram revogadas"
@@ -93,6 +97,10 @@
         "title": "URL do servidor atualizado",
         "message": "O URL do servidor foi atualizado com sucesso"
       },
+      "serverUpdated": {
+        "title": "Servidor atualizado",
+        "message": "O servidor foi atualizado com sucesso"
+      },
       "syncCompletedWithErrors": {
         "title": "Sincronização concluída com erros"
       },
@@ -151,6 +159,7 @@
       "ruleDeleteFailed": "Falha ao eliminar a regra",
       "streamTerminateFailed": "Falha ao terminar a transmissão",
       "serverUrlUpdateFailed": "Falha ao atualizar URL do servidor",
+      "serverUpdateFailed": "Falha ao atualizar servidor",
       "serverReorderFailed": "Falha ao reordenar servidores",
       "sessionsDeleteFailed": "Falha ao eliminar sessões",
       "apiKeyGenerateFailed": "Falha ao gerar chave API",
@@ -158,6 +167,7 @@
       "mobileAccessDisableFailed": "Falha ao desativar acesso móvel",
       "pairTokenGenerateFailed": "Falha ao gerar token de emparelhamento",
       "deviceRemoveFailed": "Falha ao remover dispositivo",
+      "deviceRenameFailed": "Falha ao renomear dispositivo",
       "sessionsRevokeFailed": "Falha ao revogar sessões",
       "displayNameUpdateFailed": "Falha ao atualizar nome de exibição",
       "trustScoresResetFailed": "Falha ao redefinir pontuações de confiança",

@@ -92,7 +92,7 @@ export {
   useCreateServer,
   useDeleteServer,
   useSyncServer,
-  useUpdateServerUrl,
+  useUpdateServer,
   useServerStatistics,
   usePlexServerConnections,
   useReorderServers,
@@ -110,6 +110,7 @@ export {
   useEnableMobile,
   useDisableMobile,
   useGeneratePairToken,
+  useUpdateMobileSession,
   useRevokeSession,
   useRevokeMobileSessions,
 } from './useMobile';

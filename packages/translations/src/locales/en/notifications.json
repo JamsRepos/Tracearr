@@ -33,6 +33,10 @@
         "title": "Device Removed",
         "message": "The device has been disconnected"
       },
+      "deviceRenamed": {
+        "title": "Device Renamed",
+        "message": "The device name has been updated"
+      },
       "sessionsRevoked": {
         "title": "Sessions Revoked",
         "message": "All mobile sessions have been revoked"
@@ -92,6 +96,10 @@
         "title": "Server URL Updated",
         "message": "The server URL has been updated successfully"
       },
+      "serverUpdated": {
+        "title": "Server Updated",
+        "message": "The server has been updated successfully"
+      },
       "syncCompletedWithErrors": {
         "title": "Sync Completed with Errors"
       },
@@ -150,6 +158,7 @@
       "ruleDeleteFailed": "Failed to delete rule",
       "streamTerminateFailed": "Failed to terminate stream",
       "serverUrlUpdateFailed": "Failed to update server URL",
+      "serverUpdateFailed": "Failed to update server",
       "serverReorderFailed": "Failed to reorder servers",
       "sessionsDeleteFailed": "Failed to delete sessions",
       "apiKeyGenerateFailed": "Failed to generate API key",
@@ -157,6 +166,7 @@
       "mobileAccessDisableFailed": "Failed to disable mobile access",
       "pairTokenGenerateFailed": "Failed to generate pair token",
       "deviceRemoveFailed": "Failed to remove device",
+      "deviceRenameFailed": "Failed to rename device",
       "sessionsRevokeFailed": "Failed to revoke sessions",
       "displayNameUpdateFailed": "Failed to update display name",
       "trustScoresResetFailed": "Failed to reset trust scores",

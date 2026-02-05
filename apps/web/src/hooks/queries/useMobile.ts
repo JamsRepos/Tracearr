@@ -69,6 +69,25 @@ export function useGeneratePairToken() {
   });
 }
 
+export function useUpdateMobileSession() {
+  const { t } = useTranslation('notifications');
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, deviceName }: { id: string; deviceName: string }) =>
+      api.mobile.updateSession(id, { deviceName }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['mobile', 'config'] });
+      toast.success(t('toast.success.deviceRenamed.title'), {
+        description: t('toast.success.deviceRenamed.message'),
+      });
+    },
+    onError: (err) => {
+      toast.error(t('toast.error.deviceRenameFailed'), { description: err.message });
+    },
+  });
+}
+
 export function useRevokeSession() {
   const { t } = useTranslation('notifications');
   const queryClient = useQueryClient();

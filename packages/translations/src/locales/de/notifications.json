@@ -34,6 +34,10 @@
         "title": "Gerät entfernt",
         "message": "Das Gerät wurde getrennt"
       },
+      "deviceRenamed": {
+        "title": "Gerät umbenannt",
+        "message": "Der Gerätename wurde aktualisiert"
+      },
       "sessionsRevoked": {
         "title": "Sitzungen widerrufen",
         "message": "Alle mobilen Sitzungen wurden widerrufen"
@@ -88,6 +92,10 @@
       "streamTerminated": {
         "title": "Stream beendet",
         "message": "Die Wiedergabesitzung wurde gestoppt"
+      },
+      "serverUpdated": {
+        "title": "Server aktualisiert",
+        "message": "Der Server wurde erfolgreich aktualisiert"
       },
       "serverUrlUpdated": {
         "title": "Server-URL aktualisiert",
@@ -151,6 +159,7 @@
       "ruleDeleteFailed": "Regel löschen fehlgeschlagen",
       "streamTerminateFailed": "Stream konnte nicht beendet werden",
       "serverUrlUpdateFailed": "Server-URL aktualisieren fehlgeschlagen",
+      "serverUpdateFailed": "Server aktualisieren fehlgeschlagen",
       "serverReorderFailed": "Server neu ordnen fehlgeschlagen",
       "sessionsDeleteFailed": "Sitzungen löschen fehlgeschlagen",
       "apiKeyGenerateFailed": "API-Schlüssel generieren fehlgeschlagen",
@@ -158,6 +167,7 @@
       "mobileAccessDisableFailed": "Mobilen Zugriff deaktivieren fehlgeschlagen",
       "pairTokenGenerateFailed": "Pairing-Token generieren fehlgeschlagen",
       "deviceRemoveFailed": "Gerät entfernen fehlgeschlagen",
+      "deviceRenameFailed": "Gerät umbenennen fehlgeschlagen",
       "sessionsRevokeFailed": "Sitzungen widerrufen fehlgeschlagen",
       "displayNameUpdateFailed": "Anzeigename aktualisieren fehlgeschlagen",
       "trustScoresResetFailed": "Vertrauenswertung zurücksetzen fehlgeschlagen",

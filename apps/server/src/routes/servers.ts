@@ -8,6 +8,7 @@ import {
   createServerSchema,
   serverIdParamSchema,
   reorderServersSchema,
+  updateServerSchema,
   SERVER_STATS_CONFIG,
 } from '@tracearr/shared';
 import { db } from '../db/client.js';
@@ -175,8 +176,9 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
   });
 
   /**
-   * PATCH /servers/:id - Update server URL
-   * Verifies the new URL is reachable with existing token before updating.
+   * PATCH /servers/:id - Update server name and/or URL
+   * Accepts optional name and/or url; at least one is required.
+   * When url is provided, verifies the new URL is reachable with existing token before updating.
    *
    * For Plex servers with clientIdentifier:
    * - Validates that the clientIdentifier matches the server's machineIdentifier
@@ -188,14 +190,14 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       return reply.badRequest('Invalid server ID');
     }
 
-    const body = request.body as { url?: string; clientIdentifier?: string };
-    if (!body.url || typeof body.url !== 'string') {
-      return reply.badRequest('URL is required');
+    const body = updateServerSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.badRequest(body.error.issues[0]?.message ?? 'Invalid request body');
     }
 
     const { id } = params.data;
-    const newUrl = body.url.replace(/\/$/, ''); // Remove trailing slash
-    const { clientIdentifier } = body;
+    const { name: newName, url: bodyUrl, clientIdentifier } = body.data;
+    const newUrl = bodyUrl !== undefined ? bodyUrl.replace(/\/$/, '') : undefined;
     const authUser = request.user;
 
     // Only owners can update servers
@@ -211,8 +213,62 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       return reply.notFound('Server not found');
     }
 
-    // Don't update if URL is the same
-    if (server.url === newUrl) {
+    // If only name is being updated, no URL verification needed
+    if (newUrl !== undefined) {
+      // Don't update if URL is the same (and no name change, or name is same)
+      if (server.url === newUrl && (newName === undefined || server.name === newName)) {
+        return {
+          id: server.id,
+          name: newName ?? server.name,
+          type: server.type,
+          url: server.url,
+          createdAt: server.createdAt,
+          updatedAt: server.updatedAt,
+        };
+      }
+
+      // For Plex servers: Validate machineIdentifier if provided
+      if (server.type === 'plex' && clientIdentifier) {
+        if (server.machineIdentifier && server.machineIdentifier !== clientIdentifier) {
+          return reply.badRequest(
+            'Server mismatch: The selected connection belongs to a different server. ' +
+              'Please select a connection for the correct server.'
+          );
+        }
+      }
+
+      // Verify the new URL works with the existing token
+      try {
+        if (server.type === 'plex') {
+          const adminCheck = await PlexClient.verifyServerAdmin(server.token, newUrl);
+          if (!adminCheck.success) {
+            if (adminCheck.code === PlexClient.AdminVerifyError.CONNECTION_FAILED) {
+              return reply.serviceUnavailable(adminCheck.message);
+            }
+            return reply.forbidden(adminCheck.message);
+          }
+        } else if (server.type === 'jellyfin') {
+          const adminCheck = await JellyfinClient.verifyServerAdmin(server.token, newUrl);
+          if (!adminCheck.success) {
+            if (adminCheck.code === JellyfinClient.AdminVerifyError.CONNECTION_FAILED) {
+              return reply.serviceUnavailable(adminCheck.message);
+            }
+            return reply.forbidden(adminCheck.message);
+          }
+        } else if (server.type === 'emby') {
+          const isAdmin = await EmbyClient.verifyServerAdmin(server.token, newUrl);
+          if (!isAdmin) {
+            return reply.forbidden('Token does not have admin access at this URL');
+          }
+        }
+      } catch (error) {
+        app.log.error({ error, serverId: id, newUrl }, 'Failed to verify new server URL');
+        return reply.badRequest(
+          'Failed to connect to server at new URL. Please verify the URL is correct.'
+        );
+      }
+    } else if (newName !== undefined && server.name === newName) {
+      // Name-only update but name unchanged
       return {
         id: server.id,
         name: server.name,
@@ -223,52 +279,16 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       };
     }
 
-    // For Plex servers: Validate machineIdentifier if provided
-    // This prevents connecting Server A's config to Server B's URL
-    if (server.type === 'plex' && clientIdentifier) {
-      if (server.machineIdentifier && server.machineIdentifier !== clientIdentifier) {
-        return reply.badRequest(
-          'Server mismatch: The selected connection belongs to a different server. ' +
-            'Please select a connection for the correct server.'
-        );
-      }
-    }
+    // Build update object
+    const updatePayload: { name?: string; url?: string; updatedAt: Date } = {
+      updatedAt: new Date(),
+    };
+    if (newName !== undefined) updatePayload.name = newName;
+    if (newUrl !== undefined) updatePayload.url = newUrl;
 
-    // Verify the new URL works with the existing token
-    try {
-      if (server.type === 'plex') {
-        const adminCheck = await PlexClient.verifyServerAdmin(server.token, newUrl);
-        if (!adminCheck.success) {
-          if (adminCheck.code === PlexClient.AdminVerifyError.CONNECTION_FAILED) {
-            return reply.serviceUnavailable(adminCheck.message);
-          }
-          return reply.forbidden(adminCheck.message);
-        }
-      } else if (server.type === 'jellyfin') {
-        const adminCheck = await JellyfinClient.verifyServerAdmin(server.token, newUrl);
-        if (!adminCheck.success) {
-          if (adminCheck.code === JellyfinClient.AdminVerifyError.CONNECTION_FAILED) {
-            return reply.serviceUnavailable(adminCheck.message);
-          }
-          return reply.forbidden(adminCheck.message);
-        }
-      } else if (server.type === 'emby') {
-        const isAdmin = await EmbyClient.verifyServerAdmin(server.token, newUrl);
-        if (!isAdmin) {
-          return reply.forbidden('Token does not have admin access at this URL');
-        }
-      }
-    } catch (error) {
-      app.log.error({ error, serverId: id, newUrl }, 'Failed to verify new server URL');
-      return reply.badRequest(
-        'Failed to connect to server at new URL. Please verify the URL is correct.'
-      );
-    }
-
-    // Update the server URL
     const updated = await db
       .update(servers)
-      .set({ url: newUrl, updatedAt: new Date() })
+      .set(updatePayload)
       .where(eq(servers.id, id))
       .returning({
         id: servers.id,
@@ -284,7 +304,12 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       return reply.internalServerError('Failed to update server');
     }
 
-    app.log.info({ serverId: id, oldUrl: server.url, newUrl }, 'Server URL updated');
+    if (newUrl !== undefined) {
+      app.log.info({ serverId: id, oldUrl: server.url, newUrl }, 'Server URL updated');
+    }
+    if (newName !== undefined) {
+      app.log.info({ serverId: id, oldName: server.name, newName }, 'Server name updated');
+    }
 
     return result;
   });

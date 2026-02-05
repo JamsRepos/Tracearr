@@ -90,6 +90,10 @@ const pushTokenSchema = z.object({
   deviceSecret: z.string().min(32).max(64).optional(), // Update device secret for push encryption
 });
 
+const updateMobileSessionSchema = z.object({
+  deviceName: z.string().min(1).max(100),
+});
+
 /**
  * Generate a new mobile access token
  */
@@ -444,6 +448,58 @@ export const mobileRoutes: FastifyPluginAsync = async (app) => {
     );
 
     return { success: true };
+  });
+
+  /**
+   * PATCH /mobile/sessions/:id - Update mobile session device name (owner only)
+   */
+  app.patch('/sessions/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authUser = request.user;
+
+    if (authUser.role !== 'owner') {
+      return reply.forbidden('Only server owners can rename mobile sessions');
+    }
+
+    const { id } = request.params as { id: string };
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return reply.badRequest('Invalid session ID format');
+    }
+
+    const body = updateMobileSessionSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.badRequest(body.error.issues[0]?.message ?? 'Invalid request body');
+    }
+
+    const sessionRow = await db
+      .select()
+      .from(mobileSessions)
+      .where(eq(mobileSessions.id, id))
+      .limit(1);
+
+    if (sessionRow.length === 0) {
+      return reply.notFound('Mobile session not found');
+    }
+
+    const [updated] = await db
+      .update(mobileSessions)
+      .set({ deviceName: body.data.deviceName })
+      .where(eq(mobileSessions.id, id))
+      .returning({
+        id: mobileSessions.id,
+        deviceName: mobileSessions.deviceName,
+        deviceId: mobileSessions.deviceId,
+        platform: mobileSessions.platform,
+        lastSeenAt: mobileSessions.lastSeenAt,
+        createdAt: mobileSessions.createdAt,
+      });
+
+    if (!updated) {
+      return reply.internalServerError('Failed to update mobile session');
+    }
+
+    return { data: updated };
   });
 
   // ============================================

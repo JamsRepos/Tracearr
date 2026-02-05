@@ -127,6 +127,16 @@ export const reorderServersSchema = z.object({
   ),
 });
 
+export const updateServerSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    url: z.url().optional(),
+    clientIdentifier: z.string().optional(),
+  })
+  .refine((data) => data.name !== undefined || data.url !== undefined, {
+    message: 'At least one of name or url is required',
+  });
+
 // ============================================================================
 // User Schemas
 // ============================================================================
@@ -1010,6 +1020,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type CallbackInput = z.infer<typeof callbackSchema>;
 export type CreateServerInput = z.infer<typeof createServerSchema>;
 export type ReorderServersInput = z.infer<typeof reorderServersSchema>;
+export type UpdateServerInput = z.infer<typeof updateServerSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type SessionQueryInput = z.infer<typeof sessionQuerySchema>;
 export type HistoryQueryInput = z.infer<typeof historyQuerySchema>;

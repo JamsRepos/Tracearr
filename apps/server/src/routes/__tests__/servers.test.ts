@@ -109,6 +109,16 @@ function mockDbUpdate() {
   return chain;
 }
 
+function mockDbUpdateReturning(result: unknown[]) {
+  const chain = {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(result),
+  };
+  vi.mocked(db.update).mockReturnValue(chain as never);
+  return chain;
+}
+
 async function buildTestApp(authUser: AuthUser): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   await app.register(sensible);
@@ -455,6 +465,73 @@ describe('Server Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe('PATCH /servers/:id', () => {
+    it('updates server name only for owner', async () => {
+      app = await buildTestApp(ownerUser);
+
+      mockDbSelectLimit([mockServer]);
+      const updatedServer = {
+        ...mockServer,
+        name: 'Renamed Server',
+        updatedAt: new Date(),
+      };
+      mockDbUpdateReturning([updatedServer]);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/servers/${mockServer.id}`,
+        payload: { name: 'Renamed Server' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.name).toBe('Renamed Server');
+      expect(body.id).toBe(mockServer.id);
+      expect(db.update).toHaveBeenCalled();
+    });
+
+    it('rejects when neither name nor url provided', async () => {
+      app = await buildTestApp(ownerUser);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/servers/${mockServer.id}`,
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toMatch(/name or url|At least one/);
+    });
+
+    it('rejects non-owner with 403', async () => {
+      app = await buildTestApp(viewerUser);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/servers/${mockServer.id}`,
+        payload: { name: 'New Name' },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().message).toContain('Only server owners');
+    });
+
+    it('returns 404 when server not found', async () => {
+      app = await buildTestApp(ownerUser);
+
+      mockDbSelectLimit([]);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/servers/${mockServer.id}`,
+        payload: { name: 'New Name' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe('Server not found');
     });
   });
 

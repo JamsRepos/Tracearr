@@ -491,6 +491,18 @@ class ApiClient {
     },
     create: (data: { name: string; type: string; url: string; token: string }) =>
       this.request<Server>('/servers', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; url?: string; clientIdentifier?: string }) =>
+      this.request<Server>(`/servers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(
+          Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) as {
+            name?: string;
+            url?: string;
+            clientIdentifier?: string;
+          }
+        ),
+      }),
+    /** @deprecated Use servers.update(id, { url, clientIdentifier }) */
     updateUrl: (id: string, url: string, clientIdentifier?: string) =>
       this.request<Server>(`/servers/${id}`, {
         method: 'PATCH',
@@ -1459,6 +1471,17 @@ class ApiClient {
         method: 'POST',
         body: '{}',
       }),
+    updateSession: (id: string, data: { deviceName: string }) =>
+      this.request<{
+        data: {
+          id: string;
+          deviceName: string;
+          deviceId: string;
+          platform: string;
+          lastSeenAt: string;
+          createdAt: string;
+        };
+      }>(`/mobile/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     revokeSession: (id: string) =>
       this.request<{ success: boolean }>(`/mobile/sessions/${id}`, { method: 'DELETE' }),
     revokeSessions: () =>
