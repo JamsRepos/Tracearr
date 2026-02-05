@@ -138,7 +138,9 @@ export function useDebouncedSave<K extends keyof Settings>(
     };
   }, [value, delay, performSave]);
 
-  type SetValueOptions = { saveImmediately?: boolean };
+  interface SetValueOptions {
+    saveImmediately?: boolean;
+  }
   const setValueWithTracking = useCallback(
     (newValue: Settings[K] | undefined, options?: SetValueOptions) => {
       userHasEditedRef.current = true;
