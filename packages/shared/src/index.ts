@@ -95,6 +95,7 @@ export type {
   Settings,
   WebhookFormat,
   UnitSystem,
+  LoginMethod,
   // Tautulli import
   TautulliImportProgress,
   TautulliImportResult,
@@ -422,7 +423,14 @@ export {
 } from './constants.js';
 
 // Role helper exports
-export { ROLE_PERMISSIONS, canLogin, hasMinRole, isOwner, isActive } from './types.js';
+export {
+  ROLE_PERMISSIONS,
+  canLogin,
+  hasMinRole,
+  isOwner,
+  isActive,
+  getPrimaryAuthMethod,
+} from './types.js';
 
 // Session constants
 export { MEDIA_TYPES, DEFAULT_STREAM_DETAILS } from './types.js';

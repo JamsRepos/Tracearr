@@ -240,6 +240,28 @@
     "violationLog": "Violation Log"
   },
   "settings": {
+    "access": {
+      "title": "Access Control",
+      "description": "Configure who can access Tracearr and who has owner rights",
+      "allowGuestAccess": "Allow Guest Access",
+      "allowGuestAccessDescription": "When disabled, only the server owner can log in to Tracearr",
+      "enabledLoginMethods": "Enabled login methods",
+      "enabledLoginMethodsDescription": "Choose which sign-in options appear and in what order. First in the list is the default on the login page. At least one method you use must stay enabled.",
+      "orderHint": "The first method in the list is the default on the login page.",
+      "jellyfinOnlyWarning": "Relying only on Jellyfin can lock you out of Tracearr if your Jellyfin server is down or unreachable. Keep local account enabled as a fallback when possible.",
+      "jellyfinOwnerAccount": "Jellyfin owner account",
+      "noJellyfinAdminsFound": "No Jellyfin admins found. Add a Jellyfin server (Settings → Servers) and connect with an API key.",
+      "jellyfinOwnerDescription": "Which Jellyfin admin gets full owner access when signing in with Jellyfin",
+      "singleOwnerNote": "Note: In v1, Tracearr only supports single-owner access. Even with guest access enabled, guests can only view their own sessions and violations.",
+      "addMethod": "Add method",
+      "selectMethods": "Select methods...",
+      "loginMethodPlex": "Plex",
+      "loginMethodJellyfinAdmin": "Jellyfin Admin",
+      "loginMethodLocalAccount": "Local Account",
+      "selectAccount": "Select account",
+      "moveUp": "Move {{label}} up",
+      "moveDown": "Move {{label}} down"
+    },
     "plex": {
       "noServersFound": "Nenhum servidor Plex encontrado",
       "noServersFoundHint": "Certifique-se de que possui pelo menos um servidor Plex",

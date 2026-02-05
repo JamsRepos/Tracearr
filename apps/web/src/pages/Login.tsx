@@ -30,6 +30,10 @@ export function Login() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasPasswordAuth, setHasPasswordAuth] = useState(false);
   const [hasJellyfinServers, setHasJellyfinServers] = useState(false);
+  const [hasPlexServers, setHasPlexServers] = useState(false);
+  const [enabledLoginMethods, setEnabledLoginMethods] = useState<
+    ('plex' | 'jellyfin' | 'local')[] | null
+  >(null);
 
   // Auth form state - which form to show (jellyfin or local)
   // Default to Jellyfin if Jellyfin servers exist, otherwise default to local
@@ -69,6 +73,8 @@ export function Login() {
           setNeedsSetup(status.needsSetup);
           setHasPasswordAuth(status.hasPasswordAuth);
           setHasJellyfinServers(status.hasJellyfinServers);
+          setHasPlexServers(status.hasPlexServers ?? false);
+          setEnabledLoginMethods(status.enabledLoginMethods ?? null);
           // Use the configured primary auth method
           setShowJellyfinForm(status.primaryAuthMethod === 'jellyfin');
           setSetupLoading(false);
@@ -317,6 +323,17 @@ export function Login() {
     );
   }
 
+  // Which login options to show (respect enabledLoginMethods from settings; null = all available)
+  const showPlexOption =
+    (enabledLoginMethods === null || enabledLoginMethods.includes('plex')) &&
+    (hasPlexServers || needsSetup);
+  const showJellyfinOption =
+    (enabledLoginMethods === null || enabledLoginMethods.includes('jellyfin')) &&
+    hasJellyfinServers;
+  const showLocalOption =
+    (enabledLoginMethods === null || enabledLoginMethods.includes('local')) &&
+    (hasPasswordAuth || needsSetup);
+
   // Server selection step (only during Plex signup)
   if (authStep === 'server-select' && plexServers.length > 0) {
     return (
@@ -396,14 +413,18 @@ export function Login() {
             </div>
           ) : (
             <>
-              {/* Plex Login Button - Always Available */}
-              <Button className={`w-full ${PLEX_COLOR} text-white`} onClick={handlePlexLogin}>
-                <MediaServerIcon type="plex" className="mr-2 h-4 w-4" />
-                {needsSetup ? t('settings:plex.signUpWithPlex') : t('settings:plex.signInWithPlex')}
-              </Button>
+              {/* Plex Login Button - only when enabled and usable (has server or setup) */}
+              {showPlexOption && (
+                <Button className={`w-full ${PLEX_COLOR} text-white`} onClick={handlePlexLogin}>
+                  <MediaServerIcon type="plex" className="mr-2 h-4 w-4" />
+                  {needsSetup
+                    ? t('settings:plex.signUpWithPlex')
+                    : t('settings:plex.signInWithPlex')}
+                </Button>
+              )}
 
               {/* Divider between Plex and other auth methods */}
-              {(hasJellyfinServers || hasPasswordAuth || needsSetup) && (
+              {showPlexOption && (showJellyfinOption || showLocalOption) && (
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
@@ -415,10 +436,10 @@ export function Login() {
               )}
 
               {/* Conditional Auth Forms - Show only one at a time with transition */}
-              {(hasJellyfinServers || hasPasswordAuth || needsSetup) && (
+              {(showJellyfinOption || showLocalOption) && (
                 <div className="relative min-h-[200px]">
                   {/* Jellyfin Admin Login Form */}
-                  {showJellyfinForm && hasJellyfinServers && (
+                  {showJellyfinForm && showJellyfinOption && (
                     <div
                       key="jellyfin-form"
                       className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
@@ -466,7 +487,7 @@ export function Login() {
                       </form>
 
                       {/* Toggle button to switch to local auth */}
-                      {hasPasswordAuth && (
+                      {showLocalOption && (
                         <Button
                           type="button"
                           variant="link"
@@ -480,7 +501,7 @@ export function Login() {
                   )}
 
                   {/* Local Auth Form */}
-                  {!showJellyfinForm && (hasPasswordAuth || needsSetup) && (
+                  {!showJellyfinForm && showLocalOption && (
                     <div
                       key="local-form"
                       className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
@@ -568,7 +589,7 @@ export function Login() {
                       )}
 
                       {/* Toggle button to switch to Jellyfin auth */}
-                      {hasJellyfinServers && (
+                      {showJellyfinOption && (
                         <Button
                           type="button"
                           variant="link"

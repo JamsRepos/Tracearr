@@ -4,6 +4,7 @@
 
 import type { FastifyPluginAsync } from 'fastify';
 import { isNotNull, eq } from 'drizzle-orm';
+import { getPrimaryAuthMethod } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { servers, users, settings } from '../db/schema.js';
 
@@ -21,25 +22,36 @@ export const setupRoutes: FastifyPluginAsync = async (app) => {
    */
   app.get('/status', async () => {
     // Check for servers and users in parallel
-    const [serverList, jellyfinServerList, ownerList, passwordUserList] = await Promise.all([
-      db.select({ id: servers.id }).from(servers).limit(1),
-      db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'jellyfin')).limit(1),
-      db.select({ id: users.id }).from(users).where(eq(users.role, 'owner')).limit(1),
-      db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1),
-    ]);
+    const [serverList, jellyfinServerList, plexServerList, ownerList, passwordUserList] =
+      await Promise.all([
+        db.select({ id: servers.id }).from(servers).limit(1),
+        db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'jellyfin')).limit(1),
+        db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'plex')).limit(1),
+        db.select({ id: users.id }).from(users).where(eq(users.role, 'owner')).limit(1),
+        db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1),
+      ]);
 
-    // Try to get primaryAuthMethod from settings, but handle case where column doesn't exist yet
+    // Try to get primaryAuthMethod and enabledLoginMethods from settings (columns may not exist yet)
     let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
+    let enabledLoginMethods: ('plex' | 'jellyfin' | 'local')[] | null = null;
     try {
       const settingsRow = await db
-        .select({ primaryAuthMethod: settings.primaryAuthMethod })
+        .select({
+          primaryAuthMethod: settings.primaryAuthMethod,
+          enabledLoginMethods: settings.enabledLoginMethods,
+        })
         .from(settings)
         .limit(1);
-      if (settingsRow[0]?.primaryAuthMethod) {
-        primaryAuthMethod = settingsRow[0].primaryAuthMethod;
+      const row = settingsRow[0];
+      if (row?.primaryAuthMethod) {
+        primaryAuthMethod = row.primaryAuthMethod;
+      }
+      if (row && 'enabledLoginMethods' in row && Array.isArray(row.enabledLoginMethods)) {
+        enabledLoginMethods = row.enabledLoginMethods;
+        primaryAuthMethod = getPrimaryAuthMethod(enabledLoginMethods);
       }
     } catch {
-      // Column doesn't exist yet (migration not run) - use default
+      // Columns don't exist yet (migration not run) - use defaults
       primaryAuthMethod = 'local';
     }
 
@@ -47,8 +59,10 @@ export const setupRoutes: FastifyPluginAsync = async (app) => {
       needsSetup: ownerList.length === 0,
       hasServers: serverList.length > 0,
       hasJellyfinServers: jellyfinServerList.length > 0,
+      hasPlexServers: plexServerList.length > 0,
       hasPasswordAuth: passwordUserList.length > 0,
       primaryAuthMethod,
+      enabledLoginMethods,
     };
   });
 };

@@ -825,6 +825,15 @@ export type WebhookFormat = z.infer<typeof webhookFormatSchema>;
 // Unit system for display preferences (stored in settings)
 export type UnitSystem = 'metric' | 'imperial';
 
+/** Login methods that can be shown on the login page */
+export type LoginMethod = 'plex' | 'jellyfin' | 'local';
+
+/** Primary auth method derived from enabled login methods order (first jellyfin or local). */
+export function getPrimaryAuthMethod(methods: LoginMethod[]): 'jellyfin' | 'local' {
+  const first = methods.find((m): m is 'jellyfin' | 'local' => m === 'jellyfin' || m === 'local');
+  return first ?? 'local';
+}
+
 // Settings types
 export interface Settings {
   allowGuestAccess: boolean;
@@ -856,6 +865,10 @@ export interface Settings {
   primaryAuthMethod: 'jellyfin' | 'local';
   /** Jellyfin user ID designated as Tracearr owner (when primaryAuthMethod is jellyfin) */
   jellyfinOwnerId: string | null;
+  /** Which login methods to show on the login page. Null = all available (backward compat) */
+  enabledLoginMethods: LoginMethod[] | null;
+  /** Only in GET /settings (owner): whether any user has a password (for showing Local in enabled methods). */
+  hasPasswordAuth?: boolean;
 }
 
 // Heavy operations lock info (for "Waiting for X" display)

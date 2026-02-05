@@ -689,6 +689,10 @@ export const settings = pgTable('settings', {
     .notNull()
     .default('local'), // Default to local auth
   jellyfinOwnerId: varchar('jellyfin_owner_id', { length: 255 }), // Jellyfin user ID of admin selected as Tracearr owner (when primaryAuthMethod is jellyfin)
+  // Which login methods to show on the login page. Null = all available methods enabled (backward compat)
+  enabledLoginMethods: text('enabled_login_methods')
+    .array()
+    .$type<('plex' | 'jellyfin' | 'local')[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

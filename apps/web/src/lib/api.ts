@@ -325,8 +325,10 @@ class ApiClient {
         needsSetup: boolean;
         hasServers: boolean;
         hasJellyfinServers: boolean;
+        hasPlexServers: boolean;
         hasPasswordAuth: boolean;
         primaryAuthMethod: 'jellyfin' | 'local';
+        enabledLoginMethods: ('plex' | 'jellyfin' | 'local')[] | null;
       }>('/setup/status'),
   };
 

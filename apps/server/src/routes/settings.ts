@@ -3,11 +3,17 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { eq, sql } from 'drizzle-orm';
+import type { InferSelectModel } from 'drizzle-orm';
+import { eq, sql, isNotNull } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
-import { updateSettingsSchema, type Settings, type WebhookFormat } from '@tracearr/shared';
+import {
+  updateSettingsSchema,
+  getPrimaryAuthMethod,
+  type Settings,
+  type WebhookFormat,
+} from '@tracearr/shared';
 import { db } from '../db/client.js';
-import { settings, users, sessions } from '../db/schema.js';
+import { settings, users, sessions, servers } from '../db/schema.js';
 import { geoipService } from '../services/geoip.js';
 
 // API token format: trr_pub_<32 random bytes as base64url>
@@ -23,6 +29,45 @@ import { notificationManager } from '../services/notifications/index.js';
 // Default settings row ID (singleton pattern)
 const SETTINGS_ID = 1;
 
+type SettingsRow = InferSelectModel<typeof settings>;
+
+const maskIfSet = (value: string | null | undefined): string | null => (value ? '********' : null);
+
+/** Build Settings API response from a DB row (masks secrets, derives primary from order when present). */
+function rowToSettingsResponse(row: SettingsRow): Settings {
+  const enabledLoginMethods = row.enabledLoginMethods ?? null;
+  const primaryAuthMethod =
+    row.primaryAuthMethod === 'jellyfin' || row.primaryAuthMethod === 'local'
+      ? row.primaryAuthMethod
+      : enabledLoginMethods
+        ? getPrimaryAuthMethod(enabledLoginMethods)
+        : 'local';
+
+  return {
+    allowGuestAccess: row.allowGuestAccess,
+    unitSystem: row.unitSystem,
+    discordWebhookUrl: row.discordWebhookUrl ?? null,
+    customWebhookUrl: row.customWebhookUrl ?? null,
+    webhookFormat: row.webhookFormat ?? null,
+    ntfyTopic: row.ntfyTopic ?? null,
+    ntfyAuthToken: maskIfSet(row.ntfyAuthToken),
+    pushoverUserKey: row.pushoverUserKey ?? null,
+    pushoverApiToken: maskIfSet(row.pushoverApiToken),
+    pollerEnabled: row.pollerEnabled,
+    pollerIntervalMs: row.pollerIntervalMs,
+    usePlexGeoip: row.usePlexGeoip,
+    tautulliUrl: row.tautulliUrl ?? null,
+    tautulliApiKey: maskIfSet(row.tautulliApiKey),
+    externalUrl: row.externalUrl ?? null,
+    basePath: row.basePath ?? '',
+    trustProxy: row.trustProxy,
+    mobileEnabled: row.mobileEnabled,
+    primaryAuthMethod,
+    jellyfinOwnerId: row.jellyfinOwnerId ?? null,
+    enabledLoginMethods,
+  };
+}
+
 export const settingsRoutes: FastifyPluginAsync = async (app) => {
   /**
    * GET /settings - Get application settings
@@ -30,29 +75,16 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authUser = request.user;
 
-    // Only owners can view settings
     if (authUser.role !== 'owner') {
       return reply.forbidden('Only server owners can view settings');
     }
 
-    // Get or create settings
-    // First try to get settings - if primaryAuthMethod column doesn't exist, this will fail
-    let settingsRow;
-    let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
-
+    let row: SettingsRow | undefined;
     try {
-      // Try full select including primaryAuthMethod
-      settingsRow = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
-
-      // If we got here, column exists - extract the value
-      const row = settingsRow[0];
-      if (row && 'primaryAuthMethod' in row && row.primaryAuthMethod) {
-        primaryAuthMethod = row.primaryAuthMethod;
-      }
+      const rows = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
+      row = rows[0];
     } catch {
-      // Column doesn't exist yet - select without primaryAuthMethod
-      // We need to explicitly select each column
-      settingsRow = await db
+      const fallback = await db
         .select({
           id: settings.id,
           allowGuestAccess: settings.allowGuestAccess,
@@ -77,74 +109,34 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         .from(settings)
         .where(eq(settings.id, SETTINGS_ID))
         .limit(1);
-      // Use default since column doesn't exist
-      primaryAuthMethod = 'local';
+      row = fallback[0] as SettingsRow;
     }
 
-    // Create default settings if not exists
-    if (settingsRow.length === 0) {
+    if (!row) {
       try {
         const inserted = await db
           .insert(settings)
-          .values({
-            id: SETTINGS_ID,
-            allowGuestAccess: false,
-            primaryAuthMethod: 'local',
-          })
+          .values({ id: SETTINGS_ID, allowGuestAccess: false, primaryAuthMethod: 'local' })
           .returning();
-        settingsRow = inserted;
+        row = inserted[0];
       } catch {
-        // Column doesn't exist - insert without primaryAuthMethod
         const inserted = await db
           .insert(settings)
-          .values({
-            id: SETTINGS_ID,
-            allowGuestAccess: false,
-          })
+          .values({ id: SETTINGS_ID, allowGuestAccess: false })
           .returning();
-        settingsRow = inserted;
+        row = inserted[0] as SettingsRow;
       }
     }
 
-    const row = settingsRow[0];
     if (!row) {
       return reply.internalServerError('Failed to load settings');
     }
 
-    // Handle case where usePlexGeoip column might not exist yet (before migration)
-    let usePlexGeoip = false;
-    if ('usePlexGeoip' in row && typeof row.usePlexGeoip === 'boolean') {
-      usePlexGeoip = row.usePlexGeoip;
-    }
-    let jellyfinOwnerId: string | null = null;
-    if ('jellyfinOwnerId' in row && typeof row.jellyfinOwnerId === 'string') {
-      jellyfinOwnerId = row.jellyfinOwnerId;
-    }
-
-    const result: Settings = {
-      allowGuestAccess: row.allowGuestAccess,
-      unitSystem: row.unitSystem,
-      discordWebhookUrl: row.discordWebhookUrl,
-      customWebhookUrl: row.customWebhookUrl,
-      webhookFormat: row.webhookFormat,
-      ntfyTopic: row.ntfyTopic,
-      ntfyAuthToken: row.ntfyAuthToken ? '********' : null, // Mask auth token
-      pushoverUserKey: row.pushoverUserKey,
-      pushoverApiToken: row.pushoverApiToken ? '********' : null, // Mask API Token
-      pollerEnabled: row.pollerEnabled,
-      pollerIntervalMs: row.pollerIntervalMs,
-      usePlexGeoip,
-      tautulliUrl: row.tautulliUrl,
-      tautulliApiKey: row.tautulliApiKey ? '********' : null, // Mask API key
-      externalUrl: row.externalUrl,
-      basePath: row.basePath,
-      trustProxy: row.trustProxy,
-      mobileEnabled: row.mobileEnabled,
-      primaryAuthMethod,
-      jellyfinOwnerId,
-    };
-
-    return result;
+    const result = rowToSettingsResponse(row);
+    const hasPasswordAuth =
+      (await db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1))
+        .length > 0;
+    return { ...result, hasPasswordAuth };
   });
 
   /**
@@ -184,6 +176,7 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       trustProxy: boolean;
       primaryAuthMethod: 'jellyfin' | 'local';
       jellyfinOwnerId: string | null;
+      enabledLoginMethods: ('plex' | 'jellyfin' | 'local')[] | null;
       updatedAt: Date;
     }> = {
       updatedAt: new Date(),
@@ -273,6 +266,30 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       updateData.jellyfinOwnerId = body.data.jellyfinOwnerId;
     }
 
+    if (body.data.enabledLoginMethods !== undefined) {
+      const newEnabled = body.data.enabledLoginMethods;
+      // Ensure at least one *usable* login method remains (user must be able to log in)
+      const [plexServerRow, jellyfinServerRow, passwordUserRow] = await Promise.all([
+        db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'plex')).limit(1),
+        db.select({ id: servers.id }).from(servers).where(eq(servers.type, 'jellyfin')).limit(1),
+        db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1),
+      ]);
+      const hasPlexServers = plexServerRow.length > 0;
+      const hasJellyfinServers = jellyfinServerRow.length > 0;
+      const hasPasswordAuth = passwordUserRow.length > 0;
+      const hasUsablePlex = newEnabled?.includes('plex') && hasPlexServers;
+      const hasUsableJellyfin = newEnabled?.includes('jellyfin') && hasJellyfinServers;
+      const hasUsableLocal = newEnabled?.includes('local') && hasPasswordAuth;
+      const atLeastOneUsable = hasUsablePlex || hasUsableJellyfin || hasUsableLocal;
+      if (!newEnabled || newEnabled.length === 0 || !atLeastOneUsable) {
+        return reply.badRequest(
+          'At least one enabled login method must be available (e.g. Plex requires a Plex server, Jellyfin requires a Jellyfin server, Local requires a password set).'
+        );
+      }
+      updateData.enabledLoginMethods = newEnabled;
+      updateData.primaryAuthMethod = getPrimaryAuthMethod(newEnabled);
+    }
+
     // Ensure settings row exists
     const existing = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
 
@@ -299,58 +316,57 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
         trustProxy: updateData.trustProxy ?? false,
         primaryAuthMethod: updateData.primaryAuthMethod ?? 'local',
         jellyfinOwnerId: updateData.jellyfinOwnerId ?? null,
+        enabledLoginMethods: updateData.enabledLoginMethods ?? null,
       });
     } else {
-      // Update existing
       await db.update(settings).set(updateData).where(eq(settings.id, SETTINGS_ID));
     }
 
-    // Return updated settings
-    const updated = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
+    // Return updated settings (full select; fallback if migration not run)
+    let row: SettingsRow | undefined;
+    try {
+      const full = await db.select().from(settings).where(eq(settings.id, SETTINGS_ID)).limit(1);
+      row = full[0];
+    } catch {
+      const fallback = await db
+        .select({
+          allowGuestAccess: settings.allowGuestAccess,
+          unitSystem: settings.unitSystem,
+          discordWebhookUrl: settings.discordWebhookUrl,
+          customWebhookUrl: settings.customWebhookUrl,
+          webhookFormat: settings.webhookFormat,
+          ntfyTopic: settings.ntfyTopic,
+          ntfyAuthToken: settings.ntfyAuthToken,
+          pushoverUserKey: settings.pushoverUserKey,
+          pushoverApiToken: settings.pushoverApiToken,
+          pollerEnabled: settings.pollerEnabled,
+          pollerIntervalMs: settings.pollerIntervalMs,
+          usePlexGeoip: settings.usePlexGeoip,
+          tautulliUrl: settings.tautulliUrl,
+          tautulliApiKey: settings.tautulliApiKey,
+          externalUrl: settings.externalUrl,
+          basePath: settings.basePath,
+          trustProxy: settings.trustProxy,
+          mobileEnabled: settings.mobileEnabled,
+          primaryAuthMethod: settings.primaryAuthMethod,
+          jellyfinOwnerId: settings.jellyfinOwnerId,
+          updatedAt: settings.updatedAt,
+        })
+        .from(settings)
+        .where(eq(settings.id, SETTINGS_ID))
+        .limit(1);
+      row = fallback[0] as SettingsRow;
+    }
 
-    const row = updated[0];
     if (!row) {
       return reply.internalServerError('Failed to update settings');
     }
 
-    // Handle case where columns might not exist yet (before migration)
-    let primaryAuthMethod: 'jellyfin' | 'local' = 'local';
-    if ('primaryAuthMethod' in row && row.primaryAuthMethod) {
-      primaryAuthMethod = row.primaryAuthMethod;
-    }
-    let usePlexGeoip = false;
-    if ('usePlexGeoip' in row && typeof row.usePlexGeoip === 'boolean') {
-      usePlexGeoip = row.usePlexGeoip;
-    }
-    let jellyfinOwnerId: string | null = null;
-    if ('jellyfinOwnerId' in row && typeof row.jellyfinOwnerId === 'string') {
-      jellyfinOwnerId = row.jellyfinOwnerId;
-    }
-
-    const result: Settings = {
-      allowGuestAccess: row.allowGuestAccess,
-      unitSystem: row.unitSystem,
-      discordWebhookUrl: row.discordWebhookUrl,
-      customWebhookUrl: row.customWebhookUrl,
-      webhookFormat: row.webhookFormat,
-      ntfyTopic: row.ntfyTopic,
-      ntfyAuthToken: row.ntfyAuthToken ? '********' : null, // Mask auth token
-      pushoverUserKey: row.pushoverUserKey,
-      pushoverApiToken: row.pushoverApiToken ? '********' : null, // Mask API token
-      pollerEnabled: row.pollerEnabled,
-      pollerIntervalMs: row.pollerIntervalMs,
-      usePlexGeoip,
-      tautulliUrl: row.tautulliUrl,
-      tautulliApiKey: row.tautulliApiKey ? '********' : null, // Mask API key
-      externalUrl: row.externalUrl,
-      basePath: row.basePath,
-      trustProxy: row.trustProxy,
-      mobileEnabled: row.mobileEnabled,
-      primaryAuthMethod,
-      jellyfinOwnerId,
-    };
-
-    return result;
+    const result = rowToSettingsResponse(row);
+    const hasPasswordAuth =
+      (await db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1))
+        .length > 0;
+    return { ...result, hasPasswordAuth };
   });
 
   /**

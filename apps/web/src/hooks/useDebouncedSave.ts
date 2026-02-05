@@ -32,6 +32,7 @@ export function useDebouncedSave<K extends keyof Settings>(
   const hasErrorRef = useRef(false);
   const userHasEditedRef = useRef(false);
   const isSavingRef = useRef(false);
+  const saveImmediatelyRef = useRef(false);
 
   const performSave = useCallback(
     (valueToSave: Settings[K] | undefined) => {
@@ -97,11 +98,20 @@ export function useDebouncedSave<K extends keyof Settings>(
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
 
     if (hasErrorRef.current) {
       hasErrorRef.current = false;
       setErrorMessage(null);
+    }
+
+    // Save immediately when requested (e.g. reorder) instead of debouncing
+    if (saveImmediatelyRef.current) {
+      saveImmediatelyRef.current = false;
+      setStatus('saving');
+      performSave(value);
+      return;
     }
 
     // Show saving indicator during debounce
@@ -128,10 +138,17 @@ export function useDebouncedSave<K extends keyof Settings>(
     };
   }, [value, delay, performSave]);
 
-  const setValueWithTracking = useCallback((newValue: Settings[K] | undefined) => {
-    userHasEditedRef.current = true;
-    setValue(newValue);
-  }, []);
+  type SetValueOptions = { saveImmediately?: boolean };
+  const setValueWithTracking = useCallback(
+    (newValue: Settings[K] | undefined, options?: SetValueOptions) => {
+      userHasEditedRef.current = true;
+      if (options?.saveImmediately) {
+        saveImmediatelyRef.current = true;
+      }
+      setValue(newValue);
+    },
+    []
+  );
 
   // Force immediate save (useful for programmatic changes like "Detect" button)
   const saveNow = useCallback(() => {

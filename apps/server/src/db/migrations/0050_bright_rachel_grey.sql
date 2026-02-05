@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "enabled_login_methods" text[];

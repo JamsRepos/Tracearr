@@ -675,6 +675,12 @@ export const updateSettingsSchema = z.object({
   // Authentication settings
   primaryAuthMethod: z.enum(['jellyfin', 'local']).optional(),
   jellyfinOwnerId: z.string().max(255).nullable().optional(),
+  enabledLoginMethods: z
+    .array(z.enum(['plex', 'jellyfin', 'local']))
+    .min(1)
+    .max(3)
+    .nullable()
+    .optional(),
 });
 
 // ============================================================================
